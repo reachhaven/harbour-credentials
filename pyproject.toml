@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harbour-credentials"
+version = "0.1.0"
+description = "JOSE signing and verification for Harbour Verifiable Credentials (Ed25519/EdDSA)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MPL-2.0" }
+authors = [
+    { name = "Reachhaven", email = "info@reachhaven.com" }
+]
+keywords = ["verifiable-credentials", "jose", "jws", "ed25519", "did", "json-ld"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+]
+
+dependencies = [
+    "joserfc>=1.0.0",
+    "cryptography>=44.0.0",
+    "base58>=2.1.0",
+    "sd-jwt>=0.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==25.12.0",
+    "flake8==7.1.2",
+    "isort==7.0.0",
+    "pre-commit==4.5.1",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/reachhaven/harbour-credentials"
+Repository = "https://github.com/reachhaven/harbour-credentials.git"
+Issues = "https://github.com/reachhaven/harbour-credentials/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["harbour*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | dist
+  | node_modules
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+skip = [".git", ".venv", "build", "dist", "node_modules"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/harbour"]
+omit = ["*/tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

@@ -1,0 +1,7 @@
+{
+  "_comment": "TEST ONLY — Ed25519 keypair for unit tests. DO NOT use in production.",
+  "kty": "OKP",
+  "crv": "Ed25519",
+  "x": "vEUXnYTP6l4pQHw-YhHa3YgZE4Fd2W9JbhLVkaUzIxw",
+  "d": "NN0saawqd5b7xgFtNpN0wqTM2f-wOorK94E5oJRjfDk"
+}

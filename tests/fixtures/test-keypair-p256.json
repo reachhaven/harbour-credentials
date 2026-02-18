@@ -1,0 +1,8 @@
+{
+  "_comment": "TEST ONLY -- P-256 keypair for unit tests. DO NOT use in production.",
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "6IV8gKy5sZtpBj0cmcLMvvYQElrmSMcZ1j3YyOb_KwQ",
+  "y": "bDwerXTq4pnsPuhO0RFYhmouOeF0p8FdSBcwzMpvGU0",
+  "d": "7yMRXKrj3u0wYr-WJoJSo2jU5MHZEKjtYL1JLnyndUE"
+}
