@@ -1,0 +1,229 @@
+id: https://w3id.org/reachhaven/harbour/credentials/v1
+name: harbour
+description: >
+  LinkML schema for Harbour credentials vocabulary.
+  Defines constraints on the W3C VC envelope (cred:), evidence types,
+  status, trust anchors, and revocation registries.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
+  core: https://w3id.org/reachhaven/harbour/core/v1/
+  gx: https://w3id.org/gaia-x/development#
+  xsd: http://www.w3.org/2001/XMLSchema#
+  cs: https://www.w3.org/ns/credentials/status#
+  cred: https://www.w3.org/2018/credentials#
+  schema: http://schema.org/
+
+default_prefix: harbour
+default_range: string
+
+imports:
+  - linkml:types
+  - ./core
+  - ../../service-characteristics/linkml/gaia-x
+
+slots:
+  # --- DID Slots ---
+  controller:
+    slot_uri: https://www.w3.org/ns/did#controller
+    range: string
+
+  serviceEndpoint:
+    slot_uri: https://www.w3.org/ns/did#serviceEndpoint
+    range: Any
+    required: true
+
+  # --- Revocation Registry (CRSet) Slots ---
+  statusPurpose:
+    slot_uri: cs:statusPurpose
+    range: string
+    required: false
+
+  registryEndpoint:
+    description: Service endpoint IRI for the CRSet.
+    slot_uri: harbour:registryEndpoint
+    range: uri
+    required: false
+
+  contractURN:
+    slot_uri: harbour:contractURN
+    range: uri
+    required: false
+
+  sourceRepository:
+    slot_uri: harbour:sourceRepository
+    range: uri
+    required: false
+
+  implementation:
+    slot_uri: harbour:implementation
+    range: uri
+    required: false
+
+  # --- Trust Anchor / Organization Slots ---
+  contactType:
+    slot_uri: schema:contactType
+    range: string
+
+  # --- Credential / Evidence Slots ---
+  evidence:
+    slot_uri: cred:evidence
+    range: Evidence
+    multivalued: true
+    required: false
+
+  verifiablePresentation:
+    description: >
+      A Verifiable Presentation embedded as evidence. In examples this is
+      shown as expanded JSON-LD for readability; on the wire it is encoded
+      as a VC-JOSE-COSE compact JWS string (typ: vp+ld+jwt).
+    slot_uri: harbour:verifiablePresentation
+    range: Any
+    required: false
+
+  vp:
+    description: >
+      DEPRECATED: Use verifiablePresentation instead.
+      A Verifiable Presentation embedded as evidence (nested JSON-LD object).
+    slot_uri: harbour:vp
+    range: Any
+    required: false
+
+  # --- W3C VC v2 Envelope Slots (harbour constrains these) ---
+  validFrom:
+    slot_uri: cred:validFrom
+    range: datetime
+    required: true
+
+  validUntil:
+    slot_uri: cred:validUntil
+    range: datetime
+    required: false
+
+classes:
+  Any:
+    class_uri: linkml:Any
+    description: "Generic class for any type of value."
+
+  # TermsAndConditions is defined upstream in Gaia-X service-offering.yaml
+  # with url (gx:url) and hash (gx:hash) slots — reused as-is.
+
+  # ==========================================
+  # 1. ROOT DOCUMENT
+  # ==========================================
+  DIDDocument:
+    class_uri: https://www.w3.org/ns/did#DIDDocument
+    slots:
+      - id
+      - controller
+    attributes:
+      service:
+        slot_uri: https://www.w3.org/ns/did#service
+        multivalued: true
+        inlined: true
+        range: ServiceUnion
+      verificationMethod:
+        slot_uri: https://www.w3.org/ns/did#verificationMethod
+        multivalued: true
+        range: VerificationMethod
+
+  # ==========================================
+  # 2. SERVICES
+  # ==========================================
+  ServiceUnion:
+    union_of:
+      - TrustAnchorService
+      - CRSetRevocationRegistryService
+
+  TrustAnchorService:
+    class_uri: harbour:TrustAnchorService
+    slots:
+      - id
+      - type
+      - serviceEndpoint
+    slot_usage:
+      serviceEndpoint:
+        range: OrganizationEndpoint
+        inlined: true
+
+  OrganizationEndpoint:
+    class_uri: schema:Organization
+    slots:
+      - name
+      - url
+      - description
+      - contactPoint
+    slot_usage:
+      contactPoint:
+        range: ContactPoint
+        inlined: true
+
+  ContactPoint:
+    class_uri: schema:ContactPoint
+    slots:
+      - contactType
+      - email
+
+  CRSetRevocationRegistryService:
+    class_uri: harbour:CRSetRevocationRegistryService
+    slots:
+      - id
+      - type
+      - serviceEndpoint
+    slot_usage:
+      serviceEndpoint:
+        range: CRSetServiceEndpoint
+        inlined: true
+
+  CRSetServiceEndpoint:
+    class_uri: harbour:CRSetServiceEndpoint
+    slots:
+      - registryEndpoint
+      - statusPurpose
+      - contractURN
+      - sourceRepository
+      - implementation
+
+  # ==========================================
+  # 3. CREDENTIALS & EVIDENCE
+  # ==========================================
+  Evidence:
+    abstract: true
+    class_uri: cred:Evidence
+    slots:
+      - type
+
+  EmailVerification:
+    is_a: Evidence
+    description: Evidence that an email address was verified (e.g. via Altme EmailPass).
+    class_uri: harbour:EmailVerification
+    slots:
+      - verifiablePresentation
+
+  IssuanceEvidence:
+    is_a: Evidence
+    description: Evidence referencing a previously issued credential.
+    class_uri: harbour:IssuanceEvidence
+    slots:
+      - verifiablePresentation
+
+  CRSetEntry:
+    class_uri: harbour:CRSetEntry
+    slots:
+      - id
+      - type
+      - statusPurpose
+
+  # ==========================================
+  # 4. HELPERS
+  # ==========================================
+  VerificationMethod:
+    class_uri: https://www.w3.org/ns/did#VerificationMethod
+    slots:
+      - id
+      - type
+      - controller
+    attributes:
+      blockchainAccountId:
+        range: string
