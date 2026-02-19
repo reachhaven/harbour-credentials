@@ -5,18 +5,16 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
-from harbour.jose.keys import p256_public_key_to_did_key
-from harbour.jose.signer import sign_vc_jose, sign_vp_jose
-from harbour.jose.verifier import verify_vc_jose, verify_vp_jose
+from harbour.signer import sign_vc_jose, sign_vp_jose
+from harbour.verifier import verify_vc_jose, verify_vp_jose
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-JS_DIR = Path(__file__).parent.parent / "js"
+TS_DIR = Path(__file__).parent.parent / "src" / "typescript" / "harbour"
 
 # Skip if node_modules not installed
 pytestmark = pytest.mark.skipif(
-    not (JS_DIR / "node_modules").exists(),
-    reason="JS dependencies not installed (run 'npm install' in js/)",
+    not (TS_DIR / "node_modules").exists(),
+    reason="TypeScript dependencies not installed (run 'npm install' in src/typescript/harbour/)",
 )
 
 
@@ -26,7 +24,7 @@ def _run_node(script: str) -> str:
         ["node", "--input-type=module", "-e", script],
         capture_output=True,
         text=True,
-        cwd=str(JS_DIR),
+        cwd=str(TS_DIR),
         timeout=30,
     )
     if result.returncode != 0:
@@ -40,8 +38,12 @@ class TestPythonSignNodeVerify:
     def test_vc_jose(self, sample_vc, p256_private_key, p256_public_key):
         token = sign_vc_jose(sample_vc, p256_private_key)
         fixture = json.loads((FIXTURES_DIR / "test-keypair-p256.json").read_text())
-        pub_jwk = {"kty": fixture["kty"], "crv": fixture["crv"],
-                    "x": fixture["x"], "y": fixture["y"]}
+        pub_jwk = {
+            "kty": fixture["kty"],
+            "crv": fixture["crv"],
+            "x": fixture["x"],
+            "y": fixture["y"],
+        }
 
         script = f"""
 import {{ compactVerify, importJWK }} from "jose";
@@ -57,12 +59,18 @@ console.log(JSON.stringify(payload));
 
     def test_vp_jose(self, sample_vp, p256_private_key):
         token = sign_vp_jose(
-            sample_vp, p256_private_key,
-            nonce="interop-nonce", audience="did:web:verifier.test"
+            sample_vp,
+            p256_private_key,
+            nonce="interop-nonce",
+            audience="did:web:verifier.test",
         )
         fixture = json.loads((FIXTURES_DIR / "test-keypair-p256.json").read_text())
-        pub_jwk = {"kty": fixture["kty"], "crv": fixture["crv"],
-                    "x": fixture["x"], "y": fixture["y"]}
+        pub_jwk = {
+            "kty": fixture["kty"],
+            "crv": fixture["crv"],
+            "x": fixture["x"],
+            "y": fixture["y"],
+        }
 
         script = f"""
 import {{ compactVerify, importJWK }} from "jose";
@@ -120,7 +128,8 @@ console.log(token);
 """
         token = _run_node(script)
         result = verify_vp_jose(
-            token, p256_public_key,
+            token,
+            p256_public_key,
             expected_nonce="cross-nonce",
             expected_audience="did:web:verifier.test",
         )

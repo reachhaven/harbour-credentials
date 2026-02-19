@@ -1,11 +1,9 @@
 """Tests for VC-JOSE-COSE verification."""
 
 import pytest
-
-from harbour.jose.keys import generate_ed25519_keypair, generate_p256_keypair
-from harbour.jose.signer import sign_vc_jose, sign_vp_jose
-from harbour.jose.verifier import VerificationError, verify_vc_jose, verify_vp_jose
-
+from harbour.keys import generate_p256_keypair
+from harbour.signer import sign_vc_jose, sign_vp_jose
+from harbour.verifier import VerificationError, verify_vc_jose, verify_vp_jose
 
 # ---------------------------------------------------------------------------
 # VC verification — P-256
@@ -77,9 +75,7 @@ def test_verify_vp_jose_valid(sample_vp, p256_private_key, p256_public_key):
     assert result["aud"] == "did:web:verifier.example.com"
 
 
-def test_verify_vp_jose_wrong_nonce_fails(
-    sample_vp, p256_private_key, p256_public_key
-):
+def test_verify_vp_jose_wrong_nonce_fails(sample_vp, p256_private_key, p256_public_key):
     token = sign_vp_jose(sample_vp, p256_private_key, nonce="real-nonce")
     with pytest.raises(VerificationError, match="Nonce mismatch"):
         verify_vp_jose(token, p256_public_key, expected_nonce="wrong-nonce")

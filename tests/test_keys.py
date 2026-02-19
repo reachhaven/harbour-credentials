@@ -11,8 +11,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-
-from harbour.jose.keys import (
+from harbour.keys import (
     generate_ed25519_keypair,
     generate_p256_keypair,
     keypair_to_jwk,
@@ -23,7 +22,6 @@ from harbour.jose.keys import (
     public_key_to_did_key,
     public_key_to_multibase,
 )
-
 
 # ---------------------------------------------------------------------------
 # Ed25519

@@ -1,0 +1,87 @@
+site_name: Harbour Credentials
+site_description: Cryptographic library for signing and verifying verifiable credentials
+site_url: https://ascs-ev.github.io/harbour-credentials/
+repo_url: https://github.com/ASCS-eV/harbour-credentials
+repo_name: ASCS-eV/harbour-credentials
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep-purple
+      accent: deep-purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep-purple
+      accent: deep-purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src/python]
+          options:
+            show_source: true
+            show_root_heading: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+  - User Guide:
+      - Key Management: guide/keys.md
+      - Signing Credentials: guide/signing.md
+      - Verifying Credentials: guide/verification.md
+      - SD-JWT Selective Disclosure: guide/sd-jwt.md
+      - Key Binding (KB-JWT): guide/kb-jwt.md
+      - X.509 Certificates: guide/x509.md
+  - CLI Reference:
+      - Overview: cli/index.md
+      - harbour.keys: cli/keys.md
+      - harbour.signer: cli/signer.md
+      - harbour.verifier: cli/verifier.md
+      - harbour.sd_jwt: cli/sd-jwt.md
+      - harbour.kb_jwt: cli/kb-jwt.md
+      - harbour.x509: cli/x509.md
+  - API Reference:
+      - Python: api/python/index.md
+      - TypeScript: api/typescript/index.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Architecture: development/architecture.md

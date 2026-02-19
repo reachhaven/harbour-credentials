@@ -38,6 +38,12 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=6.0",
 ]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "pymdown-extensions>=10.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/reachhaven/harbour-credentials"
@@ -45,8 +51,8 @@ Repository = "https://github.com/reachhaven/harbour-credentials.git"
 Issues = "https://github.com/reachhaven/harbour-credentials/issues"
 
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["harbour*"]
+where = ["src/python"]
+include = ["harbour*", "credentials*"]
 
 [tool.black]
 line-length = 88
@@ -74,7 +80,7 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["src/harbour"]
+source = ["src/python/harbour", "src/python/credentials"]
 omit = ["*/tests/*", "*/__init__.py"]
 
 [tool.coverage.report]

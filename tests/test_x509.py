@@ -4,9 +4,8 @@ import datetime
 
 import pytest
 from cryptography import x509
-
-from harbour.jose.keys import generate_ed25519_keypair, generate_p256_keypair
-from harbour.jose.x509 import (
+from harbour.keys import generate_ed25519_keypair, generate_p256_keypair
+from harbour.x509 import (
     cert_to_x5c,
     extract_public_key,
     generate_self_signed_cert,
@@ -19,16 +18,18 @@ class TestSelfSignedCert:
     def test_generate_p256(self):
         priv, pub = generate_p256_keypair()
         cert = generate_self_signed_cert(priv, subject="Test CA")
-        assert cert.subject.get_attributes_for_oid(
-            x509.oid.NameOID.COMMON_NAME
-        )[0].value == "Test CA"
+        assert (
+            cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+            == "Test CA"
+        )
 
     def test_generate_ed25519(self):
         priv, pub = generate_ed25519_keypair()
         cert = generate_self_signed_cert(priv, subject="Ed25519 CA")
-        assert cert.subject.get_attributes_for_oid(
-            x509.oid.NameOID.COMMON_NAME
-        )[0].value == "Ed25519 CA"
+        assert (
+            cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+            == "Ed25519 CA"
+        )
 
     def test_validity_period(self):
         priv, _ = generate_p256_keypair()
@@ -97,8 +98,8 @@ class TestSignWithX5c:
     """Integration: sign a VC-JOSE-COSE with x5c header, verify using cert."""
 
     def test_sign_verify_via_x5c(self):
-        from harbour.jose.signer import sign_vc_jose
-        from harbour.jose.verifier import verify_vc_jose
+        from harbour.signer import sign_vc_jose
+        from harbour.verifier import verify_vc_jose
 
         priv, _ = generate_p256_keypair()
         cert = generate_self_signed_cert(priv, subject="Issuer")

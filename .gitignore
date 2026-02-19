@@ -4,3 +4,7 @@ __pycache__/
 .coverage
 artifacts/*/
 dist/
+.venv/
+
+# Agent workspace (untracked)
+/.playground/
