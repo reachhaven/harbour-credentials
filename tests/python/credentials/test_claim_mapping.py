@@ -3,131 +3,185 @@
 import json
 from pathlib import Path
 
-import pytest
 from credentials.claim_mapping import (
     MAPPINGS,
+    create_mapping,
     get_mapping_for_vc,
+    register_mapping,
     sd_jwt_claims_to_vc,
     vc_to_sd_jwt_claims,
 )
 
-# Find examples dir: go up to harbour-credentials, then to parent credentials repo
-_REPO_ROOT = Path(__file__).resolve().parent
-while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
-    _REPO_ROOT = _REPO_ROOT.parent
-EXAMPLES_DIR = _REPO_ROOT.parent.parent / "examples"
+# Use shared fixtures in tests/fixtures/credentials/
+FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "credentials"
 
 
-def _load_example(name: str) -> dict:
-    with open(EXAMPLES_DIR / name) as f:
+def _load_fixture(name: str) -> dict:
+    """Load a test fixture from the fixtures directory."""
+    with open(FIXTURES_DIR / name) as f:
         return json.load(f)
 
 
-class TestParticipantMapping:
-    @pytest.mark.skip(reason="Example data format changed - legalName field missing")
+class TestHarbourLegalPersonMapping:
     def test_vc_to_claims(self):
-        vc = _load_example("simpulseid-participant-credential.json")
-        mapping = MAPPINGS["simpulseid:ParticipantCredential"]
+        vc = _load_fixture("harbour-legal-person-credential.json")
+        mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
-        assert claims["iss"] == "did:web:did.ascs.digital:participants:ascs"
-        assert claims["sub"] == "did:web:did.ascs.digital:participants:bmw"
-        assert claims["legalName"] == "Bayerische Motoren Werke Aktiengesellschaft"
-        assert claims["legalForm"] == "AG"
-        assert claims["email"] == "imprint@bmw.com"
-        assert "legalAddress" in claims
-        assert "email" in disclosable
-        assert "legalAddress" in disclosable
+        assert claims["iss"] == "did:web:trust-anchor.example.com"
+        assert claims["sub"] == "did:web:participant.example.com"
+        assert claims["legalName"] == "Example Corporation GmbH"
+        assert "registrationNumber" in claims
+        assert "registrationNumber" in disclosable
 
-    @pytest.mark.skip(reason="Example data format changed - legalName field missing")
+    def test_has_credential_status(self):
+        vc = _load_fixture("harbour-legal-person-credential.json")
+        assert "credentialStatus" in vc
+        status = vc["credentialStatus"][0]
+        assert status["type"] == "harbour:CRSetEntry"
+        assert status["statusPurpose"] == "revocation"
+
+    def test_subject_is_harbour_legal_person(self):
+        """Verify the subject uses harbour:LegalPerson (wraps gx:LegalPerson)."""
+        vc = _load_fixture("harbour-legal-person-credential.json")
+        types = vc["credentialSubject"]["type"]
+        assert "harbour:LegalPerson" in types
+        assert "gx:LegalPerson" in types
+
     def test_roundtrip(self):
-        vc = _load_example("simpulseid-participant-credential.json")
-        mapping = MAPPINGS["simpulseid:ParticipantCredential"]
+        vc = _load_fixture("harbour-legal-person-credential.json")
+        mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, _ = vc_to_sd_jwt_claims(vc, mapping)
         reconstructed = sd_jwt_claims_to_vc(
-            claims, mapping, "simpulseid:ParticipantCredential"
+            claims, mapping, "harbour:LegalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["legalName"]
-            == vc["credentialSubject"]["legalName"]
-        )
-        assert (
-            reconstructed["credentialSubject"]["legalForm"]
-            == vc["credentialSubject"]["legalForm"]
+            reconstructed["credentialSubject"]["gx:legalName"]
+            == vc["credentialSubject"]["gx:legalName"]
         )
 
 
-class TestAdministratorMapping:
+class TestHarbourNaturalPersonMapping:
     def test_vc_to_claims(self):
-        vc = _load_example("simpulseid-administrator-credential.json")
-        mapping = MAPPINGS["simpulseid:AdministratorCredential"]
+        vc = _load_fixture("harbour-natural-person-credential.json")
+        mapping = MAPPINGS["harbour:NaturalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
-        assert claims["givenName"] == "Andreas"
-        assert claims["familyName"] == "Admin"
-        assert claims["email"] == "andreas.admin@bmw.com"
+        assert claims["givenName"] == "Alice"
+        assert claims["familyName"] == "Smith"
+        assert claims["email"] == "alice.smith@example.com"
         assert "givenName" in disclosable
         assert "email" in disclosable
 
+    def test_has_credential_status(self):
+        vc = _load_fixture("harbour-natural-person-credential.json")
+        assert "credentialStatus" in vc
+        status = vc["credentialStatus"][0]
+        assert status["type"] == "harbour:CRSetEntry"
+
+    def test_has_evidence(self):
+        vc = _load_fixture("harbour-natural-person-credential.json")
+        assert "evidence" in vc
+        evidence = vc["evidence"][0]
+        assert evidence["type"] == "harbour:EmailVerification"
+
+    def test_subject_is_harbour_natural_person(self):
+        """Verify the subject uses harbour:NaturalPerson (extends gx:Participant)."""
+        vc = _load_fixture("harbour-natural-person-credential.json")
+        types = vc["credentialSubject"]["type"]
+        assert "harbour:NaturalPerson" in types
+        assert "gx:Participant" in types
+
     def test_roundtrip(self):
-        vc = _load_example("simpulseid-administrator-credential.json")
-        mapping = MAPPINGS["simpulseid:AdministratorCredential"]
+        vc = _load_fixture("harbour-natural-person-credential.json")
+        mapping = MAPPINGS["harbour:NaturalPersonCredential"]
         claims, _ = vc_to_sd_jwt_claims(vc, mapping)
         reconstructed = sd_jwt_claims_to_vc(
-            claims, mapping, "simpulseid:AdministratorCredential"
+            claims, mapping, "harbour:NaturalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["givenName"]
-            == vc["credentialSubject"]["givenName"]
+            reconstructed["credentialSubject"]["schema:givenName"]
+            == vc["credentialSubject"]["schema:givenName"]
         )
 
 
-class TestUserMapping:
+class TestHarbourServiceOfferingMapping:
     def test_vc_to_claims(self):
-        vc = _load_example("simpulseid-user-credential.json")
-        mapping = MAPPINGS["simpulseid:UserCredential"]
+        vc = _load_fixture("harbour-service-offering-credential.json")
+        mapping = MAPPINGS["harbour:ServiceOfferingCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
-        assert "memberOf" in claims
+        assert claims["sub"] == "did:web:provider.example.com:services:data-api"
+        assert claims["name"] == "Example Data API"
+        assert "description" in disclosable
 
-    def test_roundtrip(self):
-        vc = _load_example("simpulseid-user-credential.json")
-        mapping = MAPPINGS["simpulseid:UserCredential"]
-        claims, _ = vc_to_sd_jwt_claims(vc, mapping)
-        reconstructed = sd_jwt_claims_to_vc(
-            claims, mapping, "simpulseid:UserCredential"
-        )
-        assert "UserCredential" in str(reconstructed["type"])
+    def test_has_credential_status(self):
+        vc = _load_fixture("harbour-service-offering-credential.json")
+        assert "credentialStatus" in vc
+        status = vc["credentialStatus"][0]
+        assert status["type"] == "harbour:CRSetEntry"
 
-
-class TestBaseMembershipMapping:
-    def test_vc_to_claims(self):
-        vc = _load_example("simpulseid-ascs-base-membership-credential.json")
-        mapping = MAPPINGS["simpulseid:AscsBaseMembershipCredential"]
-        claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
-
-        assert claims["programName"] == "ASCS e.V. Base Membership"
-        assert claims["memberSince"] == "2023-01-01"
-        assert "memberSince" in disclosable
-
-
-class TestEnvitedMembershipMapping:
-    def test_vc_to_claims(self):
-        vc = _load_example("simpulseid-ascs-envited-membership-credential.json")
-        mapping = MAPPINGS["simpulseid:AscsEnvitedMembershipCredential"]
-        claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
-
-        assert "baseMembershipCredential" in claims
+    def test_subject_is_harbour_service_offering(self):
+        """Verify the subject uses harbour:ServiceOffering (wraps gx:ServiceOffering)."""
+        vc = _load_fixture("harbour-service-offering-credential.json")
+        types = vc["credentialSubject"]["type"]
+        assert "harbour:ServiceOffering" in types
+        assert "gx:ServiceOffering" in types
+        status = vc["credentialStatus"][0]
+        assert status["type"] == "harbour:CRSetEntry"
 
 
 class TestMappingDiscovery:
-    def test_get_mapping_for_participant(self):
-        vc = _load_example("simpulseid-participant-credential.json")
+    def test_get_mapping_for_harbour_credential(self):
+        vc = _load_fixture("harbour-legal-person-credential.json")
         mapping = get_mapping_for_vc(vc)
         assert mapping is not None
-        assert mapping["vct"].endswith("ParticipantCredential")
+        assert "LegalPersonCredential" in mapping["vct"]
 
     def test_get_mapping_for_unknown(self):
         vc = {"type": ["VerifiableCredential", "UnknownType"]}
         mapping = get_mapping_for_vc(vc)
         assert mapping is None
+
+
+class TestCustomMapping:
+    def test_register_and_use_custom_mapping(self):
+        # Create a custom mapping
+        custom = create_mapping(
+            vct="https://example.com/credentials/CustomCredential",
+            claims={
+                "credentialSubject.customField": "customField",
+            },
+            selectively_disclosed=["customField"],
+        )
+
+        # Register it
+        register_mapping("harbour:CustomCredential", custom)
+
+        # Use it
+        vc = {
+            "type": ["VerifiableCredential", "harbour:CustomCredential"],
+            "issuer": "did:web:issuer.example.com",
+            "validFrom": "2024-01-01T00:00:00Z",
+            "credentialSubject": {
+                "id": "did:web:subject.example.com",
+                "customField": "custom-value",
+            },
+            "credentialStatus": [
+                {
+                    "id": "did:web:issuer.example.com:revocation#abc123",
+                    "type": "harbour:CRSetEntry",
+                    "statusPurpose": "revocation",
+                }
+            ],
+        }
+
+        mapping = get_mapping_for_vc(vc)
+        assert mapping is not None
+
+        claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
+        assert claims["customField"] == "custom-value"
+        assert "customField" in disclosable
+
+        # Clean up
+        del MAPPINGS["harbour:CustomCredential"]

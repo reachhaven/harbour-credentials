@@ -1,156 +1,122 @@
-"""Claim mappings from W3C VCDM JSON-LD to SD-JWT-VC flat claims.
+"""Generic claim mappings from W3C VCDM JSON-LD to SD-JWT-VC flat claims.
 
-Defines how each SimpulseID credential type maps between nested JSON-LD
-(credentialSubject) and flat SD-JWT-VC claims, plus which claims are
-selectively disclosable.
+Provides a framework for mapping between nested JSON-LD (credentialSubject)
+and flat SD-JWT-VC claims, plus which claims are selectively disclosable.
+
+This module provides the core mapping functions. Domain-specific mappings
+(e.g., Gaia-X, organizational credentials) can register their own mappings.
 
 CLI Usage:
     python -m credentials.claim_mapping --help
-    python -m credentials.claim_mapping to-sd-jwt --input vc.json --output claims.json
-    python -m credentials.claim_mapping from-sd-jwt --input claims.json --type ParticipantCredential
+    python -m credentials.claim_mapping to-sd-jwt --input vc.json --mapping mapping.json
+    python -m credentials.claim_mapping from-sd-jwt --input claims.json --mapping mapping.json
 """
 
 import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
-VCT_BASE = "https://w3id.org/ascs-ev/simpulse-id/credentials/v1"
+# ---------------------------------------------------------------------------
+# Harbour Credential Mappings
+# ---------------------------------------------------------------------------
 
-PARTICIPANT_MAPPING = {
-    "vct": f"{VCT_BASE}/ParticipantCredential",
+# Harbour namespace
+HARBOUR_NS = "https://w3id.org/reachhaven/harbour/credentials/v1/"
+
+# Gaia-X namespace
+GAIAX_NS = "https://w3id.org/gaia-x/development#"
+
+HARBOUR_LEGAL_PERSON_MAPPING = {
+    "vct": f"{HARBOUR_NS}LegalPersonCredential",
     "claims": {
-        "credentialSubject.legalName": "legalName",
-        "credentialSubject.legalForm": "legalForm",
-        "credentialSubject.duns": "duns",
-        "credentialSubject.email": "email",
-        "credentialSubject.url": "url",
-        "credentialSubject.legalAddress": "legalAddress",
-        "credentialSubject.headquartersAddress": "headquartersAddress",
-        "credentialSubject.registrationNumber": "registrationNumber",
-        "credentialSubject.termsAndConditions": "termsAndConditions",
+        "credentialSubject.gx:legalName": "legalName",
+        "credentialSubject.gx:registrationNumber": "registrationNumber",
+        "credentialSubject.gx:headquartersAddress": "headquartersAddress",
+        "credentialSubject.gx:legalAddress": "legalAddress",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "legalName", "legalForm"],
+    "always_disclosed": ["iss", "vct", "iat", "exp", "legalName"],
     "selectively_disclosed": [
-        "legalAddress",
-        "headquartersAddress",
         "registrationNumber",
-        "email",
-        "url",
-        "duns",
+        "headquartersAddress",
+        "legalAddress",
     ],
 }
 
-ADMINISTRATOR_MAPPING = {
-    "vct": f"{VCT_BASE}/AdministratorCredential",
+HARBOUR_NATURAL_PERSON_MAPPING = {
+    "vct": f"{HARBOUR_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.givenName": "givenName",
-        "credentialSubject.familyName": "familyName",
-        "credentialSubject.email": "email",
+        "credentialSubject.schema:givenName": "givenName",
+        "credentialSubject.schema:familyName": "familyName",
+        "credentialSubject.schema:email": "email",
         "credentialSubject.memberOf": "memberOf",
-        "credentialSubject.address": "address",
-        "credentialSubject.termsAndConditions": "termsAndConditions",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "memberOf"],
-    "selectively_disclosed": [
-        "givenName",
-        "familyName",
-        "email",
-        "address",
-    ],
+    "always_disclosed": ["iss", "vct", "iat", "exp"],
+    "selectively_disclosed": ["givenName", "familyName", "email", "memberOf"],
 }
 
-USER_MAPPING = {
-    "vct": f"{VCT_BASE}/UserCredential",
+HARBOUR_SERVICE_OFFERING_MAPPING = {
+    "vct": f"{HARBOUR_NS}ServiceOfferingCredential",
     "claims": {
-        "credentialSubject.givenName": "givenName",
-        "credentialSubject.familyName": "familyName",
-        "credentialSubject.email": "email",
-        "credentialSubject.memberOf": "memberOf",
-        "credentialSubject.termsAndConditions": "termsAndConditions",
+        "credentialSubject.gx:providedBy": "providedBy",
+        "credentialSubject.gx:name": "name",
+        "credentialSubject.schema:description": "description",
+        "credentialSubject.gx:serviceOfferingTermsAndConditions": "termsAndConditions",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "memberOf"],
-    "selectively_disclosed": [
-        "givenName",
-        "familyName",
-        "email",
-    ],
-}
-
-BASE_MEMBERSHIP_MAPPING = {
-    "vct": f"{VCT_BASE}/AscsBaseMembershipCredential",
-    "claims": {
-        "credentialSubject.memberOf": "memberOf",
-        "credentialSubject.programName": "programName",
-        "credentialSubject.hostingOrganization": "hostingOrganization",
-        "credentialSubject.memberSince": "memberSince",
-        "credentialSubject.termsAndConditions": "termsAndConditions",
-    },
-    "always_disclosed": [
-        "iss",
-        "vct",
-        "iat",
-        "exp",
-        "memberOf",
-        "programName",
-    ],
-    "selectively_disclosed": ["memberSince", "hostingOrganization"],
-}
-
-ENVITED_MEMBERSHIP_MAPPING = {
-    "vct": f"{VCT_BASE}/AscsEnvitedMembershipCredential",
-    "claims": {
-        "credentialSubject.memberOf": "memberOf",
-        "credentialSubject.programName": "programName",
-        "credentialSubject.hostingOrganization": "hostingOrganization",
-        "credentialSubject.memberSince": "memberSince",
-        "credentialSubject.baseMembershipCredential": "baseMembershipCredential",
-        "credentialSubject.termsAndConditions": "termsAndConditions",
-    },
-    "always_disclosed": [
-        "iss",
-        "vct",
-        "iat",
-        "exp",
-        "memberOf",
-        "programName",
-        "baseMembershipCredential",
-    ],
-    "selectively_disclosed": ["memberSince", "hostingOrganization"],
+    "always_disclosed": ["iss", "vct", "iat", "exp", "providedBy", "name"],
+    "selectively_disclosed": ["description", "termsAndConditions"],
 }
 
 # Registry: VC type string → mapping dict
-MAPPINGS = {
-    "simpulseid:ParticipantCredential": PARTICIPANT_MAPPING,
-    "simpulseid:AdministratorCredential": ADMINISTRATOR_MAPPING,
-    "simpulseid:UserCredential": USER_MAPPING,
-    "simpulseid:AscsBaseMembershipCredential": BASE_MEMBERSHIP_MAPPING,
-    "simpulseid:AscsEnvitedMembershipCredential": ENVITED_MEMBERSHIP_MAPPING,
+# Additional mappings can be registered at runtime
+MAPPINGS: dict[str, dict] = {
+    "harbour:LegalPersonCredential": HARBOUR_LEGAL_PERSON_MAPPING,
+    "harbour:NaturalPersonCredential": HARBOUR_NATURAL_PERSON_MAPPING,
+    "harbour:ServiceOfferingCredential": HARBOUR_SERVICE_OFFERING_MAPPING,
 }
 
 
-def vc_to_sd_jwt_claims(vc: dict, mapping: dict) -> tuple[dict, list[str]]:
-    """Convert a W3C VCDM JSON-LD VC to flat SD-JWT-VC claims.
+def register_mapping(vc_type: str, mapping: dict) -> None:
+    """Register a custom credential type mapping.
 
     Args:
-        vc: The Verifiable Credential JSON-LD dict.
-        mapping: One of the *_MAPPING dicts above.
+        vc_type: The credential type name (e.g., "MyCustomCredential").
+        mapping: Mapping dict with keys: vct, claims, always_disclosed, selectively_disclosed.
+    """
+    MAPPINGS[vc_type] = mapping
+
+
+def vc_to_sd_jwt_claims(vc: dict, mapping: dict) -> tuple[dict, list[str]]:
+    """Convert a JSON-LD object to flat SD-JWT-VC claims.
+
+    Supports both:
+    - W3C VCDM format (with credentialSubject)
+    - Gaia-X flat format (with @id, @type at top level)
+
+    Args:
+        vc: The JSON-LD dict (VC or Gaia-X object).
+        mapping: Mapping dict with keys: vct, claims, always_disclosed, selectively_disclosed.
 
     Returns:
         Tuple of (flat_claims_dict, disclosable_claim_names).
     """
-    claims = {}
+    claims: dict[str, Any] = {}
 
-    # Map issuer
+    # Map issuer (W3C VCDM style)
     issuer = vc.get("issuer")
     if isinstance(issuer, dict):
         claims["iss"] = issuer.get("id", "")
     elif isinstance(issuer, str):
         claims["iss"] = issuer
 
-    # Map subject ID
-    subject = vc.get("credentialSubject", {})
-    claims["sub"] = subject.get("id", "")
+    # Map subject ID - support both W3C VCDM and Gaia-X flat format
+    if "credentialSubject" in vc:
+        subject = vc.get("credentialSubject", {})
+        claims["sub"] = subject.get("id", "")
+    elif "@id" in vc:
+        # Gaia-X flat format: @id is the subject
+        claims["sub"] = vc["@id"]
 
     # Map validity
     if "validFrom" in vc:
@@ -176,19 +142,14 @@ def sd_jwt_claims_to_vc(claims: dict, mapping: dict, vc_type: str) -> dict:
 
     Args:
         claims: Flat claims dict.
-        mapping: One of the *_MAPPING dicts above.
-        vc_type: The VC type (e.g., "simpulseid:ParticipantCredential").
+        mapping: Mapping dict.
+        vc_type: The VC type (e.g., "LegalParticipantCredential").
 
     Returns:
         W3C VCDM JSON-LD dict.
     """
     vc: dict = {
-        "@context": [
-            "https://www.w3.org/ns/credentials/v2",
-            "https://w3id.org/ascs-ev/simpulse-id/credentials/v1/",
-            "https://w3id.org/reachhaven/harbour/credentials/v1/",
-            "https://w3id.org/gaia-x/development/",
-        ],
+        "@context": ["https://www.w3.org/ns/credentials/v2"],
         "type": ["VerifiableCredential", vc_type],
     }
 
@@ -218,12 +179,60 @@ def sd_jwt_claims_to_vc(claims: dict, mapping: dict, vc_type: str) -> dict:
 
 
 def get_mapping_for_vc(vc: dict) -> dict | None:
-    """Find the matching mapping for a VC based on its type."""
+    """Find the matching mapping for a VC based on its type.
+
+    Supports both:
+    - W3C VCDM: "type" array (e.g., ["VerifiableCredential", "PersonCredential"])
+    - Gaia-X: "@type" string (e.g., "gx:LegalPerson")
+
+    Args:
+        vc: The JSON-LD dict.
+
+    Returns:
+        Matching mapping dict or None if not found.
+    """
+    # Get types from both W3C VCDM and JSON-LD formats
     vc_types = vc.get("type", [])
+    if isinstance(vc_types, str):
+        vc_types = [vc_types]
+
+    # Also check @type for Gaia-X format
+    at_type = vc.get("@type")
+    if at_type:
+        if isinstance(at_type, str):
+            vc_types = vc_types + [at_type]
+        elif isinstance(at_type, list):
+            vc_types = vc_types + at_type
+
     for vc_type, mapping in MAPPINGS.items():
         if vc_type in vc_types:
             return mapping
     return None
+
+
+def create_mapping(
+    vct: str,
+    claims: dict[str, str],
+    always_disclosed: list[str] | None = None,
+    selectively_disclosed: list[str] | None = None,
+) -> dict:
+    """Create a new mapping configuration.
+
+    Args:
+        vct: The SD-JWT-VC type URI.
+        claims: Dict mapping JSON-LD paths to flat claim names.
+        always_disclosed: Claim names that are always disclosed.
+        selectively_disclosed: Claim names that can be selectively disclosed.
+
+    Returns:
+        Mapping dict ready for use with vc_to_sd_jwt_claims/sd_jwt_claims_to_vc.
+    """
+    return {
+        "vct": vct,
+        "claims": claims,
+        "always_disclosed": always_disclosed or ["iss", "vct", "iat", "exp"],
+        "selectively_disclosed": selectively_disclosed or [],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -231,10 +240,10 @@ def get_mapping_for_vc(vc: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def _get_nested(obj: dict, path: str):
+def _get_nested(obj: dict, path: str) -> Any:
     """Get a nested value by dot-separated path."""
     parts = path.split(".")
-    current = obj
+    current: Any = obj
     for part in parts:
         if isinstance(current, dict):
             current = current.get(part)
@@ -243,7 +252,7 @@ def _get_nested(obj: dict, path: str):
     return current
 
 
-def _set_nested(obj: dict, path: str, value):
+def _set_nested(obj: dict, path: str, value: Any) -> None:
     """Set a nested value by dot-separated path."""
     parts = path.split(".")
     current = obj
@@ -259,7 +268,7 @@ def _set_nested(obj: dict, path: str, value):
 # ---------------------------------------------------------------------------
 
 
-def main():
+def main() -> None:
     """CLI entry point for claim mapping."""
     parser = argparse.ArgumentParser(
         prog="credentials.claim_mapping",
@@ -268,7 +277,7 @@ def main():
         epilog="""
 Examples:
   python -m credentials.claim_mapping to-sd-jwt --input vc.json
-  python -m credentials.claim_mapping from-sd-jwt --input claims.json --type ParticipantCredential
+  python -m credentials.claim_mapping from-sd-jwt --input claims.json --type PersonCredential
   python -m credentials.claim_mapping list-types
         """,
     )
@@ -294,7 +303,7 @@ Examples:
         "--input", "-i", required=True, help="Input claims JSON file"
     )
     from_parser.add_argument(
-        "--type", "-t", required=True, help="VC type (e.g., ParticipantCredential)"
+        "--type", "-t", required=True, help="VC type (e.g., PersonCredential)"
     )
     from_parser.add_argument("--output", "-o", help="Output file (default: stdout)")
 
@@ -335,10 +344,10 @@ Examples:
     elif args.command == "from-sd-jwt":
         data = json.loads(Path(args.input).read_text())
         claims = data.get("claims", data)  # Support both wrapped and raw claims
-        vc_type = f"simpulseid:{args.type}"
+        vc_type = args.type
         mapping = MAPPINGS.get(vc_type)
         if mapping is None:
-            print(f"Unknown VC type: {args.type}", file=sys.stderr)
+            print(f"Unknown VC type: {vc_type}", file=sys.stderr)
             print(f"Available: {', '.join(MAPPINGS.keys())}", file=sys.stderr)
             sys.exit(1)
 

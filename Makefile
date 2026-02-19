@@ -142,17 +142,17 @@ test-cov:
 # TypeScript targets
 build-ts:
 	@echo "🔧 Building TypeScript..."
-	@cd $(TS_DIR) && npm install && npm run build
+	@cd $(TS_DIR) && corepack enable && yarn install && yarn build
 	@echo "✅ TypeScript build complete"
 
 test-ts:
 	@echo "🧪 Running TypeScript tests..."
-	@cd $(TS_DIR) && npm test
+	@cd $(TS_DIR) && corepack enable && yarn test
 	@echo "✅ TypeScript tests complete"
 
 lint-ts:
 	@echo "🔍 Linting TypeScript..."
-	@cd $(TS_DIR) && npm run lint
+	@cd $(TS_DIR) && corepack enable && yarn lint
 	@echo "✅ TypeScript lint complete"
 
 # Compound targets

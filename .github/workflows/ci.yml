@@ -39,13 +39,16 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
         working-directory: src/typescript/harbour
-        run: npm ci
+        run: yarn install --immutable
 
       - name: Type check
         working-directory: src/typescript/harbour
-        run: npx tsc --noEmit
+        run: yarn lint
 
   test-python:
     name: Test (Python)
@@ -74,13 +77,16 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
         working-directory: src/typescript/harbour
-        run: npm ci
+        run: yarn install --immutable
 
       - name: Run tests
         working-directory: src/typescript/harbour
-        run: npx vitest run
+        run: yarn test
 
   test-interop:
     name: Cross-Runtime Interop
@@ -98,12 +104,15 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install Python dependencies
         run: python3 -m pip install -e ".[dev]"
 
       - name: Install TypeScript dependencies
         working-directory: src/typescript/harbour
-        run: npm ci
+        run: yarn install --immutable
 
       - name: Run interop tests
         run: PYTHONPATH=src/python:$PYTHONPATH pytest tests/test_interop.py -v --tb=short
