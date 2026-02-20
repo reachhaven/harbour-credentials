@@ -1,12 +1,9 @@
 """Tests for SD-JWT-VC issuance and verification."""
 
 import pytest
-
-from harbour.jose.keys import generate_p256_keypair, p256_public_key_to_jwk
-from harbour.jose.sd_jwt import issue_sd_jwt_vc
-from harbour.jose.sd_jwt_verifier import verify_sd_jwt_vc
-from harbour.jose.verifier import VerificationError
-
+from harbour.keys import generate_p256_keypair, p256_public_key_to_jwk
+from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
+from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
     "iss": "did:web:did.ascs.digital:participants:ascs",
@@ -23,9 +20,7 @@ VCT = "https://w3id.org/ascs-ev/simpulse-id/credentials/v1/ParticipantCredential
 
 class TestSDJWTVCIssuance:
     def test_issue_produces_sd_jwt_format(self, p256_private_key):
-        sd_jwt = issue_sd_jwt_vc(
-            SAMPLE_CLAIMS, p256_private_key, vct=VCT
-        )
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         parts = sd_jwt.split("~")
         # At minimum: issuer-jwt and trailing empty
         assert len(parts) >= 2
@@ -47,9 +42,7 @@ class TestSDJWTVCIssuance:
         assert all(len(p) > 0 for p in parts[1:3])
 
     def test_issue_includes_vct_in_payload(self, p256_private_key, p256_public_key):
-        sd_jwt = issue_sd_jwt_vc(
-            SAMPLE_CLAIMS, p256_private_key, vct=VCT
-        )
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
         assert result["vct"] == VCT
 
@@ -68,16 +61,12 @@ class TestSDJWTVCIssuance:
 
 class TestSDJWTVCVerification:
     def test_verify_all_disclosed(self, p256_private_key, p256_public_key):
-        sd_jwt = issue_sd_jwt_vc(
-            SAMPLE_CLAIMS, p256_private_key, vct=VCT
-        )
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
         assert result["legalName"] == "Bayerische Motoren Werke AG"
         assert result["iss"] == "did:web:did.ascs.digital:participants:ascs"
 
-    def test_verify_with_selective_disclosure(
-        self, p256_private_key, p256_public_key
-    ):
+    def test_verify_with_selective_disclosure(self, p256_private_key, p256_public_key):
         sd_jwt = issue_sd_jwt_vc(
             SAMPLE_CLAIMS,
             p256_private_key,
@@ -110,28 +99,20 @@ class TestSDJWTVCVerification:
         assert len(disclosed_keys & {"email", "countryCode"}) == 1
 
     def test_verify_wrong_key_fails(self, p256_private_key):
-        sd_jwt = issue_sd_jwt_vc(
-            SAMPLE_CLAIMS, p256_private_key, vct=VCT
-        )
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         _, wrong_public = generate_p256_keypair()
         with pytest.raises(VerificationError):
             verify_sd_jwt_vc(sd_jwt, wrong_public)
 
-    def test_verify_expected_vct_mismatch(
-        self, p256_private_key, p256_public_key
-    ):
-        sd_jwt = issue_sd_jwt_vc(
-            SAMPLE_CLAIMS, p256_private_key, vct=VCT
-        )
+    def test_verify_expected_vct_mismatch(self, p256_private_key, p256_public_key):
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         with pytest.raises(VerificationError, match="VCT mismatch"):
             verify_sd_jwt_vc(
                 sd_jwt, p256_public_key, expected_vct="https://wrong.example.com/vc"
             )
 
     def test_tamper_issuer_jwt(self, p256_private_key, p256_public_key):
-        sd_jwt = issue_sd_jwt_vc(
-            SAMPLE_CLAIMS, p256_private_key, vct=VCT
-        )
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         parts = sd_jwt.split("~")
         jwt_parts = parts[0].split(".")
         # Corrupt signature

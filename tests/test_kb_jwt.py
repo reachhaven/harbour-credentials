@@ -1,11 +1,10 @@
 """Tests for KB-JWT creation and verification with transaction_data support."""
 
 import pytest
-
-from harbour.jose.keys import generate_p256_keypair, p256_public_key_to_jwk
-from harbour.jose.kb_jwt import create_kb_jwt, verify_kb_jwt
-from harbour.jose.sd_jwt import issue_sd_jwt_vc
-from harbour.jose.verifier import VerificationError
+from harbour.kb_jwt import create_kb_jwt, verify_kb_jwt
+from harbour.keys import generate_p256_keypair, p256_public_key_to_jwk
+from harbour.sd_jwt import issue_sd_jwt_vc
+from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
     "iss": "did:web:did.ascs.digital:participants:ascs",

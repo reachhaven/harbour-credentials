@@ -1,9 +1,8 @@
 """Legacy tests for tampering detection with Ed25519Signature2018 (deprecated)."""
 
 import pytest
-
-from harbour.jose.signer import sign_vc
-from harbour.jose.verifier import VerificationError, verify_vc
+from harbour.signer import sign_vc
+from harbour.verifier import VerificationError, verify_vc
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 

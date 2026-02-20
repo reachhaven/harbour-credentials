@@ -4,3 +4,19 @@ __pycache__/
 .coverage
 artifacts/*/
 dist/
+.venv/
+
+# Node/TypeScript
+node_modules/
+
+# Yarn PnP (anywhere in repo)
+**/.pnp.*
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/sdks
+!**/.yarn/versions
+
+# Agent workspace (untracked)
+/.playground/

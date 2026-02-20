@@ -4,9 +4,8 @@ import base64
 import json
 
 import pytest
-
-from harbour.jose.signer import sign_vc_jose
-from harbour.jose.verifier import VerificationError, verify_vc_jose
+from harbour.signer import sign_vc_jose
+from harbour.verifier import VerificationError, verify_vc_jose
 
 
 def test_tamper_payload(sample_vc, p256_private_key, p256_public_key):

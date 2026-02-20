@@ -3,10 +3,9 @@
 import json
 
 import pytest
-
-from harbour.jose.keys import generate_ed25519_keypair
-from harbour.jose.signer import sign_vc
-from harbour.jose.verifier import VerificationError, verify_vc
+from harbour.keys import generate_ed25519_keypair
+from harbour.signer import sign_vc
+from harbour.verifier import VerificationError, verify_vc
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 

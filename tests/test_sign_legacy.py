@@ -3,8 +3,7 @@
 import warnings
 
 import pytest
-
-from harbour.jose.signer import sign_vc
+from harbour.signer import sign_vc
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 

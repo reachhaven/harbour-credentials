@@ -6,13 +6,12 @@ from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ec import (
+    SECP256R1,
     EllipticCurvePrivateNumbers,
     EllipticCurvePublicNumbers,
-    SECP256R1,
 )
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-from harbour.jose.keys import p256_public_key_to_did_key, public_key_to_did_key
+from harbour.keys import p256_public_key_to_did_key, public_key_to_did_key
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

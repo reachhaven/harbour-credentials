@@ -3,8 +3,7 @@
 import base64
 import json
 
-from harbour.jose.signer import sign_vc_jose, sign_vp_jose
-
+from harbour.signer import sign_vc_jose, sign_vp_jose
 
 # ---------------------------------------------------------------------------
 # VC signing — P-256 (ES256)

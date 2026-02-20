@@ -1,13 +1,30 @@
 # Harbour Credentials — Design Documentation
 
+## Package Structure (Current)
+
+```
+harbour-credentials/
+├── src/
+│   ├── python/
+│   │   ├── harbour/           # Crypto library (6 modules)
+│   │   └── credentials/       # LinkML pipeline (3 modules)
+│   └── typescript/
+│       └── harbour/           # Crypto library (6 modules)
+├── tests/
+│   ├── *.py                   # Python tests (76 tests)
+│   └── typescript/harbour/    # TypeScript tests (36 tests)
+├── linkml/                    # LinkML schemas
+└── artifacts/                 # Generated OWL/SHACL/context
+```
+
 ## Architecture Decision Records
 
 | # | Decision | Status |
 |---|----------|--------|
-| [001](decisions/001-vc-securing-mechanism.md) | SD-JWT-VC (EUDI) + VC-JOSE-COSE (Gaia-X) — dual format | Proposed |
-| [002](decisions/002-dual-runtime-architecture.md) | Dual Python/JavaScript runtime | Proposed |
-| [003](decisions/003-canonicalization.md) | No canonicalization required | Proposed |
-| [004](decisions/004-key-management.md) | ES256 (P-256) primary + X.509 + DID | Proposed |
+| [001](decisions/001-vc-securing-mechanism.md) | SD-JWT-VC (EUDI) + VC-JOSE-COSE (Gaia-X) — dual format | Accepted |
+| [002](decisions/002-dual-runtime-architecture.md) | Dual Python/JavaScript runtime | Accepted |
+| [003](decisions/003-canonicalization.md) | No canonicalization required | Accepted |
+| [004](decisions/004-key-management.md) | ES256 (P-256) primary + X.509 + DID | Accepted |
 
 ## Key Findings (February 2026)
 
