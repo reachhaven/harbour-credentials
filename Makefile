@@ -6,25 +6,30 @@
 TS_DIR := src/typescript/harbour
 OMB_SUBMODULE_DIR := submodules/ontology-management-base
 
-# Prefer parent venv if it exists; otherwise use local .venv
-ifneq ($(wildcard ../../.venv/bin/python3),)
-    VENV := ../../.venv
+# In CI, use system Python; locally, prefer parent venv then local .venv
+ifdef CI
+    VENV := $(dir $(shell which python3))..
+    PYTHON := python3
 else
-    VENV := .venv
+    ifneq ($(wildcard ../../.venv/bin/python3),)
+        VENV := ../../.venv
+    else
+        VENV := .venv
+    endif
+    PYTHON := $(VENV)/bin/python3
 endif
 
 # Bootstrap interpreter used only to create the venv
 BOOTSTRAP_PYTHON := python3
 
 # Tooling inside the selected virtual environment
-PYTHON := $(VENV)/bin/python3
 PIP := $(PYTHON) -m pip
 PRECOMMIT := $(PYTHON) -m pre_commit
 PYTEST := $(PYTHON) -m pytest
 
-# Check if dev environment is set up
+# Check if dev environment is set up (skipped in CI)
 define check_dev_setup
-	@if [ ! -x "$(PYTHON)" ]; then \
+	@if [ -z "$$CI" ] && [ ! -x "$(PYTHON)" ]; then \
 		echo ""; \
 		echo "❌ Development environment not set up."; \
 		echo ""; \
@@ -33,7 +38,7 @@ define check_dev_setup
 		echo ""; \
 		exit 1; \
 	fi
-	@if ! $(PYTHON) -c "import pre_commit, linkml" 2>/dev/null; then \
+	@if ! $(PYTHON) -c "import linkml" 2>/dev/null; then \
 		echo ""; \
 		echo "❌ Dev dependencies not installed."; \
 		echo ""; \
@@ -47,9 +52,15 @@ endef
 # LinkML schema files
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
 DOMAINS := harbour core
-GEN_OWL := $(VENV)/bin/gen-owl
-GEN_SHACL := $(VENV)/bin/gen-shacl
-GEN_JSONLD_CONTEXT := $(VENV)/bin/gen-jsonld-context
+ifdef CI
+    GEN_OWL := gen-owl
+    GEN_SHACL := gen-shacl
+    GEN_JSONLD_CONTEXT := gen-jsonld-context
+else
+    GEN_OWL := $(VENV)/bin/gen-owl
+    GEN_SHACL := $(VENV)/bin/gen-shacl
+    GEN_JSONLD_CONTEXT := $(VENV)/bin/gen-jsonld-context
+endif
 
 # Default target
 help:
