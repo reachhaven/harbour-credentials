@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePrivateNumbers,
     EllipticCurvePublicNumbers,
 )
-from harbour.keys import p256_public_key_to_did_key
+from harbour.keys import PrivateKey, p256_public_key_to_did_key
 from harbour.signer import sign_vc_jose, sign_vp_jose
 
 
@@ -79,7 +79,7 @@ def load_test_p256_keypair(fixtures_dir: Path | None = None):
     return private_key, private_key.public_key()
 
 
-def sign_evidence_vp(vp: dict, private_key, kid: str) -> str:
+def sign_evidence_vp(vp: dict, private_key: PrivateKey, kid: str) -> str:
     """Sign an evidence VP and its inner VCs as VC-JOSE-COSE JWTs.
 
     Takes the expanded VP object, signs each inner VC, replaces them with
@@ -131,7 +131,9 @@ def decode_evidence_vp(vp_jwt: str) -> dict:
     return decoded
 
 
-def process_example(example_path: Path, private_key, kid: str, output_dir: Path):
+def process_example(
+    example_path: Path, private_key: PrivateKey, kid: str, output_dir: Path
+) -> Path:
     """Process a single example credential.
 
     Reads the expanded example, signs evidence and outer VC, writes all
@@ -227,7 +229,7 @@ Examples:
 
     # Load key
     if args.key:
-        from harbour.signer import _load_private_key
+        from harbour._crypto import load_private_key as _load_private_key
 
         private_key, _ = _load_private_key(args.key)
         public_key = private_key.public_key()

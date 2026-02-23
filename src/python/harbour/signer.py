@@ -15,17 +15,17 @@ import sys
 import warnings
 from pathlib import Path
 
-from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePrivateKey
-
 # Legacy imports for backwards compatibility
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from harbour._crypto import import_private_key as _import_private_key
+from harbour._crypto import load_private_key as _load_private_key
+from harbour._crypto import resolve_private_key_alg as _resolve_alg
 from harbour.keys import (
     PrivateKey,
     keypair_to_jwk,
-    p256_keypair_to_jwk,
 )
 from joserfc import jws
-from joserfc.jwk import ECKey, OKPKey
+from joserfc.jwk import OKPKey
 
 
 def sign_vc_jose(
@@ -145,23 +145,12 @@ def sign_vc(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_alg(private_key: PrivateKey, alg: str | None) -> str:
-    """Determine the JWS algorithm from the key type."""
-    if alg is not None:
-        return alg
-    if isinstance(private_key, EllipticCurvePrivateKey):
-        return "ES256"
-    if isinstance(private_key, Ed25519PrivateKey):
-        return "EdDSA"
-    raise TypeError(f"Unsupported key type: {type(private_key)}")
-
-
 def _build_header(
     alg: str,
     typ: str,
     kid: str | None = None,
     x5c: list[str] | None = None,
-) -> dict:
+) -> dict[str, object]:
     """Build a JOSE protected header."""
     header = {"alg": alg, "typ": typ}
     if kid is not None:
@@ -171,52 +160,9 @@ def _build_header(
     return header
 
 
-def _import_private_key(private_key: PrivateKey, alg: str):
-    """Import a cryptography private key into a joserfc JWK."""
-    if isinstance(private_key, EllipticCurvePrivateKey):
-        jwk_dict = p256_keypair_to_jwk(private_key)
-        return ECKey.import_key(jwk_dict)
-    elif isinstance(private_key, Ed25519PrivateKey):
-        jwk_dict = keypair_to_jwk(private_key)
-        return OKPKey.import_key(jwk_dict)
-    raise TypeError(f"Unsupported key type: {type(private_key)}")
-
-
 def _canonicalize(obj: dict) -> bytes:
     """Canonical JSON serialization (legacy, used only by sign_vc)."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-
-def _load_private_key(jwk_path: str) -> tuple:
-    """Load a private key from JWK file and return (key, alg)."""
-    from cryptography.hazmat.primitives.asymmetric.ec import (
-        SECP256R1,
-        EllipticCurvePrivateNumbers,
-        EllipticCurvePublicNumbers,
-    )
-    from harbour.keys import _b64url_decode
-
-    jwk = json.loads(Path(jwk_path).read_text())
-
-    if jwk.get("kty") == "EC" and jwk.get("crv") == "P-256":
-        x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
-        y = int.from_bytes(_b64url_decode(jwk["y"]), "big")
-        d = int.from_bytes(_b64url_decode(jwk["d"]), "big")
-        pub_nums = EllipticCurvePublicNumbers(x, y, SECP256R1())
-        priv_nums = EllipticCurvePrivateNumbers(d, pub_nums)
-        return priv_nums.private_key(), "ES256"
-    elif jwk.get("kty") == "OKP" and jwk.get("crv") == "Ed25519":
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
-        d_bytes = _b64url_decode(jwk["d"])
-        return Ed25519PrivateKey.from_private_bytes(d_bytes), "EdDSA"
-    else:
-        raise ValueError(f"Unsupported key type: {jwk.get('kty')}/{jwk.get('crv')}")
 
 
 def main():

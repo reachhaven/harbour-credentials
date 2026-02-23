@@ -17,9 +17,12 @@ import secrets
 import sys
 from pathlib import Path
 
+from harbour._crypto import import_private_key as _import_private_key
+from harbour._crypto import import_public_key as _import_public_key
+from harbour._crypto import resolve_private_key_alg as _resolve_alg
+from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PrivateKey, PublicKeyType
-from harbour.signer import _import_private_key, _resolve_alg
-from harbour.verifier import VerificationError, _alg_for_key, _import_public_key
+from harbour.verifier import VerificationError
 from joserfc import jws
 
 # SD-JWT uses ~-delimited format: <issuer-jwt>~<disclosure1>~<disclosure2>~...~
@@ -250,30 +253,42 @@ Examples:
         sys.exit(0)
 
     if args.command == "issue":
-        # Load claims
+        from harbour._crypto import load_private_key
+
         claims_data = json.loads(Path(args.claims).read_text())
-        # Load private key
-        priv_key_data = json.loads(Path(args.key).read_text())
-        # For now, assume JWK format - would need conversion logic
-        print(
-            f"Issue command not yet fully implemented (claims: {len(claims_data)} keys, key type: {priv_key_data.get('kty', 'unknown')})",
-            file=sys.stderr,
+        private_key, _ = load_private_key(args.key)
+
+        sd_jwt_token = issue_sd_jwt_vc(
+            claims_data,
+            private_key,
+            vct=args.vct,
+            disclosable=args.disclose or None,
         )
-        sys.exit(1)
+
+        if args.output:
+            Path(args.output).write_text(sd_jwt_token)
+            print(f"SD-JWT-VC written to {args.output}", file=sys.stderr)
+        else:
+            print(sd_jwt_token)
 
     elif args.command == "verify":
-        # Load SD-JWT
+        from harbour._crypto import load_public_key as _load_public_key
+
         if args.sd_jwt == "-":
             sd_jwt_token = sys.stdin.read().strip()
         else:
             sd_jwt_token = Path(args.sd_jwt).read_text().strip()
-        # Load public key
-        pub_key_data = json.loads(Path(args.public_key).read_text())
-        print(
-            f"Verify command not yet fully implemented (token length: {len(sd_jwt_token)}, key type: {pub_key_data.get('kty', 'unknown')})",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+
+        public_key = _load_public_key(args.public_key)
+
+        try:
+            disclosed = verify_sd_jwt_vc(
+                sd_jwt_token, public_key, expected_vct=args.vct
+            )
+            print(json.dumps(disclosed, indent=2))
+        except VerificationError as e:
+            print(f"Verification failed: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

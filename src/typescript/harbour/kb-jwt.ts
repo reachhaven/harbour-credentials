@@ -5,6 +5,7 @@
  * the holder creates a KB-JWT that includes transaction_data_hashes.
  */
 
+import { timingSafeEqual as _timingSafeEqual } from "node:crypto";
 import * as jose from "jose";
 
 const SD_JWT_SEPARATOR = "~";
@@ -67,8 +68,9 @@ export async function createKbJwt(
   }
 
   // Sign KB-JWT
+  const alg = resolveAlg(holderPrivateKey);
   const kbJwt = await new jose.SignJWT(kbPayload as unknown as jose.JWTPayload)
-    .setProtectedHeader({ alg: "ES256", typ: "kb+jwt" })
+    .setProtectedHeader({ alg, typ: "kb+jwt" })
     .sign(holderPrivateKey);
 
   // Ensure sdJwt ends with ~ then append kb_jwt
@@ -122,7 +124,7 @@ export async function verifyKbJwt(
   let payload: KbJwtPayload;
   try {
     const result = await jose.jwtVerify(kbJwt, holderPublicKey, {
-      algorithms: ["ES256"],
+      algorithms: ["ES256", "EdDSA"],
     });
     payload = result.payload as unknown as KbJwtPayload;
   } catch (e) {
@@ -173,10 +175,14 @@ export async function verifyKbJwt(
     }
 
     const actualHashes = payload.transaction_data_hashes || [];
-    if (
-      actualHashes.length !== expectedHashes.length ||
-      !actualHashes.every((h, i) => h === expectedHashes[i])
-    ) {
+    // Use constant-length comparison to avoid timing side-channels
+    const match =
+      actualHashes.length === expectedHashes.length &&
+      actualHashes.reduce(
+        (acc: boolean, h, i) => acc && timingSafeEqual(h, expectedHashes[i]),
+        true,
+      );
+    if (!match) {
       throw new KbJwtVerificationError("transaction_data_hashes mismatch");
     }
 
@@ -190,8 +196,24 @@ export async function verifyKbJwt(
   return payload;
 }
 
+// Helper: resolve algorithm from key type
+function resolveAlg(key: CryptoKey): string {
+  if (key.algorithm.name === "ECDSA") return "ES256";
+  if (key.algorithm.name === "Ed25519") return "EdDSA";
+  throw new Error(`Unsupported key algorithm: ${key.algorithm.name}`);
+}
+
 // Helper: Base64url encode without padding
 function base64urlEncode(bytes: Uint8Array): string {
-  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
-  return btoa(binString).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  return Buffer.from(bytes)
+    .toString("base64url")
+    .replace(/=+$/, "");
+}
+
+// Helper: constant-time string comparison to avoid timing side-channels
+function timingSafeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return _timingSafeEqual(bufA, bufB);
 }

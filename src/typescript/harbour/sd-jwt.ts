@@ -5,6 +5,7 @@
  * for maximum portability.
  */
 
+import * as jose from "jose";
 import { CompactSign, compactVerify } from "jose";
 import { VerificationError } from "./verifier.js";
 
@@ -68,7 +69,7 @@ export async function issueSdJwtVc(
   const signer = new CompactSign(payloadBytes);
   const header: Record<string, unknown> = { alg, typ: "vc+sd-jwt" };
   if (options.x5c) header.x5c = options.x5c;
-  signer.setProtectedHeader(header as any);
+  signer.setProtectedHeader(header as jose.CompactJWSHeaderParameters);
 
   const issuerJwt = await signer.sign(privateKey);
   return [issuerJwt, ...disclosures, ""].join(SD_JWT_SEPARATOR);

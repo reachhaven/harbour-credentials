@@ -1,7 +1,11 @@
 """Tests for SD-JWT-VC issuance and verification."""
 
 import pytest
-from harbour.keys import generate_p256_keypair, p256_public_key_to_jwk
+from harbour.keys import (
+    generate_p256_keypair,
+    p256_public_key_to_jwk,
+    public_key_to_jwk,
+)
 from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.verifier import VerificationError
 
@@ -122,3 +126,42 @@ class TestSDJWTVCVerification:
         tampered = "~".join(parts)
         with pytest.raises(VerificationError):
             verify_sd_jwt_vc(tampered, p256_public_key)
+
+
+class TestSDJWTVCEd25519:
+    """SD-JWT-VC tests with Ed25519 keys."""
+
+    def test_issue_and_verify_ed25519(self, ed25519_private_key, ed25519_public_key):
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, ed25519_private_key, vct=VCT)
+        result = verify_sd_jwt_vc(sd_jwt, ed25519_public_key)
+        assert result["vct"] == VCT
+        assert result["legalName"] == "Bayerische Motoren Werke AG"
+
+    def test_selective_disclosure_ed25519(
+        self, ed25519_private_key, ed25519_public_key
+    ):
+        sd_jwt = issue_sd_jwt_vc(
+            SAMPLE_CLAIMS,
+            ed25519_private_key,
+            vct=VCT,
+            disclosable=["email", "countryCode"],
+        )
+        result = verify_sd_jwt_vc(sd_jwt, ed25519_public_key)
+        assert result["email"] == "imprint@bmw.com"
+        assert result["countryCode"] == "DE"
+
+    def test_wrong_key_type_fails(self, ed25519_private_key, p256_public_key):
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, ed25519_private_key, vct=VCT)
+        with pytest.raises(VerificationError):
+            verify_sd_jwt_vc(sd_jwt, p256_public_key)
+
+    def test_cnf_with_ed25519(self, ed25519_private_key, ed25519_public_key):
+        holder_jwk = public_key_to_jwk(ed25519_public_key)
+        sd_jwt = issue_sd_jwt_vc(
+            SAMPLE_CLAIMS,
+            ed25519_private_key,
+            vct=VCT,
+            cnf={"jwk": holder_jwk},
+        )
+        result = verify_sd_jwt_vc(sd_jwt, ed25519_public_key)
+        assert result["cnf"]["jwk"]["crv"] == "Ed25519"

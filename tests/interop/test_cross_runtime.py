@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.signer import sign_vc_jose, sign_vp_jose
 from harbour.verifier import verify_vc_jose, verify_vp_jose
 
@@ -148,3 +149,66 @@ console.log(token);
             expected_audience="did:web:verifier.test",
         )
         assert result["type"] == ["VerifiablePresentation"]
+
+
+class TestPythonSDJWTNodeVerify:
+    """Python issues SD-JWT-VC → Node.js verifies the issuer JWT signature."""
+
+    def test_sd_jwt_signature_interop(self, p256_private_key):
+        """Python-issued SD-JWT-VC can be signature-verified by Node.js."""
+        claims = {"iss": "did:web:test", "name": "Test"}
+        sd_jwt = issue_sd_jwt_vc(
+            claims,
+            p256_private_key,
+            vct="https://example.com/vc",
+            disclosable=["name"],
+        )
+        # Extract issuer JWT (first part before ~)
+        issuer_jwt = sd_jwt.split("~")[0]
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
+        pub_jwk = {
+            "kty": fixture["kty"],
+            "crv": fixture["crv"],
+            "x": fixture["x"],
+            "y": fixture["y"],
+        }
+
+        script = f"""
+import {{ compactVerify, importJWK }} from "jose";
+const key = await importJWK({json.dumps(pub_jwk)}, "ES256");
+const result = await compactVerify("{issuer_jwt}", key);
+const header = JSON.parse(Buffer.from("{issuer_jwt}".split(".")[0], "base64url").toString());
+if (header.typ !== "vc+sd-jwt") throw new Error("wrong typ: " + header.typ);
+const payload = JSON.parse(new TextDecoder().decode(result.payload));
+if (payload.vct !== "https://example.com/vc") throw new Error("wrong vct");
+console.log("OK");
+"""
+        assert _run_node(script) == "OK"
+
+
+class TestNodeSDJWTPythonVerify:
+    """Node.js issues SD-JWT-VC → Python verifies it."""
+
+    def test_sd_jwt_from_node(self, p256_public_key):
+        """Node-issued SD-JWT-VC can be verified by Python."""
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
+
+        script = f"""
+import {{ CompactSign, importJWK }} from "jose";
+const jwk = {json.dumps(fixture)};
+const key = await importJWK(jwk, "ES256");
+const payload = new TextEncoder().encode(JSON.stringify({{
+  vct: "https://example.com/vc",
+  iss: "did:web:node-issuer",
+  name: "NodeTest"
+}}));
+const signer = new CompactSign(payload);
+signer.setProtectedHeader({{ alg: "ES256", typ: "vc+sd-jwt" }});
+const token = await signer.sign(key);
+// Output as SD-JWT (issuer-jwt with trailing ~)
+console.log(token + "~");
+"""
+        sd_jwt = _run_node(script)
+        result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
+        assert result["iss"] == "did:web:node-issuer"
+        assert result["vct"] == "https://example.com/vc"

@@ -2,6 +2,7 @@
  * Sign Verifiable Credentials and Presentations as VC-JOSE-COSE compact JWS.
  */
 
+import * as jose from "jose";
 import { CompactSign } from "jose";
 
 export interface SignOptions {
@@ -40,7 +41,7 @@ export async function signVcJose(
   const header: Record<string, unknown> = { alg, typ: "vc+ld+jwt" };
   if (options.kid) header.kid = options.kid;
   if (options.x5c) header.x5c = options.x5c;
-  signer.setProtectedHeader(header as any);
+  signer.setProtectedHeader(header as jose.CompactJWSHeaderParameters);
 
   return signer.sign(privateKey);
 }
@@ -70,7 +71,7 @@ export async function signVpJose(
   const signer = new CompactSign(payload);
   const header: Record<string, unknown> = { alg, typ: "vp+ld+jwt" };
   if (options.kid) header.kid = options.kid;
-  signer.setProtectedHeader(header as any);
+  signer.setProtectedHeader(header as jose.CompactJWSHeaderParameters);
 
   return signer.sign(privateKey);
 }

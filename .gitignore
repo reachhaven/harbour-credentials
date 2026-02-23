@@ -20,5 +20,11 @@ node_modules/
 !**/.yarn/sdks
 !**/.yarn/versions
 
+# Secrets and credentials
+.env
+.env.*
+*.key
+*.pem
+
 # Agent workspace (untracked)
 /.playground/

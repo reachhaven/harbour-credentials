@@ -166,7 +166,9 @@ def validate_x5c_chain(
     return True
 
 
-def _verify_cert_signature(cert: x509.Certificate, issuer_public_key) -> None:
+def _verify_cert_signature(
+    cert: x509.Certificate, issuer_public_key: PublicKeyType
+) -> None:
     """Verify a certificate's signature using the issuer's public key."""
     from cryptography.hazmat.primitives.asymmetric.ec import (
         ECDSA,
@@ -253,7 +255,7 @@ Examples:
         sys.exit(0)
 
     if args.command == "generate":
-        from harbour.signer import _load_private_key
+        from harbour._crypto import load_private_key as _load_private_key
 
         private_key, _ = _load_private_key(args.key)
         cert = generate_self_signed_cert(

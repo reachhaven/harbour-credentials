@@ -2,7 +2,11 @@
 
 import pytest
 from harbour.kb_jwt import create_kb_jwt, verify_kb_jwt
-from harbour.keys import generate_p256_keypair, p256_public_key_to_jwk
+from harbour.keys import (
+    generate_p256_keypair,
+    p256_public_key_to_jwk,
+    public_key_to_jwk,
+)
 from harbour.sd_jwt import issue_sd_jwt_vc
 from harbour.verifier import VerificationError
 
@@ -172,3 +176,72 @@ class TestTransactionData:
             expected_audience="https://verifier.example.com",
         )
         assert "transaction_data_hashes" not in payload
+
+
+class TestKBJWTEd25519:
+    """KB-JWT tests with Ed25519 keys."""
+
+    @pytest.fixture()
+    def ed25519_sd_jwt_with_cnf(self, ed25519_private_key, ed25519_public_key):
+        holder_pub_jwk = public_key_to_jwk(ed25519_public_key)
+        return issue_sd_jwt_vc(
+            SAMPLE_CLAIMS,
+            ed25519_private_key,
+            vct=VCT,
+            cnf={"jwk": holder_pub_jwk},
+        )
+
+    def test_create_and_verify_ed25519(
+        self, ed25519_sd_jwt_with_cnf, ed25519_private_key, ed25519_public_key
+    ):
+        sd_jwt_kb = create_kb_jwt(
+            ed25519_sd_jwt_with_cnf,
+            ed25519_private_key,
+            nonce="ed-nonce",
+            audience="https://verifier.example.com",
+        )
+        payload = verify_kb_jwt(
+            sd_jwt_kb,
+            ed25519_public_key,
+            expected_nonce="ed-nonce",
+            expected_audience="https://verifier.example.com",
+        )
+        assert payload["nonce"] == "ed-nonce"
+        assert "sd_hash" in payload
+
+    def test_transaction_data_ed25519(
+        self, ed25519_sd_jwt_with_cnf, ed25519_private_key, ed25519_public_key
+    ):
+        tx_data = ['{"action":"transfer","amount":"50 EUR"}']
+        sd_jwt_kb = create_kb_jwt(
+            ed25519_sd_jwt_with_cnf,
+            ed25519_private_key,
+            nonce="tx-nonce",
+            audience="https://verifier.example.com",
+            transaction_data=tx_data,
+        )
+        payload = verify_kb_jwt(
+            sd_jwt_kb,
+            ed25519_public_key,
+            expected_nonce="tx-nonce",
+            expected_audience="https://verifier.example.com",
+            expected_transaction_data=tx_data,
+        )
+        assert len(payload["transaction_data_hashes"]) == 1
+
+    def test_wrong_key_type_fails(
+        self, ed25519_sd_jwt_with_cnf, ed25519_private_key, p256_public_key
+    ):
+        sd_jwt_kb = create_kb_jwt(
+            ed25519_sd_jwt_with_cnf,
+            ed25519_private_key,
+            nonce="nonce",
+            audience="https://verifier.example.com",
+        )
+        with pytest.raises(VerificationError):
+            verify_kb_jwt(
+                sd_jwt_kb,
+                p256_public_key,
+                expected_nonce="nonce",
+                expected_audience="https://verifier.example.com",
+            )

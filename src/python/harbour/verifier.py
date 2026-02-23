@@ -14,15 +14,16 @@ import sys
 import warnings
 from pathlib import Path
 
-from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from harbour._crypto import import_public_key as _import_public_key
+from harbour._crypto import load_public_key as _load_public_key
+from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import (
     PublicKeyType,
-    p256_public_key_to_jwk,
     public_key_to_jwk,
 )
 from joserfc import jws
-from joserfc.jwk import ECKey, OKPKey
+from joserfc.jwk import OKPKey
 
 
 class VerificationError(Exception):
@@ -173,56 +174,9 @@ def _verify_jose(token: str, public_key: PublicKeyType, expected_typ: str) -> di
     return payload
 
 
-def _import_public_key(public_key: PublicKeyType):
-    """Import a cryptography public key into a joserfc JWK."""
-    if isinstance(public_key, EllipticCurvePublicKey):
-        jwk_dict = p256_public_key_to_jwk(public_key)
-        return ECKey.import_key(jwk_dict)
-    elif isinstance(public_key, Ed25519PublicKey):
-        jwk_dict = public_key_to_jwk(public_key)
-        return OKPKey.import_key(jwk_dict)
-    raise TypeError(f"Unsupported key type: {type(public_key)}")
-
-
-def _alg_for_key(public_key: PublicKeyType) -> str:
-    """Determine the JWS algorithm from the key type."""
-    if isinstance(public_key, EllipticCurvePublicKey):
-        return "ES256"
-    if isinstance(public_key, Ed25519PublicKey):
-        return "EdDSA"
-    raise TypeError(f"Unsupported key type: {type(public_key)}")
-
-
 def _canonicalize(obj: dict) -> bytes:
     """Canonical JSON serialization (legacy, used only by verify_vc)."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-
-def _load_public_key(jwk_path: str) -> PublicKeyType:
-    """Load a public key from JWK file."""
-    from cryptography.hazmat.primitives.asymmetric.ec import (
-        SECP256R1,
-        EllipticCurvePublicNumbers,
-    )
-    from harbour.keys import _b64url_decode
-
-    jwk = json.loads(Path(jwk_path).read_text())
-
-    if jwk.get("kty") == "EC" and jwk.get("crv") == "P-256":
-        x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
-        y = int.from_bytes(_b64url_decode(jwk["y"]), "big")
-        numbers = EllipticCurvePublicNumbers(x, y, SECP256R1())
-        return numbers.public_key()
-    elif jwk.get("kty") == "OKP" and jwk.get("crv") == "Ed25519":
-        x_bytes = _b64url_decode(jwk["x"])
-        return Ed25519PublicKey.from_public_bytes(x_bytes)
-    else:
-        raise ValueError(f"Unsupported key type: {jwk.get('kty')}/{jwk.get('crv')}")
 
 
 def main():

@@ -49,17 +49,19 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install Python dependencies
         run: python3 -m pip install -e ".[docs]"
 
       - name: Install TypeScript dependencies
         working-directory: src/typescript/harbour
-        run: npm ci
+        run: yarn install --immutable
 
       - name: Generate TypeScript API docs
         working-directory: src/typescript/harbour
         run: npx typedoc --out ../../../docs/api/typescript index.ts --skipErrorChecking
-        continue-on-error: true
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

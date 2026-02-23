@@ -271,6 +271,10 @@ classes:
       email:
         slot_uri: schema:email
         range: string
+      memberOf:
+        description: Organization (LegalPerson) the natural person belongs to.
+        slot_uri: schema:memberOf
+        range: uri
 
   ServiceOffering:
     description: >
@@ -291,9 +295,11 @@ classes:
         slot_uri: gx:providedBy
         range: uri
       termsAndConditions:
-        description: Terms and conditions for this service offering.
+        description: >
+          Terms and conditions for this service offering. In Gaia-X, this is
+          an object with gx:url and gx:hash properties.
         slot_uri: gx:serviceOfferingTermsAndConditions
-        range: string
+        range: Any
 
   # ==========================================
   # 4. CREDENTIAL TYPES
@@ -400,4 +406,5 @@ classes:
       - controller
     attributes:
       blockchainAccountId:
+        slot_uri: harbour:blockchainAccountId
         range: string

@@ -17,9 +17,12 @@ import sys
 import time
 from pathlib import Path
 
+from harbour._crypto import import_private_key as _import_private_key
+from harbour._crypto import import_public_key as _import_public_key
+from harbour._crypto import resolve_private_key_alg as _resolve_alg
+from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PrivateKey, PublicKeyType
-from harbour.signer import _import_private_key, _resolve_alg
-from harbour.verifier import VerificationError, _alg_for_key, _import_public_key
+from harbour.verifier import VerificationError
 from joserfc import jws
 
 SD_JWT_SEPARATOR = "~"
@@ -233,7 +236,7 @@ Examples:
 
     if args.command == "create":
         sd_jwt = Path(args.sd_jwt).read_text().strip()
-        from harbour.signer import _load_private_key
+        from harbour._crypto import load_private_key as _load_private_key
 
         private_key, _ = _load_private_key(args.key)
         result = create_kb_jwt(
@@ -250,7 +253,7 @@ Examples:
 
     elif args.command == "verify":
         sd_jwt_with_kb = Path(args.sd_jwt).read_text().strip()
-        from harbour.verifier import _load_public_key
+        from harbour._crypto import load_public_key as _load_public_key
 
         public_key = _load_public_key(args.public_key)
         try:
