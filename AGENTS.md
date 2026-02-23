@@ -16,7 +16,7 @@ Read these before making changes; they are authoritative for repo workflows.
 src/
 ├── python/
 │   ├── harbour/        # Crypto library (sign, verify, keys, sd-jwt, kb-jwt, x509)
-│   └── credentials/    # LinkML generation pipeline
+│   └── credentials/    # Credential processing pipeline
 └── typescript/
     └── harbour/        # TypeScript port of crypto library
 

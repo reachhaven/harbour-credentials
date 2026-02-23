@@ -31,7 +31,7 @@ make setup
 source .venv/bin/activate
 ```
 
-> **Note:** The `--recurse-submodules` flag is required to clone the Gaia-X service-characteristics, ontology-management-base, and w3id.org submodules.
+> **Note:** The `--recurse-submodules` flag is required to clone the ontology-management-base and w3id.org submodules.
 >
 > `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies (`corepack enable` + `yarn install` in `src/typescript/harbour`).
 > Use `make install-dev` only if you need to refresh an existing Python environment.
@@ -153,22 +153,20 @@ make generate
 # 2. Navigate to the validation suite
 cd submodules/ontology-management-base
 
-# 3. Validate credential fixtures against harbour SHACL shapes
+# 3. Validate credential examples against harbour SHACL shapes
 python3 -m src.tools.validators.validation_suite \
   --run check-data-conformance \
-  --data-paths ../../tests/fixtures/credentials/ \
+  --data-paths ../../examples/ \
   --artifacts ../../artifacts
 
-# 4. Validate specific credentials with harbour + gx artifacts
+# 4. Validate a specific credential with harbour + gx artifacts
 python3 -m src.tools.validators.validation_suite \
   --run check-data-conformance \
-  --data-paths ../../tests/fixtures/credentials/harbour-legal-person-credential.json \
-  --artifacts ../../artifacts ../../submodules/service-characteristics/artifacts
+  --data-paths ../../examples/legal-person-credential.json \
+  --artifacts ../../artifacts
 ```
 
 > **Note**: The validation suite uses `--data-paths` for input files and `--artifacts` for schema directories.
-
-> **Known Issue**: SHACL and JSON-LD context generation currently fails due to relative import issues in the Gaia-X service-characteristics schema (`address.yaml` not found). The OWL ontology generates successfully (3.5MB with full Gaia-X imports).
 
 ### Quick Validation Check
 
@@ -209,7 +207,7 @@ def validate_harbour_credential(filepath: str) -> bool:
     return has_valid_from and has_crset and has_harbour_type and has_gx_type
 
 # Example usage
-validate_harbour_credential("tests/fixtures/credentials/harbour-legal-person-credential.json")
+validate_harbour_credential("examples/legal-person-credential.json")
 EOF
 ```
 
@@ -242,8 +240,6 @@ python -m harbour.sd_jwt verify --sd-jwt token.txt --public-key key.jwk
 # X.509 Certificates
 python -m harbour.x509 generate --key key.jwk --subject "Test Issuer" --output cert.pem
 
-# LinkML Generation (credentials module)
-python -m credentials.linkml_generator linkml/*.yaml --out-root artifacts/
 ```
 
 ## Package Structure
@@ -258,8 +254,7 @@ src/
 │   │   ├── sd_jwt.py      # SD-JWT-VC issue/verify
 │   │   ├── kb_jwt.py      # Key Binding JWT
 │   │   └── x509.py        # X.509 certificates
-│   └── credentials/       # LinkML pipeline
-│       ├── linkml_generator.py
+│   └── credentials/       # Credential processing pipeline
 │       ├── claim_mapping.py
 │       └── example_signer.py
 └── typescript/
@@ -272,15 +267,15 @@ src/
 
 submodules/
 ├── ontology-management-base/  # Validation pipeline, SHACL tools
-├── service-characteristics/   # Gaia-X LinkML schemas (gx: prefix)
 └── w3id.org/                  # W3ID context resolution
+
+examples/
+├── legal-person-credential.json       # Harbour credential examples
+├── natural-person-credential.json     # (canonical unsigned JSON-LD)
+└── service-offering-credential.json
 
 tests/
 ├── fixtures/                      # Shared test fixtures
-│   ├── credentials/               # Harbour credential examples
-│   │   ├── harbour-legal-person-credential.json
-│   │   ├── harbour-natural-person-credential.json
-│   │   └── harbour-service-offering-credential.json
 │   ├── keys/                      # Test keypairs
 │   ├── tokens/                    # Signed token fixtures
 │   └── sample-vc.json             # Shared unsigned VC payload

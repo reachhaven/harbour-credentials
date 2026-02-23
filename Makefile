@@ -156,35 +156,16 @@ install-dev:
 	@echo "✅ Development dependencies installed"
 
 # Generate artifacts from LinkML models
-# Note: The harbour schema imports Gaia-X schemas via submodule. LinkML's
-# transitive import resolution fails for nested submodule paths, so we create
-# a temporary copy without the Gaia-X import for SHACL/context generators.
 generate:
 	$(call check_dev_setup)
 	@echo "🔧 Generating artifacts from LinkML schemas..."
-	@echo "  Creating temporary harbour schema (without Gaia-X submodule import)..."
-	@$(PYTHON) -c "\
-	import yaml; \
-	from pathlib import Path; \
-	doc = yaml.safe_load(Path('linkml/harbour.yaml').read_text()); \
-	doc['imports'] = [i for i in doc.get('imports', []) if 'gaia-x' not in i]; \
-	Path('linkml/harbour_no_gx_tmp.yaml').write_text(yaml.dump(doc, default_flow_style=False, sort_keys=False))"
 	@for domain in $(DOMAINS); do \
 		echo "  Processing $$domain..."; \
 		mkdir -p artifacts/$$domain; \
-		if [ "$$domain" = "harbour" ]; then \
-			$(GEN_OWL) linkml/$${domain}_no_gx_tmp.yaml > artifacts/$$domain/$$domain.owl.ttl 2>/dev/null || true; \
-			$(GEN_SHACL) linkml/$${domain}_no_gx_tmp.yaml > artifacts/$$domain/$$domain.shacl.ttl; \
-			$(GEN_JSONLD_CONTEXT) linkml/$${domain}_no_gx_tmp.yaml > artifacts/$$domain/$$domain.context.jsonld; \
-		else \
-			$(GEN_OWL) linkml/$$domain.yaml > artifacts/$$domain/$$domain.owl.ttl; \
-			$(GEN_SHACL) linkml/$$domain.yaml > artifacts/$$domain/$$domain.shacl.ttl; \
-			$(GEN_JSONLD_CONTEXT) linkml/$$domain.yaml > artifacts/$$domain/$$domain.context.jsonld; \
-		fi; \
+		$(GEN_OWL) linkml/$$domain.yaml > artifacts/$$domain/$$domain.owl.ttl; \
+		$(GEN_SHACL) linkml/$$domain.yaml > artifacts/$$domain/$$domain.shacl.ttl; \
+		$(GEN_JSONLD_CONTEXT) linkml/$$domain.yaml > artifacts/$$domain/$$domain.context.jsonld; \
 	done
-	@rm -f linkml/harbour_no_gx_tmp.yaml
-	@echo "  Post-processing JSON-LD contexts..."
-	@$(PYTHON) scripts/fix_jsonld_context.py artifacts/harbour/harbour.context.jsonld
 	@echo ""
 	@echo "✅ Artifacts generated in artifacts/"
 

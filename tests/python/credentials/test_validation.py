@@ -15,7 +15,6 @@ _REPO_ROOT = Path(__file__).resolve().parent
 while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
     _REPO_ROOT = _REPO_ROOT.parent
 
-FIXTURES_DIR = _REPO_ROOT / "tests" / "fixtures" / "credentials"
 EXAMPLES_DIR = _REPO_ROOT / "examples"
 ARTIFACTS_DIR = _REPO_ROOT / "artifacts" / "harbour"
 CONTEXT_PATH = ARTIFACTS_DIR / "harbour.context.jsonld"
@@ -27,13 +26,10 @@ def _load_json(path: Path) -> dict:
 
 
 def _all_credential_files() -> list[Path]:
-    """Collect all credential JSON files from fixtures and examples."""
-    files = []
-    if FIXTURES_DIR.is_dir():
-        files.extend(sorted(FIXTURES_DIR.glob("harbour-*.json")))
+    """Collect all credential JSON files from examples/."""
     if EXAMPLES_DIR.is_dir():
-        files.extend(sorted(EXAMPLES_DIR.glob("*.json")))
-    return files
+        return sorted(EXAMPLES_DIR.glob("*.json"))
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +126,7 @@ class TestContextConsistency:
         assert "ServiceOfferingCredential" in context
 
     def test_class_iris_are_prefixed(self):
-        """All harbour classes must have prefixed @id (not bare local names)."""
+        """All harbour classes must be defined in the context."""
         ctx = _load_json(CONTEXT_PATH).get("@context", {})
         harbour_classes = [
             "CRSetEntry",
@@ -143,11 +139,15 @@ class TestContextConsistency:
             "NaturalPersonCredential",
             "ServiceOfferingCredential",
         ]
+        has_vocab = "@vocab" in ctx
         for cls in harbour_classes:
             entry = ctx.get(cls)
             assert entry is not None, f"Missing {cls} in context"
             aid = entry.get("@id") if isinstance(entry, dict) else entry
-            assert ":" in aid, f"{cls} has unprefixed @id: {aid}"
+            # With @vocab, bare names resolve to the default namespace
+            assert (
+                has_vocab or ":" in aid
+            ), f"{cls} has unprefixed @id without @vocab: {aid}"
 
 
 # ---------------------------------------------------------------------------

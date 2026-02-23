@@ -12,19 +12,22 @@ from credentials.claim_mapping import (
     vc_to_sd_jwt_claims,
 )
 
-# Use shared fixtures in tests/fixtures/credentials/
-FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "credentials"
+_REPO_ROOT = Path(__file__).resolve().parent
+while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
+    _REPO_ROOT = _REPO_ROOT.parent
+
+EXAMPLES_DIR = _REPO_ROOT / "examples"
 
 
 def _load_fixture(name: str) -> dict:
-    """Load a test fixture from the fixtures directory."""
-    with open(FIXTURES_DIR / name) as f:
+    """Load a credential example from the examples directory."""
+    with open(EXAMPLES_DIR / name) as f:
         return json.load(f)
 
 
 class TestHarbourLegalPersonMapping:
     def test_vc_to_claims(self):
-        vc = _load_fixture("harbour-legal-person-credential.json")
+        vc = _load_fixture("legal-person-credential.json")
         mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
@@ -35,7 +38,7 @@ class TestHarbourLegalPersonMapping:
         assert "registrationNumber" in disclosable
 
     def test_has_credential_status(self):
-        vc = _load_fixture("harbour-legal-person-credential.json")
+        vc = _load_fixture("legal-person-credential.json")
         assert "credentialStatus" in vc
         status = vc["credentialStatus"][0]
         assert status["type"] == "harbour:CRSetEntry"
@@ -43,13 +46,13 @@ class TestHarbourLegalPersonMapping:
 
     def test_subject_is_harbour_legal_person(self):
         """Verify the subject uses harbour:LegalPerson (wraps gx:LegalPerson)."""
-        vc = _load_fixture("harbour-legal-person-credential.json")
+        vc = _load_fixture("legal-person-credential.json")
         types = vc["credentialSubject"]["type"]
         assert "harbour:LegalPerson" in types
         assert "gx:LegalPerson" in types
 
     def test_roundtrip(self):
-        vc = _load_fixture("harbour-legal-person-credential.json")
+        vc = _load_fixture("legal-person-credential.json")
         mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, _ = vc_to_sd_jwt_claims(vc, mapping)
         reconstructed = sd_jwt_claims_to_vc(
@@ -63,7 +66,7 @@ class TestHarbourLegalPersonMapping:
 
 class TestHarbourNaturalPersonMapping:
     def test_vc_to_claims(self):
-        vc = _load_fixture("harbour-natural-person-credential.json")
+        vc = _load_fixture("natural-person-credential.json")
         mapping = MAPPINGS["harbour:NaturalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
@@ -74,26 +77,26 @@ class TestHarbourNaturalPersonMapping:
         assert "email" in disclosable
 
     def test_has_credential_status(self):
-        vc = _load_fixture("harbour-natural-person-credential.json")
+        vc = _load_fixture("natural-person-credential.json")
         assert "credentialStatus" in vc
         status = vc["credentialStatus"][0]
         assert status["type"] == "harbour:CRSetEntry"
 
     def test_has_evidence(self):
-        vc = _load_fixture("harbour-natural-person-credential.json")
+        vc = _load_fixture("natural-person-credential.json")
         assert "evidence" in vc
         evidence = vc["evidence"][0]
         assert evidence["type"] == "harbour:EmailVerification"
 
     def test_subject_is_harbour_natural_person(self):
         """Verify the subject uses harbour:NaturalPerson (extends gx:Participant)."""
-        vc = _load_fixture("harbour-natural-person-credential.json")
+        vc = _load_fixture("natural-person-credential.json")
         types = vc["credentialSubject"]["type"]
         assert "harbour:NaturalPerson" in types
         assert "gx:Participant" in types
 
     def test_roundtrip(self):
-        vc = _load_fixture("harbour-natural-person-credential.json")
+        vc = _load_fixture("natural-person-credential.json")
         mapping = MAPPINGS["harbour:NaturalPersonCredential"]
         claims, _ = vc_to_sd_jwt_claims(vc, mapping)
         reconstructed = sd_jwt_claims_to_vc(
@@ -107,7 +110,7 @@ class TestHarbourNaturalPersonMapping:
 
 class TestHarbourServiceOfferingMapping:
     def test_vc_to_claims(self):
-        vc = _load_fixture("harbour-service-offering-credential.json")
+        vc = _load_fixture("service-offering-credential.json")
         mapping = MAPPINGS["harbour:ServiceOfferingCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
@@ -116,14 +119,14 @@ class TestHarbourServiceOfferingMapping:
         assert "description" in disclosable
 
     def test_has_credential_status(self):
-        vc = _load_fixture("harbour-service-offering-credential.json")
+        vc = _load_fixture("service-offering-credential.json")
         assert "credentialStatus" in vc
         status = vc["credentialStatus"][0]
         assert status["type"] == "harbour:CRSetEntry"
 
     def test_subject_is_harbour_service_offering(self):
         """Verify the subject uses harbour:ServiceOffering (wraps gx:ServiceOffering)."""
-        vc = _load_fixture("harbour-service-offering-credential.json")
+        vc = _load_fixture("service-offering-credential.json")
         types = vc["credentialSubject"]["type"]
         assert "harbour:ServiceOffering" in types
         assert "gx:ServiceOffering" in types
@@ -133,7 +136,7 @@ class TestHarbourServiceOfferingMapping:
 
 class TestMappingDiscovery:
     def test_get_mapping_for_harbour_credential(self):
-        vc = _load_fixture("harbour-legal-person-credential.json")
+        vc = _load_fixture("legal-person-credential.json")
         mapping = get_mapping_for_vc(vc)
         assert mapping is not None
         assert "LegalPersonCredential" in mapping["vct"]

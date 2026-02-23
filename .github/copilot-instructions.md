@@ -51,7 +51,7 @@ Read these BEFORE making changes:
 src/
 ├── python/
 │   ├── harbour/        # Crypto library (keys, sign, verify, sd-jwt, kb-jwt, x509)
-│   └── credentials/    # LinkML pipeline (Python only)
+│   └── credentials/    # Credential processing pipeline
 └── typescript/
     └── harbour/        # TypeScript port of crypto library
 

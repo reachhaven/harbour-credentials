@@ -66,7 +66,7 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `sd_jwt` / `sd-jwt` | `sd_jwt.py` | `sd-jwt.ts` | SD-JWT-VC selective disclosure |
 | `kb_jwt` / `kb-jwt` | `kb_jwt.py` | `kb-jwt.ts` | Key Binding JWT |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates |
-| `credentials/` | Python only | — | LinkML generation pipeline |
+| `credentials/` | Python only | — | Credential processing pipeline |
 
 ### Test Layout
 
@@ -91,7 +91,6 @@ Tests live in `tests/` with shared fixtures:
 Clone with `--recurse-submodules`. If already cloned: `git submodule update --init --recursive --depth 1`
 
 - `submodules/ontology-management-base/` — SHACL validation suite
-- `submodules/service-characteristics/` — Gaia-X LinkML schemas
 - `submodules/w3id.org/` — W3ID context resolution
 
 ### LinkML → Artifacts Pipeline
@@ -124,7 +123,7 @@ import {
 
 ## CLI Entry Points
 
-All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python -m harbour.signer --help`, etc. Also: `python -m credentials.linkml_generator --help`, `python -m credentials.claim_mapping --help`, `python -m credentials.example_signer --help`.
+All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python -m harbour.signer --help`, etc. Also: `python -m credentials.claim_mapping --help`, `python -m credentials.example_signer --help`.
 
 ## Coding Conventions
 

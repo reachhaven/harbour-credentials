@@ -22,7 +22,6 @@ default_range: string
 imports:
   - linkml:types
   - ./core
-  - ../submodules/service-characteristics/linkml/gaia-x
 
 slots:
   # --- DID Slots ---
