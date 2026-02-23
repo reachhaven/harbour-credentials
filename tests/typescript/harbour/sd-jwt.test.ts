@@ -28,7 +28,7 @@ let publicKey: CryptoKey;
 
 beforeAll(async () => {
   const fixture = JSON.parse(
-    readFileSync(resolve(FIXTURES_DIR, "test-keypair-p256.json"), "utf-8"),
+    readFileSync(resolve(FIXTURES_DIR, "keys", "test-keypair-p256.json"), "utf-8"),
   );
   privateKey = await importP256PrivateKey(fixture);
   publicKey = await importP256PublicKey(fixture);

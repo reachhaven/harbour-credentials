@@ -60,8 +60,8 @@ HARBOUR_SERVICE_OFFERING_MAPPING = {
     "vct": f"{HARBOUR_NS}ServiceOfferingCredential",
     "claims": {
         "credentialSubject.gx:providedBy": "providedBy",
-        "credentialSubject.gx:name": "name",
-        "credentialSubject.schema:description": "description",
+        "credentialSubject.name": "name",
+        "credentialSubject.description": "description",
         "credentialSubject.gx:serviceOfferingTermsAndConditions": "termsAndConditions",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp", "providedBy", "name"],

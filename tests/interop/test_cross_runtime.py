@@ -8,20 +8,34 @@ import pytest
 from harbour.signer import sign_vc_jose, sign_vp_jose
 from harbour.verifier import verify_vc_jose, verify_vp_jose
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-TS_DIR = Path(__file__).parent.parent / "src" / "typescript" / "harbour"
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
+KEYS_DIR = FIXTURES_DIR / "keys"
+TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
-# Skip if node_modules not installed
+
+def _can_run_node_jose() -> bool:
+    """Check whether yarn-managed Node can import jose in the TS workspace."""
+    result = subprocess.run(
+        ["yarn", "node", "--input-type=module", "-e", 'import "jose";'],
+        capture_output=True,
+        text=True,
+        cwd=str(TS_DIR),
+        timeout=30,
+    )
+    return result.returncode == 0
+
+
+# Skip if TypeScript runtime dependencies are unavailable
 pytestmark = pytest.mark.skipif(
-    not (TS_DIR / "node_modules").exists(),
-    reason="TypeScript dependencies not installed (run 'npm install' in src/typescript/harbour/)",
+    not _can_run_node_jose(),
+    reason="TypeScript runtime dependencies unavailable (run 'make ts-bootstrap').",
 )
 
 
 def _run_node(script: str) -> str:
     """Run a Node.js script and return its stdout."""
     result = subprocess.run(
-        ["node", "--input-type=module", "-e", script],
+        ["yarn", "node", "--input-type=module", "-e", script],
         capture_output=True,
         text=True,
         cwd=str(TS_DIR),
@@ -37,7 +51,7 @@ class TestPythonSignNodeVerify:
 
     def test_vc_jose(self, sample_vc, p256_private_key, p256_public_key):
         token = sign_vc_jose(sample_vc, p256_private_key)
-        fixture = json.loads((FIXTURES_DIR / "test-keypair-p256.json").read_text())
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
         pub_jwk = {
             "kty": fixture["kty"],
             "crv": fixture["crv"],
@@ -64,7 +78,7 @@ console.log(JSON.stringify(payload));
             nonce="interop-nonce",
             audience="did:web:verifier.test",
         )
-        fixture = json.loads((FIXTURES_DIR / "test-keypair-p256.json").read_text())
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
         pub_jwk = {
             "kty": fixture["kty"],
             "crv": fixture["crv"],
@@ -88,7 +102,7 @@ class TestNodeSignPythonVerify:
     """Node.js signs a VC/VP → Python verifies it."""
 
     def test_vc_jose(self, p256_public_key):
-        fixture = json.loads((FIXTURES_DIR / "test-keypair-p256.json").read_text())
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
         sample_vc = json.loads((FIXTURES_DIR / "sample-vc.json").read_text())
 
         script = f"""
@@ -106,7 +120,7 @@ console.log(token);
         assert result == sample_vc
 
     def test_vp_jose(self, p256_public_key):
-        fixture = json.loads((FIXTURES_DIR / "test-keypair-p256.json").read_text())
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
 
         vp = {
             "@context": ["https://www.w3.org/ns/credentials/v2"],

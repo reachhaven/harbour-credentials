@@ -28,11 +28,13 @@ Or for development:
 git clone --recurse-submodules https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 make setup
-make install-dev
 source .venv/bin/activate
 ```
 
 > **Note:** The `--recurse-submodules` flag is required to clone the Gaia-X service-characteristics, ontology-management-base, and w3id.org submodules.
+>
+> `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies (`corepack enable` + `yarn install` in `src/typescript/harbour`).
+> Use `make install-dev` only if you need to refresh an existing Python environment.
 
 If you already cloned without submodules:
 
@@ -43,12 +45,9 @@ git submodule update --init --recursive --depth 1
 ### TypeScript/JavaScript
 
 ```bash
-# Enable corepack for Yarn 4
-corepack enable
-
-# Install dependencies
-cd src/typescript/harbour
-yarn install
+# If you already ran `make setup`, TypeScript dependencies are already bootstrapped.
+# Otherwise:
+make ts-bootstrap
 ```
 
 ## Quick Start
@@ -283,11 +282,13 @@ tests/
 │   │   ├── harbour-natural-person-credential.json
 │   │   └── harbour-service-offering-credential.json
 │   ├── keys/                      # Test keypairs
-│   └── certificates/              # Test certificates
+│   ├── tokens/                    # Signed token fixtures
+│   └── sample-vc.json             # Shared unsigned VC payload
+├── interop/                       # Cross-runtime interop tests
 ├── python/                        # Python tests
-│   ├── credentials/               # Credential module tests
-│   └── ...
-└── typescript/                    # TypeScript tests
+│   ├── harbour/                   # harbour module tests
+│   └── credentials/               # credentials module tests
+└── typescript/harbour/            # TypeScript tests
 
 linkml/
 ├── harbour.yaml           # Harbour credential schema
@@ -309,6 +310,9 @@ make test
 
 # TypeScript tests
 cd src/typescript/harbour && yarn test
+
+# Cross-runtime interop tests
+PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
 
 # All tests with coverage
 make test-cov

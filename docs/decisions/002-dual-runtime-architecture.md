@@ -39,15 +39,15 @@ harbour-credentials/
 │   ├── test_keys.py          # Python key tests
 │   ├── test_sign.py          # Python sign tests
 │   ├── test_verify.py        # Python verify tests
-│   └── test_interop.py       # Cross-runtime interop (Python signs, calls JS to verify)
+│   └── interop/test_cross_runtime.py  # Cross-runtime interop (Python signs, calls JS to verify)
 ├── js/tests/
 │   ├── keys.test.ts          # JS key tests
 │   ├── sign.test.ts          # JS sign tests
 │   ├── verify.test.ts        # JS verify tests
 │   └── interop.test.ts       # Cross-runtime interop (JS signs, calls Python to verify)
 ├── tests/fixtures/
-│   ├── test-keypair.json     # Shared Ed25519 JWK (used by both runtimes)
-│   ├── signed-vc.jwt         # Reference JWT signed by Python
+│   ├── keys/test-keypair.json          # Shared Ed25519 JWK (used by both runtimes)
+│   ├── tokens/signed-vc-p256.jwt       # Reference JWT signed by Python
 │   └── sample-vc.json        # Unsigned VC payload
 └── docs/
 ```
@@ -56,9 +56,9 @@ harbour-credentials/
 
 The interop guarantee is enforced by **shared test fixtures**:
 
-1. `tests/fixtures/test-keypair.json` — Same Ed25519 JWK loaded by both runtimes
+1. `tests/fixtures/keys/test-keypair.json` — Same Ed25519 JWK loaded by both runtimes
 2. `tests/fixtures/sample-vc.json` — Same unsigned VC payload
-3. `tests/fixtures/signed-vc.jwt` — Reference signed JWT (committed, deterministic)
+3. `tests/fixtures/tokens/signed-vc-p256.jwt` — Reference signed JWT (committed, deterministic)
 
 **Interop test pattern:**
 ```

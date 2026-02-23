@@ -65,7 +65,7 @@ describe("P-256 keys", () => {
 
   it("roundtrips JWK from test fixture", async () => {
     const fixture = JSON.parse(
-      readFileSync(resolve(FIXTURES_DIR, "test-keypair-p256.json"), "utf-8"),
+      readFileSync(resolve(FIXTURES_DIR, "keys", "test-keypair-p256.json"), "utf-8"),
     );
     const privateKey = await importP256PrivateKey(fixture);
     const publicKey = await importP256PublicKey(fixture);

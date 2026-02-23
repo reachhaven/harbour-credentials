@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from harbour.keys import p256_public_key_to_did_key, public_key_to_did_key
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+KEYS_DIR = FIXTURES_DIR / "keys"
 
 
 def _b64url_decode(s: str) -> bytes:
@@ -27,7 +28,7 @@ def _b64url_decode(s: str) -> bytes:
 
 def _load_ed25519_keypair():
     """Load the committed Ed25519 test keypair from fixtures."""
-    jwk_path = FIXTURES_DIR / "test-keypair.json"
+    jwk_path = KEYS_DIR / "test-keypair.json"
     with open(jwk_path) as f:
         jwk = json.load(f)
     raw_private = _b64url_decode(jwk["d"])
@@ -77,7 +78,7 @@ def did_key_vm(public_key):
 
 def _load_p256_keypair():
     """Load the committed P-256 test keypair from fixtures."""
-    jwk_path = FIXTURES_DIR / "test-keypair-p256.json"
+    jwk_path = KEYS_DIR / "test-keypair-p256.json"
     with open(jwk_path) as f:
         jwk = json.load(f)
     x = int.from_bytes(_b64url_decode(jwk["x"]), "big")

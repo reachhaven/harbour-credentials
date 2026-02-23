@@ -28,14 +28,15 @@ while (
     _HARBOUR_ROOT = _HARBOUR_ROOT.parent
 
 FIXTURES_DIR = _HARBOUR_ROOT / "tests" / "fixtures"
-EXAMPLES_DIR = _HARBOUR_ROOT.parent.parent / "examples"
+KEYS_DIR = FIXTURES_DIR / "keys"
+EXAMPLES_DIR = _HARBOUR_ROOT / "examples"
 SIGNED_DIR = EXAMPLES_DIR / "signed"
 
 
 @pytest.fixture(scope="session")
 def p256_private_key():
     """Load the test P-256 private key."""
-    jwk_path = FIXTURES_DIR / "test-keypair-p256.json"
+    jwk_path = KEYS_DIR / "test-keypair-p256.json"
     jwk = json.loads(jwk_path.read_text())
     x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
     y = int.from_bytes(_b64url_decode(jwk["y"]), "big")
@@ -89,7 +90,13 @@ def did_key_vm(private_key):
     return f"{did}#{did.split(':')[-1]}"
 
 
-@pytest.fixture(params=list(SIGNED_DIR.glob("*.jwt")) if SIGNED_DIR.exists() else [])
+@pytest.fixture(
+    params=(
+        [p for p in sorted(SIGNED_DIR.glob("*.jwt")) if ".evidence-vp." not in p.name]
+        if SIGNED_DIR.exists()
+        else []
+    )
+)
 def signed_jwt(request):
-    """Parametrized fixture for each pre-signed JWT."""
+    """Parametrized fixture for each pre-signed VC JWT (excludes evidence VPs)."""
     return request.param.read_text().strip()

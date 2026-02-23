@@ -11,8 +11,10 @@ harbour-credentials/
 │   └── typescript/
 │       └── harbour/           # Crypto library (6 modules)
 ├── tests/
-│   ├── *.py                   # Python tests (76 tests)
-│   └── typescript/harbour/    # TypeScript tests (36 tests)
+│   ├── fixtures/              # Shared fixtures (credentials, keys, tokens)
+│   ├── interop/               # Cross-runtime interoperability tests
+│   ├── python/                # Python tests (harbour + credentials)
+│   └── typescript/harbour/    # TypeScript tests
 ├── linkml/                    # LinkML schemas
 └── artifacts/                 # Generated OWL/SHACL/context
 ```

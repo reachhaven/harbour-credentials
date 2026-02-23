@@ -6,7 +6,8 @@
 
 [submodule "submodules/service-characteristics"]
 	path = submodules/service-characteristics
-	url = https://gitlab.com/gaia-x/technical-committee/service-characteristics-working-group/service-characteristics.git
+	url = https://gitlab.com/ascs-ev/service-characteristics.git
+	branch = fix/envited-ontologies
 	shallow = true
 
 [submodule "submodules/w3id.org"]

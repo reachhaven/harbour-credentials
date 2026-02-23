@@ -64,7 +64,11 @@ def load_test_p256_keypair(fixtures_dir: Path | None = None):
         )
         if not fixtures_dir.is_dir():
             fixtures_dir = repo_root / "tests" / "fixtures"
-    jwk_path = fixtures_dir / "test-keypair-p256.json"
+    keys_dir = fixtures_dir / "keys"
+    if keys_dir.is_dir():
+        jwk_path = keys_dir / "test-keypair-p256.json"
+    else:
+        jwk_path = fixtures_dir / "test-keypair-p256.json"
     jwk = json.loads(jwk_path.read_text())
     x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
     y = int.from_bytes(_b64url_decode(jwk["y"]), "big")

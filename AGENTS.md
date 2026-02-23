@@ -21,9 +21,12 @@ src/
     └── harbour/        # TypeScript port of crypto library
 
 tests/
-├── fixtures/           # Shared test fixtures (keys, certs)
-├── python/credentials/ # Python credentials tests
-└── typescript/harbour/ # TypeScript tests
+├── fixtures/           # Shared test fixtures (credentials, keys, tokens)
+├── interop/            # Cross-runtime interoperability tests
+├── python/
+│   ├── harbour/        # Python harbour module tests
+│   └── credentials/    # Python credentials module tests
+└── typescript/harbour/ # TypeScript harbour module tests
 ```
 
 ## Build, Test, and Development Commands

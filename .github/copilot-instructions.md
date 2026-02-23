@@ -56,9 +56,12 @@ src/
     └── harbour/        # TypeScript port of crypto library
 
 tests/
-├── fixtures/           # Shared test fixtures
-├── python/credentials/ # Credentials tests
-└── typescript/harbour/ # TypeScript tests
+├── fixtures/           # Shared test fixtures (credentials, keys, tokens)
+├── interop/            # Cross-runtime interoperability tests
+├── python/
+│   ├── harbour/        # Harbour Python tests
+│   └── credentials/    # Credentials Python tests
+└── typescript/harbour/ # Harbour TypeScript tests
 ```
 
 ## Key Conventions
