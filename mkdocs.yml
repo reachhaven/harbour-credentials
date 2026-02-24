@@ -64,9 +64,22 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
+  - Guide:
+      - Delegated Signing: guide/delegated-signing.md
+      - Evidence Types: guide/evidence.md
+  - Specifications:
+      - Delegation Challenge Encoding: specs/delegation-challenge-encoding.md
+      - DID Method Evaluation: specs/did-method-evaluation.md
+      - Reference Specs: specs/references/README.md
   - CLI Reference:
       - Overview: cli/index.md
   - API Reference:
       - Python: api/python/index.md
       - TypeScript: api/typescript/index.md
-  - Architecture Decisions: decisions/
+  - Architecture:
+      - Overview: architecture.md
+      - ADR-001 VC Securing Mechanism: decisions/001-vc-securing-mechanism.md
+      - ADR-002 Dual Runtime: decisions/002-dual-runtime-architecture.md
+      - ADR-003 Canonicalization: decisions/003-canonicalization.md
+      - ADR-004 Key Management: decisions/004-key-management.md
+  - Contributing: contributing.md

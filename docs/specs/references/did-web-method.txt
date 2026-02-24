@@ -1,0 +1,429 @@
+
+
+  did:web Method Specification
+
+      DIDs that target a distributed ledger face significant practical
+      challenges in bootstrapping enough meaningful trusted data around
+      identities to incentivize mass adoption.
+      We propose a new DID method using a web domain's existing reputation.
+
+      Introduction
+
+        Preface
+
+        The Web DID method specification conforms to the requirements specified
+        in the Decentralized Identifiers v1.0 Specification [[DID-CORE]]. For
+        more information about DIDs and DID method specifications, please also
+        see the [[?DID-PRIMER]]
+
+        Examples
+
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/suites/jws-2020/v1"
+  ],
+  "id": "did:web:example.com",
+  "verificationMethod": [
+    {
+      "id": "did:web:example.com#key-0",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:example.com",
+      "publicKeyJwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "0-e2i2_Ua1S5HbTYnVB0lj2Z2ytXu2-tYmDFf8f5NjU"
+      }
+    },
+    {
+      "id": "did:web:example.com#key-1",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:example.com",
+      "publicKeyJwk": {
+        "kty": "OKP",
+        "crv": "X25519",
+        "x": "9GXjPGGvmRq9F6Ng5dQQ_s31mfhxrcNZxRGONrmH30k"
+      }
+    },
+    {
+      "id": "did:web:example.com#key-2",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:example.com",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "38M1FDts7Oea7urmseiugGW7tWc3mLpJh6rKe7xINZ8",
+        "y": "nDQW6XZ7b_u2Sy9slofYLlG03sOEoug3I0aAPQ0exs4"
+      }
+    },
+  ],
+  "authentication": [
+    "did:web:example.com#key-0",
+    "did:web:example.com#key-2"
+  ],
+  "assertionMethod": [
+    "did:web:example.com#key-0",
+    "did:web:example.com#key-2"
+  ],
+  "keyAgreement": [
+    "did:web:example.com#key-1", 
+    "did:web:example.com#key-2"
+  ]
+}
+
+{
+  "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/secp256k1recovery-2020/v2"],
+  "id": "did:web:example.com",
+  "verificationMethod": [{
+      "id": "did:web:example.com#address-0",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:web:example.com",
+      "blockchainAccountId": "eip155:1:0x89a932207c485f85226d86f7cd486a89a24fcc12"
+  }],
+  "authentication": [
+      "did:web:example.com#address-0"
+  ]
+}
+
+      Web DID Method Specification
+
+        Target system
+
+        The target system of the Web DID method is the host (or domain if the
+        host
+        is not specified) name when the domain specified by the DID is resolved
+        through the Domain Name System (DNS).
+
+        Method name
+
+        The namestring that shall identify this DID method is: web.
+
+        A DID that uses this method MUST begin with the following prefix:
+        did:web. Per the DID specification, this string MUST be in
+        lowercase. The remainder of the DID, after the prefix, is specified
+        below.
+
+        Method-specific identifier
+
+        The method specific identifier is a fully qualified domain name that is
+        secured by a TLS/SSL certificate with an optional path to the DID
+        document. The formal rules describing valid domain name syntax are
+        described in [[RFC1035]], [[RFC1123]], and [[RFC2181]].
+
+        The method specific identifier MUST match the common name used in the
+        SSL/TLS certificate, and it MUST NOT include IP addresses. A port MAY be
+        included and the colon MUST be percent encoded to prevent a conflict
+        with paths. Directories and subdirectories MAY optionally be included,
+        delimited by colons rather than slashes.
+
+web-did = "did:web:" domain-name
+web-did = "did:web:" domain-name * (":" path)
+
+did:web:w3c-ccg.github.io
+
+did:web:w3c-ccg.github.io:user:alice
+
+did:web:example.com%3A3000
+
+        Key Material and Document Handling
+
+        Due to the way most web servers present content, it is likely that a
+        particular `did:web` document will be served with a media type of
+      `application/json`. If a document is retrieved and it is named
+      `did.json`, a few processing rules should apply:
+
+          If an
+          `@context` is present at the root of the JSON document,
+          the document should be processed according to the JSON-LD rules.
+          If this is not possible, or if the document fails processing, the
+          document should be rejected from consideration as a `did:web` doc.
+
+          If an
+          `@context` is present at the root of the JSON document,
+          and it passes JSON-LD processing, and it contains the context
+          `https://www.w3.org/ns/did/v1`, it may be further processed
+          as a
+          DID document as specified by section
+          6.3.2 of
+          the
+          [[did-core]] specification.
+
+          If no
+          `@context` is present, it should be processed via normal
+          JSON rules for DID processing as specified in section
+          6.2.2 of the
+          [[did-core]] specification.
+
+        Whenever a DID URL is present within a `did:web` document, it must
+        be an absolute URL.
+
+        This includes URLs inside of embedded key material and other metadata, and
+        prevents
+        key confusion attacks.
+
+        DID method operations
+
+          There is intentionally no HTTP API specified for did:web method
+          operations leaving programmatic registrations and management to be
+          defined by each implementation, or based on their own requirements in
+          their web environment.
+
+          Create (Register)
+
+          Creating a DID is done by:
+
+            applying at a domain name registrar for use of a domain name and
+
+            storing the location of a hosting service, the IP address at a DNS
+            lookup service
+
+            creating the DID document JSON-LD file including a suitable keypair,
+            e.g. using the Koblitz Curve, and storing the did.json
+            file under the well-known URL to represent the entire domain, or
+            under the specified path if many DIDs will be resolved in this
+            domain.
+
+          For example, for the domain name `w3c-ccg.github.io`, the `did.json`
+          will be available under the following URL:
+
+did:web:w3c-ccg.github.io
+ -> https://w3c-ccg.github.io/.well-known/did.json
+
+          If an optional path is specified rather the bare domain, the
+          did.json will be available under the specified path:
+
+did:web:w3c-ccg.github.io:user:alice
+ -> https://w3c-ccg.github.io/user/alice/did.json
+
+          If an optional port is specified on the domain, the port colon
+          splitting the host and the port MUST be percent encoded to prevent
+          collision with the path.
+
+did:web:example.com%3A3000:user:alice
+ -> https://example.com:3000/user/alice/did.json
+
+          Read (Resolve)
+
+          The following steps MUST be executed to resolve the DID document from
+          a Web DID:
+
+            Replace ":" with "/" in the method specific identifier to obtain the
+            fully qualified domain name and optional path.
+
+            If the domain contains a port percent decode the colon.
+
+            Generate an HTTPS URL to the expected location of the DID document
+            by prepending https://.
+
+            If no path has been specified in the URL, append
+            /.well-known.
+
+            Append /did.json to complete the URL.
+
+            Perform an HTTP GET request to the URL using an agent
+            that can successfully negotiate a secure HTTPS connection, which
+            enforces the security requirements as described in .
+
+            Verify that the ID of the resolved DID document matches the Web DID being resolved.
+
+            When performing the DNS resolution during the HTTP GET
+            request, the client SHOULD utilize [[RFC8484]] in order to prevent
+            tracking of the identity being resolved.
+
+          Update
+
+          To update the DID document, the did.json has to be
+          updated. Please note that the DID will remain the same, but the
+          contents of the DID document could change, e.g., by including a new
+          verification key or adding service endpoints.
+
+          Managing updates to the DID Document using a version control system
+          such as git and continious integration system such as GitHub Actions
+          can provide support for authentication and audit history.
+
+          There is no HTTP API specified for the update process leaving
+          programmatic registrations and management to be defined by each
+          implementation.
+
+          Deactivate (Revoke)
+
+          To delete the DID document, the did.json has to be
+          removed or has to be no longer publicly available due to any other
+          means.
+
+        Security and privacy considerations
+
+          Authentication and Authorization
+
+          This DID method does not specify any authentication or authorization
+          mechanism for writing to, removing or creating the DID Document,
+          leaving it up to implementations to protect did:web documents as with
+          any other web resource.
+
+          It is up to implementer to secure their web environments according to
+          industry best practices for updating or otherwise managing web content
+          based on the specific needs of their threat environment.
+
+          DNS Considerations
+
+          DNS Security Considerations
+
+          DNS presents many of the attack vectors that enable active security
+          and privacy attacks on the did:web method and it's important that
+          implementors address these concerns via proper configuration of DNS.
+          For example, without proper security of the DNS resolution via DNS over HTTPS it's
+          possible for active attackers to intercept the result of the DNS
+          resolution via a Man in the Middle attack which would point at a
+          malicious server with the incorrect DID Document.
+
+          Additionally, implementors should be aware of issues presented by a
+          Spoofed DNS records where the record returned by a malicious DNS
+          Server is inauthentic and allows the record to be pointed at a
+          malicious server which contains a different DID Document. To prevent
+          this type of issue, usage of DNSSEC which is
+          RFC4033,
+          RFC4034, and
+          RFC4035.
+
+          DNS Privacy Considerations
+
+          Due to the nature of the did:web method relying upon a DNS in order to
+          resolve the web server, all resolutions of a did:web identifier have
+          the potential to be tracked by a DNS provider. Additionally, due to
+          the DID Document being stored on a web server, each time the DID
+          Document resource is retrieved, the web server has the ability to
+          track the resolution of the DID Document. To mitigate the issue of the
+          relying party being tracked when resolving the DID Document the
+          relying party should look to either use a trusted universal resolver
+          service to gain herd privacy, utilize a VPN service or perform a
+          resolution over the TOR network. Another emerging solution that will
+          be useful to address this is 
+            draft-pauly-dprive-oblivious-doh-03
+
+          DID Document Integrity Verification
+
+          Additional mechanisms such as Hashlinks
+          MAY be utilized to aid in integrity protection and verification of the
+          DID document.
+
+          Under such a scenario the hash of the DID document could be recorded
+          to a trusted or distributed store and the retriever of the DID
+          document would generate a hash of the DID document in their posession
+          with the hash retrieved to ensure that no tampering with the DID
+          document had occurred.
+
+          In-transit Security
+
+          Guidance from 
+            NIST SP 800-52 Rev. 2
+           or superceding, MUST be followed for delivery of a `did:web`
+          document.
+
+          It is additionally recommended to adhere to the latest recommendations
+          from OWASP's Transport Layer Protection Cheat Sheet [[OWASP-TRANSPORT]]
+          for hardening TLS configurations.
+
+          Consult 
+            NIST SP 800-57
+           for guidance on cryptoperiod, which is the time span during which
+          a specific key is authorized for use or in which the keys for a given
+          system or application may remain in effect.
+
+          TLS configuration MUST use at least SHA256, and SHOULD use SHA384,
+          POLY1305, or stronger, depending on the needs of your
+          operating environment.
+
+          Delete action MAY be performed by domain name registrars or DNS lookup
+          services.
+
+          As of this writing, TLS 1.2 or higher SHOULD be configured to use
+          only strong ciphers suites and to use sufficiently large key sizes.
+          As recommendations may be volatile these days, only the very latest
+          recommendations should be used. However, as a rule of thumb,
+          the following set of suites is a reasonable starting point:
+
+            ECDHE with one of the strong curves {X25519, brainpoolP384r1, NIST
+            P-384, brainpoolP256r1, NIST P-256} shall be used as key exchange.
+
+            AESGCM or ChaCha20 with 256 bit large keys shall be used for bulk
+            encryption
+
+            ECDSA with one of the strong curves {brainpoolP384r1, NIST P-384,
+            brainpoolP256r1, NIST P-256} or RSA (at least 3072) shall be used.
+
+            Authenticated Encryption with Associated Data (AEAD) shall be used
+            as Mac.
+
+          Examples of strong SSL/TLS configurations for now are:
+
+            ECDHE-ECDSA-AES256-GCM-SHA384, TLSv1.2, Kx=ECDH, Au=ECDSA, Enc=AESGCM(256), Mac=AEAD
+
+            ECDHE-RSA-AES256-GCM-SHA384, TLSv1.2, Kx=ECDH, Au=RSA Enc=AESGCM(256), Mac=AEAD
+
+            ECDHE-ECDSA-CHACHA20-POLY1305, TLSv1.2, Kx=ECDH, Au=ECDSA, Enc=ChaCha20-Poly1305, Mac=AEAD
+
+            ECDHE-RSA-CHACHA20-POLY1305, TLSv1.2, Kx=ECDH, Au=RSA, Enc=ChaCha20-Poly1305, Mac=AEAD
+
+            ECDHE-RSA-AES256-GCM-SHA384, TLSv1.2, Kx=ECDH, Au=RSA, Enc=AESGCM(256), Mac=AEAD
+
+            ECDHE-ECDSA-AES256-GCM-SHA384, TLSv1.2, Kx=ECDH, Au=ECDSA, Enc=AESGCM(256), Mac=AEAD
+
+          International Domain Names
+
+          [[DID-CORE]] identifier syntax does not 
+          allow Unicode in method name nor method specific identifiers.
+
+          Implementers should be cautious when implementing 
+          support for DID URLs that rely on domain names 
+          or path components that contain Unicode characters.
+
+          See also:
+
+            UTS-46
+
+            IDNA 2008
+
+          Optional Path Considerations
+
+          When optional paths to DID documents are used to resolve documents
+          rather than bare domains, verification with signed data proves that
+          the entity in control of the file indicated in the path has the
+          private keys. It does not prove that the domain operator has the
+          private keys.
+
+          This example:
+
+did:web:example.com:u:bob
+
+          resolves to the DID document at:
+
+https://example.com/u/bob/did.json
+
+          In this scenario, it is probable that example.com has given user Bob
+          control over the DID in question, and proofs of control refer to Bob
+          rather than all of example.com.
+
+          Cross-Origin Resource Sharing (CORS) Policy Considerations
+
+          To support scenarios where DID resolution is performed by client
+          applications running in a web browser, the file served for the DID
+          document should be accessible by any origin. To enable this,
+          the DID document HTTP response can be set to include the
+          following header:
+
+Access-Control-Allow-Origin: *
+
+      Reference implementations
+
+      The code at uport-project/https-did-resolver
+      is intended to present a reference implementation of this DID method. Any
+      other implementations should ensure that they pass the test suite
+      described in /src/__tests__ before claiming compatibility.
+
+      The code at transmute-industries/restricted-resolver
+      implements this specification.
+
+      The code at reinkrul/java-did-resolvers
+      implements this specification as a Java library.
+
+

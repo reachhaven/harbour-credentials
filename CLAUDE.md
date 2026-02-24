@@ -166,7 +166,7 @@ When instructed to prepare a commit or PR, **do not commit directly**. Create th
 |-------|------|
 | Agent instructions | [AGENTS.md](AGENTS.md) |
 | Copilot instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
-| Documentation | [docs/README.md](docs/README.md) |
+| Architecture | [docs/architecture.md](docs/architecture.md) |
 | ADRs | [docs/decisions/](docs/decisions/) |
 
 ## Common Mistakes to Avoid

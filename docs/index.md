@@ -67,6 +67,5 @@
 
 - [Installation](getting-started/installation.md) — Detailed setup instructions
 - [Quick Start](getting-started/quickstart.md) — Get up and running
-- [User Guide](guide/keys.md) — In-depth usage guides
 - [CLI Reference](cli/index.md) — Command-line tools
 - [API Reference](api/python/index.md) — Python and TypeScript APIs

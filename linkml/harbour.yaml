@@ -103,10 +103,53 @@ slots:
     description: >
       A Verifiable Presentation embedded as evidence. In examples this is
       shown as expanded JSON-LD for readability; on the wire it is encoded
-      as a VC-JOSE-COSE compact JWS string (typ: vp+ld+jwt).
+      as a VC-JOSE-COSE compact JWS string (typ: vp+ld+jwt) or SD-JWT VP.
     slot_uri: harbour:verifiablePresentation
     range: Any
     required: false
+
+  # --- Delegated Signature Evidence Slots ---
+  transactionIntent:
+    description: >
+      The action or transaction the user is consenting to. Binds consent
+      to a specific action for auditability.
+    slot_uri: harbour:transactionIntent
+    range: TransactionIntent
+    required: false
+
+  delegatedTo:
+    description: DID of the signing service executing on behalf of the user.
+    slot_uri: harbour:delegatedTo
+    range: uri
+    required: false
+
+  actionType:
+    description: >
+      Type of action being consented to (e.g., "purchase", "transfer",
+      "sign-contract", "grant-access").
+    slot_uri: harbour:actionType
+    range: string
+    required: true
+
+  actionReference:
+    description: >
+      URI or hash referencing the full transaction details. May be a URN,
+      IPFS hash, or URL to transaction specification.
+    slot_uri: harbour:actionReference
+    range: uri
+    required: false
+
+  consentTimestamp:
+    description: Timestamp when the user consented to the action.
+    slot_uri: harbour:consentTimestamp
+    range: datetime
+    required: true
+
+  consentNonce:
+    description: Unique nonce for replay protection.
+    slot_uri: harbour:consentNonce
+    range: string
+    required: true
 
   # --- Credential Envelope Slots ---
   issuer:
@@ -261,6 +304,46 @@ classes:
       - verifiablePresentation
     slot_usage:
       verifiablePresentation:
+        required: true
+
+  DelegatedSignatureEvidence:
+    is_a: Evidence
+    description: >
+      Evidence of user consent for a delegated signature operation. The signing
+      service executes a transaction on behalf of the user, with the VP serving
+      as cryptographic proof of consent. For public auditability, the VP should
+      use SD-JWT format with PII claims redacted.
+    class_uri: harbour:DelegatedSignatureEvidence
+    slots:
+      - verifiablePresentation
+      - transactionIntent
+      - delegatedTo
+    slot_usage:
+      verifiablePresentation:
+        required: true
+        description: >
+          The consent VP signed by the user. Should be SD-JWT VP format for
+          privacy-preserving public audit.
+      transactionIntent:
+        required: true
+
+  TransactionIntent:
+    description: >
+      Describes the action or transaction the user is consenting to. Included
+      in the VP evidence to bind consent to a specific action for auditability.
+    class_uri: harbour:TransactionIntent
+    slots:
+      - actionType
+      - actionReference
+      - description
+      - consentTimestamp
+      - consentNonce
+    slot_usage:
+      actionType:
+        required: true
+      consentTimestamp:
+        required: true
+      consentNonce:
         required: true
 
   CRSetEntry:

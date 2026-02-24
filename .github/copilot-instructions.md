@@ -33,11 +33,12 @@ make test-cov
 
 Read these BEFORE making changes:
 
-| Topic              | File                   |
-| ------------------ | ---------------------- |
-| Agent instructions | [../AGENTS.md](../AGENTS.md) |
-| Claude guidance    | [../CLAUDE.md](../CLAUDE.md) |
-| Documentation      | [../README.md](../README.md) |
+| Topic              | File                                      |
+| ------------------ | ----------------------------------------- |
+| Agent instructions | [AGENTS.md](../AGENTS.md)                 |
+| Claude guidance    | [CLAUDE.md](../CLAUDE.md)                 |
+| Documentation      | [README.md](../README.md)                 |
+| Architecture       | [architecture.md](../docs/architecture.md)|
 
 ## Core Principles
 
@@ -110,6 +111,7 @@ When instructed to prepare a commit or PR, **do not commit directly**. Instead:
    - `.playground/pr-description.md` — PR description
 
 The human operator will review these files and either:
+
 - Use them to manually commit/push and create a PR, or
 - Use automated tooling with signed commits (`git commit -s -S`)
 

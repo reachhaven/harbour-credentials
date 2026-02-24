@@ -122,6 +122,6 @@ This guide gets you signing and verifying credentials in minutes.
 
 ## Next Steps
 
-- [Key Management](../guide/keys.md) — Advanced key operations
-- [SD-JWT Guide](../guide/sd-jwt.md) — Selective disclosure in depth
 - [CLI Reference](../cli/index.md) — Command-line tools
+- [Python API](../api/python/index.md) — Python API reference
+- [TypeScript API](../api/typescript/index.md) — TypeScript API reference
