@@ -45,8 +45,12 @@ describe("tamper detection", () => {
     const token = await signVcJose(sampleVc, privateKey);
     const parts = token.split(".");
 
-    const sig = parts[2];
-    const corrupted = sig.slice(0, -1) + (sig.endsWith("A") ? "B" : "A");
+    // Decode signature bytes, flip several bytes, re-encode
+    const sigBytes = Buffer.from(parts[2], "base64url");
+    for (let i = 0; i < 8; i++) {
+      sigBytes[i] = sigBytes[i] ^ 0xff;
+    }
+    const corrupted = sigBytes.toString("base64url");
     const tamperedToken = `${parts[0]}.${parts[1]}.${corrupted}`;
 
     await expect(verifyVcJose(tamperedToken, publicKey)).rejects.toThrow(
