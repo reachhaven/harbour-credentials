@@ -7,12 +7,12 @@ JOSE signing and verification library for W3C Verifiable Credentials, supporting
 - **Dual Format Support**: SD-JWT-VC (EUDI/OIDC4VP) + VC-JOSE-COSE (Gaia-X)
 - **Dual Runtime**: Python and TypeScript with feature parity
 - **ES256 (P-256)**: EUDI HAIP compliant algorithm
-- **EdDSA (Ed25519)**: Legacy support (deprecated per RFC 9864)
+- **EdDSA (Ed25519)**: Supported (deprecated per RFC 9864, use ES256 for production)
 - **X.509 Support**: Certificate chains via `x5c` header
 - **DID Support**: `did:key` and `did:web` resolution
 - **Selective Disclosure**: Native SD-JWT-VC with disclosable claims
 - **Key Binding**: KB-JWT for holder binding in presentations
-- **Harbour Credential Types**: Abstraction layer over Gaia-X types with mandatory revocation support
+- **Harbour Credential Types**: Base credential framework with composition slots for Gaia-X compliance
 
 ## Installation
 
@@ -100,35 +100,49 @@ const payload = await verifyVcJose(jwt, publicKey);
 
 ## Harbour Credential Types
 
-Harbour provides an abstraction layer over Gaia-X types with mandatory revocation support:
+Harbour provides a base credential framework (`harbour.yaml`) and a Gaia-X domain layer (`gaiax-domain.yaml`) that adds participant and service offering types using a **composition pattern**:
 
-| Credential Type                     | Subject Type              | Wraps                |
-| ----------------------------------- | ------------------------- | -------------------- |
-| `harbour:LegalPersonCredential`     | `harbour:LegalPerson`     | `gx:LegalPerson`     |
-| `harbour:NaturalPersonCredential`   | `harbour:NaturalPerson`   | `gx:Participant`     |
-| `harbour:ServiceOfferingCredential` | `harbour:ServiceOffering` | `gx:ServiceOffering` |
+| Credential Type                     | Subject Type              | Composition Slot      | Gaia-X Inner Type     |
+| ----------------------------------- | ------------------------- | --------------------- | --------------------- |
+| `harbour:LegalPersonCredential`     | `harbour:LegalPerson`     | `gxParticipant`       | `gx:LegalPerson`     |
+| `harbour:NaturalPersonCredential`   | `harbour:NaturalPerson`   | `gxParticipant`       | `gx:Participant`     |
+| `harbour:ServiceOfferingCredential` | `harbour:ServiceOffering` | `gxServiceOffering`   | `gx:ServiceOffering` |
 
 All harbour credentials require:
 
+- `issuer` - DID of the credential issuer
 - `validFrom` - Mandatory datetime
 - `credentialStatus` - At least one `harbour:CRSetEntry` for revocation support
 
-Example harbour credential:
+The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
 
 ```json
 {
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
-    "https://w3id.org/reachhaven/harbour/credentials/v1/",
-    "https://w3id.org/gaia-x/development#"
+    "https://w3id.org/gaia-x/development#",
+    "https://w3id.org/reachhaven/harbour/credentials/v1/"
   ],
   "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
   "issuer": "did:web:trust-anchor.example.com",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSubject": {
     "id": "did:web:participant.example.com",
-    "type": ["harbour:LegalPerson", "gx:LegalPerson"],
-    "gx:legalName": "Example Corporation GmbH"
+    "type": "harbour:LegalPerson",
+    "name": "Example Corporation GmbH",
+    "gxParticipant": {
+      "type": "gx:LegalPerson",
+      "gx:legalName": "Example Corporation GmbH",
+      "gx:registrationNumber": "DE123456789",
+      "gx:headquartersAddress": {
+        "type": "gx:Address",
+        "gx:countryCode": "DE"
+      },
+      "gx:legalAddress": {
+        "type": "gx:Address",
+        "gx:countryCode": "DE"
+      }
+    }
   },
   "credentialStatus": [
     {
@@ -147,68 +161,14 @@ Example harbour credential:
 Validate harbour credentials against SHACL shapes using the ontology-management-base validation suite:
 
 ```bash
-# 1. Generate artifacts from LinkML schemas
+# Generate artifacts from LinkML schemas
 make generate
 
-# 2. Navigate to the validation suite
-cd submodules/ontology-management-base
+# Validate examples against SHACL shapes (harbour + gx)
+make validate-shacl
 
-# 3. Validate credential examples against harbour SHACL shapes
-python3 -m src.tools.validators.validation_suite \
-  --run check-data-conformance \
-  --data-paths ../../examples/ \
-  --artifacts ../../artifacts
-
-# 4. Validate a specific credential with harbour + gx artifacts
-python3 -m src.tools.validators.validation_suite \
-  --run check-data-conformance \
-  --data-paths ../../examples/legal-person-credential.json \
-  --artifacts ../../artifacts
-```
-
-> **Note**: The validation suite uses `--data-paths` for input files and `--artifacts` for schema directories.
-
-### Quick Validation Check
-
-For a quick structural validation without SHACL:
-
-```bash
-# Validate harbour credential requirements
-python3 << 'EOF'
-import json
-from pathlib import Path
-
-def validate_harbour_credential(filepath: str) -> bool:
-    """Validate a harbour credential has required fields."""
-    with open(filepath) as f:
-        vc = json.load(f)
-
-    # Check required fields
-    has_valid_from = "validFrom" in vc
-    has_status = "credentialStatus" in vc
-
-    if has_status:
-        status = vc["credentialStatus"][0]
-        has_crset = status.get("type") == "harbour:CRSetEntry"
-    else:
-        has_crset = False
-
-    # Check harbour abstraction types
-    subject = vc.get("credentialSubject", {})
-    types = subject.get("type", [])
-    has_harbour_type = any("harbour:" in t for t in types)
-    has_gx_type = any("gx:" in t for t in types)
-
-    print(f"validFrom: {'✅' if has_valid_from else '❌'}")
-    print(f"credentialStatus (CRSetEntry): {'✅' if has_crset else '❌'}")
-    print(f"harbour abstraction type: {'✅' if has_harbour_type else '❌'}")
-    print(f"gx compatibility type: {'✅' if has_gx_type else '❌'}")
-
-    return has_valid_from and has_crset and has_harbour_type and has_gx_type
-
-# Example usage
-validate_harbour_credential("examples/legal-person-credential.json")
-EOF
+# Run structural validation tests
+make validate
 ```
 
 ### Run Tests
@@ -286,14 +246,13 @@ tests/
 └── typescript/harbour/            # TypeScript tests
 
 linkml/
-├── harbour.yaml           # Harbour credential schema
-└── core.yaml              # Core types (id, type)
+├── core.yaml              # Core types (id, type)
+├── harbour.yaml           # Harbour base credential framework
+└── gaiax-domain.yaml      # Gaia-X domain layer (participant/service types)
 
-artifacts/
-├── harbour/
-│   ├── harbour.owl.ttl        # Generated OWL ontology
-│   ├── harbour.shacl.ttl      # Generated SHACL shapes
-│   └── harbour.context.jsonld # Generated JSON-LD context
+artifacts/                 # Generated per domain (make generate)
+├── harbour/               # Base OWL/SHACL/context
+├── gaiax-domain/          # Domain OWL/SHACL/context
 └── core/
 ```
 

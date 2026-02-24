@@ -1,7 +1,5 @@
 """Verify VC-JOSE-COSE compact JWS proofs on Verifiable Credentials/Presentations.
 
-Also retains the legacy Ed25519Signature2018 detached-JWS verifier.
-
 CLI Usage:
     python -m harbour.verifier --help
     python -m harbour.verifier verify-vc --jwt vc.jwt --public-key key.jwk
@@ -11,19 +9,13 @@ CLI Usage:
 import argparse
 import json
 import sys
-import warnings
 from pathlib import Path
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from harbour._crypto import import_public_key as _import_public_key
 from harbour._crypto import load_public_key as _load_public_key
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
-from harbour.keys import (
-    PublicKeyType,
-    public_key_to_jwk,
-)
+from harbour.keys import PublicKeyType
 from joserfc import jws
-from joserfc.jwk import OKPKey
 
 
 class VerificationError(Exception):
@@ -35,7 +27,7 @@ def verify_vc_jose(token: str, public_key: PublicKeyType) -> dict:
 
     Args:
         token: Compact JWS string (header.payload.signature).
-        public_key: ES256 (P-256) or EdDSA (Ed25519) public key.
+        public_key: Public key (P-256 for ES256, or Ed25519 for EdDSA).
 
     Returns:
         The verified VC JSON-LD dict.
@@ -57,7 +49,7 @@ def verify_vp_jose(
 
     Args:
         token: Compact JWS string (header.payload.signature).
-        public_key: ES256 (P-256) or EdDSA (Ed25519) public key.
+        public_key: Public key (P-256 for ES256, or Ed25519 for EdDSA).
         expected_nonce: If provided, verify the nonce claim matches.
         expected_audience: If provided, verify the aud claim matches.
 
@@ -85,56 +77,6 @@ def verify_vp_jose(
             )
 
     return payload
-
-
-# ---------------------------------------------------------------------------
-# Legacy API (deprecated)
-# ---------------------------------------------------------------------------
-
-
-def verify_vc(signed_vc: dict, public_key: Ed25519PublicKey) -> bool:
-    """Verify the Ed25519Signature2018 JWS proof on a signed VC.
-
-    .. deprecated:: 0.2.0
-        Use :func:`verify_vc_jose` instead.
-
-    Returns True if valid, raises VerificationError if invalid.
-    """
-    import copy
-
-    warnings.warn(
-        "verify_vc() is deprecated. Use verify_vc_jose() for standard VC-JOSE-COSE.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    proof = signed_vc.get("proof")
-    if not proof:
-        raise VerificationError("No proof found in credential")
-
-    jws_value = proof.get("jws")
-    if not jws_value:
-        raise VerificationError("No jws field in proof")
-
-    vc_without_proof = copy.deepcopy(signed_vc)
-    vc_without_proof.pop("proof", None)
-    payload = _canonicalize(vc_without_proof)
-
-    parts = jws_value.split("..")
-    if len(parts) != 2:
-        raise VerificationError(f"Invalid detached JWS format: {jws_value[:50]}...")
-
-    compact_jws = f"{parts[0]}..{parts[1]}"
-
-    jwk_dict = public_key_to_jwk(public_key)
-    key = OKPKey.import_key(jwk_dict)
-
-    try:
-        jws.deserialize_compact(compact_jws, key, algorithms=["EdDSA"], payload=payload)
-    except Exception as e:
-        raise VerificationError(f"JWS verification failed: {e}") from e
-
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -172,11 +114,6 @@ def _verify_jose(token: str, public_key: PublicKeyType, expected_typ: str) -> di
         raise VerificationError(f"Invalid payload JSON: {e}") from e
 
     return payload
-
-
-def _canonicalize(obj: dict) -> bytes:
-    """Canonical JSON serialization (legacy, used only by verify_vc)."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
 
 
 def main():

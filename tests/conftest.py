@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePublicNumbers,
 )
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from harbour.keys import p256_public_key_to_did_key, public_key_to_did_key
+from harbour.keys import p256_public_key_to_did_key
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 KEYS_DIR = FIXTURES_DIR / "keys"
@@ -50,25 +50,6 @@ def ed25519_private_key(ed25519_keypair):
 @pytest.fixture(scope="session")
 def ed25519_public_key(ed25519_keypair):
     return ed25519_keypair[1]
-
-
-# Backwards-compatible aliases for legacy tests
-@pytest.fixture(scope="session")
-def private_key(ed25519_keypair):
-    return ed25519_keypair[0]
-
-
-@pytest.fixture(scope="session")
-def public_key(ed25519_keypair):
-    return ed25519_keypair[1]
-
-
-@pytest.fixture(scope="session")
-def did_key_vm(public_key):
-    """A did:key verification method ID (did:key:z6Mk...#z6Mk...)."""
-    did = public_key_to_did_key(public_key)
-    fragment = did.split(":")[-1]
-    return f"{did}#{fragment}"
 
 
 # ---------------------------------------------------------------------------

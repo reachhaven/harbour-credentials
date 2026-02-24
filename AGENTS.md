@@ -125,7 +125,7 @@ Closes #42
 ## Coding Style
 
 ### Python
-- Python 3.10+ with type hints on public APIs
+- Python 3.12+ with type hints on public APIs
 - Use `pathlib.Path` (not `os.path`)
 - 4-space indentation
 - CLI modules must have `main()` with `argparse` and `--help`
@@ -135,7 +135,7 @@ Closes #42
 - TypeScript 5.x with strict mode
 - Use async/await for crypto operations
 - Export types alongside functions
-- Run `npm run lint` before committing
+- Run `make lint-ts` before committing
 
 ## Module CLI Requirements
 

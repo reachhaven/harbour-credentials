@@ -1,6 +1,6 @@
 # ADR-001: VC Securing Mechanism
 
-**Status:** Proposed (replaces current Ed25519Signature2018 implementation)
+**Status:** Accepted
 **Date:** 2026-02-17
 **Updated:** 2026-02-17 (extended research on EUDI/OIDC4VP/SD-JWT-VC)
 
@@ -173,7 +173,7 @@ Ed25519 keys SHOULD still be supported for backwards compatibility and testing, 
 ```
                     ┌─────────────────────────────┐
                     │   LinkML Schema Definition   │
-                    │   (simpulseid.yaml, etc.)    │
+                    │   (harbour.yaml, etc.)       │
                     └──────────┬──────────────────┘
                                │ generates
                     ┌──────────▼──────────────────┐
@@ -211,14 +211,14 @@ A credential can exist in multiple formats simultaneously. The mapping from SHAC
 - X.509 certificate management adds operational complexity
 - SD-JWT-VC mapping from JSON-LD needs explicit definition
 
-### Migration Path
-1. Add ES256 (P-256) key generation alongside Ed25519
-2. Implement VC-JOSE-COSE signer/verifier (standard JWT with ES256)
-3. Implement SD-JWT-VC signer/verifier using OpenWallet Foundation libraries
-4. Add X.509 certificate chain support
-5. Define mapping: LinkML schema attributes → SD-JWT-VC claims
-6. Deprecate Ed25519Signature2018 implementation
-7. Update CI to test both formats in both runtimes
+### Migration Path (completed)
+1. ~~Add ES256 (P-256) key generation alongside Ed25519~~
+2. ~~Implement VC-JOSE-COSE signer/verifier (standard JWT with ES256)~~
+3. ~~Implement SD-JWT-VC signer/verifier using OpenWallet Foundation libraries~~
+4. ~~Add X.509 certificate chain support~~
+5. ~~Define mapping: LinkML schema attributes → SD-JWT-VC claims~~
+6. ~~Remove Ed25519Signature2018 implementation~~
+7. ~~Update CI to test both formats in both runtimes~~
 
 ## References
 

@@ -1,6 +1,6 @@
 # ADR-003: No Canonicalization Required
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-02-17
 **Depends on:** [ADR-001](001-vc-securing-mechanism.md) (VC-JOSE-COSE)
 

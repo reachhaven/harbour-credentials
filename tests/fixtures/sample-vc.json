@@ -1,18 +1,15 @@
 {
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
-    "https://schema.ascs.digital/simpulse-id/v1/credentials/"
+    "https://w3id.org/reachhaven/harbour/credentials/v1/"
   ],
-  "type": ["VerifiableCredential", "simpulseid:ParticipantCredential"],
+  "type": ["VerifiableCredential"],
   "id": "urn:uuid:576fbefb-35e8-4b71-bb1a-53d1803c86de",
-  "issuer": {
-    "id": "did:web:did.ascs.digital:participants:ascs",
-    "type": "simpulseid:Issuer"
-  },
+  "issuer": "did:web:trust.harbour.example.com",
   "validFrom": "2025-08-06T10:15:22Z",
   "credentialSubject": {
-    "id": "did:web:did.ascs.digital:participants:bmw",
-    "type": ["simpulseid:Participant", "gx:LegalPerson"],
-    "legalName": "Bayerische Motoren Werke AG"
+    "id": "did:web:participant.example.com",
+    "type": "harbour:LegalPerson",
+    "name": "Example Corporation GmbH"
   }
 }

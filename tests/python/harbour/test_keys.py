@@ -34,25 +34,25 @@ def test_generate_ed25519_keypair():
     assert isinstance(public_key, Ed25519PublicKey)
 
 
-def test_ed25519_multibase_encoding(public_key):
-    mb = public_key_to_multibase(public_key)
+def test_ed25519_multibase_encoding(ed25519_public_key):
+    mb = public_key_to_multibase(ed25519_public_key)
     assert mb.startswith("z6Mk"), f"Expected z6Mk... prefix, got {mb[:8]}"
     assert len(mb) > 40
 
 
-def test_ed25519_multibase_deterministic(public_key):
-    mb1 = public_key_to_multibase(public_key)
-    mb2 = public_key_to_multibase(public_key)
+def test_ed25519_multibase_deterministic(ed25519_public_key):
+    mb1 = public_key_to_multibase(ed25519_public_key)
+    mb2 = public_key_to_multibase(ed25519_public_key)
     assert mb1 == mb2
 
 
-def test_ed25519_did_key_format(public_key):
-    did = public_key_to_did_key(public_key)
+def test_ed25519_did_key_format(ed25519_public_key):
+    did = public_key_to_did_key(ed25519_public_key)
     assert did.startswith("did:key:z6Mk")
 
 
-def test_ed25519_jwk_roundtrip(private_key, public_key):
-    jwk = keypair_to_jwk(private_key)
+def test_ed25519_jwk_roundtrip(ed25519_private_key, ed25519_public_key):
+    jwk = keypair_to_jwk(ed25519_private_key)
     assert jwk["kty"] == "OKP"
     assert jwk["crv"] == "Ed25519"
     assert "x" in jwk
@@ -62,7 +62,7 @@ def test_ed25519_jwk_roundtrip(private_key, public_key):
     reimported = Ed25519PublicKey.from_public_bytes(x_bytes)
     assert reimported.public_bytes(
         Encoding.Raw, PublicFormat.Raw
-    ) == public_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
+    ) == ed25519_public_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
 
 
 # ---------------------------------------------------------------------------

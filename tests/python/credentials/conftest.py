@@ -9,7 +9,6 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePrivateNumbers,
     EllipticCurvePublicNumbers,
 )
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from harbour.keys import p256_public_key_to_did_key
 
 
@@ -60,34 +59,11 @@ def p256_did_key_vm(p256_public_key):
 
 
 @pytest.fixture(
-    params=list(EXAMPLES_DIR.glob("simpulseid-*.json")) if EXAMPLES_DIR.exists() else []
+    params=list(EXAMPLES_DIR.glob("*-credential.json")) if EXAMPLES_DIR.exists() else []
 )
 def example_vc(request):
     """Parametrized fixture for each example credential."""
     return json.loads(request.param.read_text())
-
-
-# Legacy Ed25519 fixtures for backwards compatibility tests
-@pytest.fixture(scope="session")
-def private_key():
-    """Generate an Ed25519 private key for legacy tests."""
-    return Ed25519PrivateKey.generate()
-
-
-@pytest.fixture(scope="session")
-def public_key(private_key):
-    """Get the Ed25519 public key."""
-    return private_key.public_key()
-
-
-@pytest.fixture(scope="session")
-def did_key_vm(private_key):
-    """Generate DID:key verification method for Ed25519 key."""
-    from harbour.keys import public_key_to_did_key
-
-    pub = private_key.public_key()
-    did = public_key_to_did_key(pub)
-    return f"{did}#{did.split(':')[-1]}"
 
 
 @pytest.fixture(

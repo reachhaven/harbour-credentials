@@ -1,8 +1,8 @@
 """Sign and verify all example credentials from examples/."""
 
 import pytest
-from harbour.signer import sign_vc, sign_vc_jose
-from harbour.verifier import VerificationError, verify_vc, verify_vc_jose
+from harbour.signer import sign_vc_jose
+from harbour.verifier import VerificationError, verify_vc_jose
 
 # ---------------------------------------------------------------------------
 # VC-JOSE-COSE (ES256) — current format
@@ -45,17 +45,3 @@ def test_verify_signed_jwt(signed_jwt, p256_public_key):
     result = verify_vc_jose(signed_jwt, p256_public_key)
     assert "type" in result
     assert "VerifiableCredential" in result["type"]
-
-
-# ---------------------------------------------------------------------------
-# Legacy Ed25519Signature2018 — backwards compatibility
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_sign_and_verify_example_legacy(
-    example_vc, private_key, public_key, did_key_vm
-):
-    """Sign an example VC with legacy format, then verify."""
-    signed = sign_vc(example_vc, private_key, did_key_vm)
-    assert verify_vc(signed, public_key) is True

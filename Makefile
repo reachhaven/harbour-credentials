@@ -192,7 +192,7 @@ validate:
 validate-shacl:
 	$(call check_dev_setup)
 	@echo "🔧 Running SHACL data conformance check on examples..."
-	@cd $(OMB_SUBMODULE_DIR) && $(abspath $(PYTHON)) -m src.tools.validators.validation_suite \
+	@cd $(OMB_SUBMODULE_DIR) && $(shell which $(PYTHON)) -m src.tools.validators.validation_suite \
 		--run check-data-conformance \
 		--data-paths ../../examples/ \
 		--artifacts ../../artifacts ./artifacts

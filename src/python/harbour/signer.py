@@ -1,8 +1,5 @@
 """Sign Verifiable Credentials and Presentations as VC-JOSE-COSE compact JWS.
 
-Replaces the legacy Ed25519Signature2018 detached-JWS format with standard
-compact JWS per W3C VC-JOSE-COSE and ADR-001/003.
-
 CLI Usage:
     python -m harbour.signer --help
     python -m harbour.signer sign-vc --credential vc.json --key key.jwk
@@ -12,20 +9,13 @@ CLI Usage:
 import argparse
 import json
 import sys
-import warnings
 from pathlib import Path
 
-# Legacy imports for backwards compatibility
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from harbour._crypto import import_private_key as _import_private_key
 from harbour._crypto import load_private_key as _load_private_key
 from harbour._crypto import resolve_private_key_alg as _resolve_alg
-from harbour.keys import (
-    PrivateKey,
-    keypair_to_jwk,
-)
+from harbour.keys import PrivateKey
 from joserfc import jws
-from joserfc.jwk import OKPKey
 
 
 def sign_vc_jose(
@@ -40,7 +30,7 @@ def sign_vc_jose(
 
     Args:
         vc: The Verifiable Credential JSON-LD dict.
-        private_key: ES256 (P-256) or EdDSA (Ed25519) private key.
+        private_key: Private key (P-256 for ES256, or Ed25519 for EdDSA).
         alg: Algorithm override. Default: ES256 for P-256, EdDSA for Ed25519.
         kid: Key ID (DID verification method) for the JOSE header.
         x5c: X.509 certificate chain (base64 DER) for the JOSE header.
@@ -68,7 +58,7 @@ def sign_vp_jose(
 
     Args:
         vp: The Verifiable Presentation JSON-LD dict.
-        private_key: ES256 (P-256) or EdDSA (Ed25519) private key.
+        private_key: Private key (P-256 for ES256, or Ed25519 for EdDSA).
         alg: Algorithm override. Default: ES256 for P-256, EdDSA for Ed25519.
         kid: Key ID (DID verification method) for the JOSE header.
         nonce: Challenge nonce for replay protection.
@@ -93,54 +83,6 @@ def sign_vp_jose(
 
 
 # ---------------------------------------------------------------------------
-# Legacy API (deprecated)
-# ---------------------------------------------------------------------------
-
-
-def sign_vc(
-    vc: dict,
-    private_key: Ed25519PrivateKey,
-    verification_method: str,
-) -> dict:
-    """Sign a VC with Ed25519Signature2018 detached JWS proof.
-
-    .. deprecated:: 0.2.0
-        Use :func:`sign_vc_jose` instead.
-    """
-    import copy
-    from datetime import datetime, timezone
-
-    warnings.warn(
-        "sign_vc() is deprecated. Use sign_vc_jose() for standard VC-JOSE-COSE.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    signed = copy.deepcopy(vc)
-    signed.pop("proof", None)
-
-    payload = _canonicalize(signed)
-    jwk_dict = keypair_to_jwk(private_key)
-    key = OKPKey.import_key(jwk_dict)
-    protected = {"alg": "EdDSA", "b64": False, "crit": ["b64"]}
-    token = jws.serialize_compact(protected, payload, key, algorithms=["EdDSA"])
-
-    parts = token.split(".")
-    detached_jws = f"{parts[0]}..{parts[2]}"
-
-    proof = {
-        "type": "Ed25519Signature2018",
-        "proofPurpose": "assertionMethod",
-        "verificationMethod": verification_method,
-        "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "jws": detached_jws,
-    }
-
-    signed["proof"] = proof
-    return signed
-
-
-# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -158,11 +100,6 @@ def _build_header(
     if x5c is not None:
         header["x5c"] = x5c
     return header
-
-
-def _canonicalize(obj: dict) -> bytes:
-    """Canonical JSON serialization (legacy, used only by sign_vc)."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
 
 
 def main():
