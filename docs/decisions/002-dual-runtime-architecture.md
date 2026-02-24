@@ -1,6 +1,6 @@
 # ADR-002: Dual Python/JavaScript Runtime Architecture
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-02-17
 **Depends on:** [ADR-001](001-vc-securing-mechanism.md) (VC-JOSE-COSE)
 
@@ -22,33 +22,33 @@ Both groups need to sign and verify the same credentials. If the Python implemen
 ```
 harbour-credentials/
 ├── src/
-│   └── harbour/              # Python implementation
-│       ├── __init__.py
-│       └── jose/
-│           ├── keys.py       # Ed25519 key management, did:key, JWK
-│           ├── signer.py     # VC-JOSE-COSE signing
-│           └── verifier.py   # VC-JOSE-COSE verification
-├── js/
-│   ├── package.json          # npm jose dependency
-│   ├── tsconfig.json
-│   └── src/
-│       ├── keys.ts           # Ed25519 key management, did:key, JWK
-│       ├── signer.ts         # VC-JOSE-COSE signing
-│       └── verifier.ts       # VC-JOSE-COSE verification
+│   ├── python/
+│   │   ├── harbour/           # Python crypto library
+│   │   │   ├── keys.py        # Key generation (P-256, Ed25519), DID:key, JWK
+│   │   │   ├── signer.py      # VC-JOSE-COSE signing
+│   │   │   ├── verifier.py    # VC-JOSE-COSE verification
+│   │   │   ├── sd_jwt.py      # SD-JWT-VC selective disclosure
+│   │   │   ├── kb_jwt.py      # Key Binding JWT
+│   │   │   └── x509.py        # X.509 certificates
+│   │   └── credentials/       # Credential processing pipeline
+│   └── typescript/
+│       └── harbour/           # TypeScript crypto library (feature parity)
+│           ├── keys.ts
+│           ├── sign.ts
+│           ├── verify.ts
+│           ├── sd-jwt.ts
+│           └── x509.ts
 ├── tests/
-│   ├── test_keys.py          # Python key tests
-│   ├── test_sign.py          # Python sign tests
-│   ├── test_verify.py        # Python verify tests
-│   └── test_interop.py       # Cross-runtime interop (Python signs, calls JS to verify)
-├── js/tests/
-│   ├── keys.test.ts          # JS key tests
-│   ├── sign.test.ts          # JS sign tests
-│   ├── verify.test.ts        # JS verify tests
-│   └── interop.test.ts       # Cross-runtime interop (JS signs, calls Python to verify)
-├── tests/fixtures/
-│   ├── test-keypair.json     # Shared Ed25519 JWK (used by both runtimes)
-│   ├── signed-vc.jwt         # Reference JWT signed by Python
-│   └── sample-vc.json        # Unsigned VC payload
+│   ├── fixtures/
+│   │   ├── keys/              # Shared test keypairs (P-256, Ed25519)
+│   │   ├── tokens/            # Signed token fixtures
+│   │   └── sample-vc.json     # Unsigned VC payload
+│   ├── python/harbour/        # Python harbour module tests
+│   ├── python/credentials/    # Python credentials module tests
+│   ├── typescript/harbour/    # TypeScript tests (vitest)
+│   └── interop/               # Cross-runtime interop tests
+├── linkml/                    # LinkML schemas (harbour.yaml, core.yaml, gaiax-domain.yaml)
+├── artifacts/                 # Generated OWL/SHACL/JSON-LD context
 └── docs/
 ```
 
@@ -56,9 +56,10 @@ harbour-credentials/
 
 The interop guarantee is enforced by **shared test fixtures**:
 
-1. `tests/fixtures/test-keypair.json` — Same Ed25519 JWK loaded by both runtimes
-2. `tests/fixtures/sample-vc.json` — Same unsigned VC payload
-3. `tests/fixtures/signed-vc.jwt` — Reference signed JWT (committed, deterministic)
+1. `tests/fixtures/keys/test-keypair-p256.json` — Same P-256 JWK loaded by both runtimes
+2. `tests/fixtures/keys/test-keypair.json` — Same Ed25519 JWK loaded by both runtimes
+3. `tests/fixtures/sample-vc.json` — Same unsigned VC payload
+4. `tests/fixtures/tokens/signed-vc-p256.jwt` — Reference signed JWT (committed, deterministic)
 
 **Interop test pattern:**
 ```
@@ -105,7 +106,8 @@ The interop job:
 - CI pipeline is more complex (two runtimes)
 - Contributors need familiarity with both ecosystems (or can focus on one)
 
-### Not Decided Yet
-- **npm package name** — `@reachhaven/harbour-credentials` or `harbour-credentials`
-- **JS test framework** — vitest (recommended, fast, ESM-native) or jest
-- **Monorepo tooling** — whether to use npm workspaces or keep it flat
+### Decided Since Initial Proposal
+- **npm package name** — `@reachhaven/harbour-credentials`
+- **JS test framework** — vitest (fast, ESM-native)
+- **Package manager** — Yarn 4 via corepack
+- **TS source location** — `src/typescript/harbour/` (flat, no monorepo tooling)

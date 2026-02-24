@@ -1,15 +1,17 @@
 id: https://w3id.org/reachhaven/harbour/credentials/v1
 name: harbour
 description: >
-  LinkML schema for Harbour credentials vocabulary.
-  Defines constraints on the W3C VC envelope (cred:), evidence types,
-  status, trust anchors, and revocation registries.
+  Base LinkML schema for Harbour credentials.
+  Defines the W3C VC envelope constraints (issuer, validFrom,
+  credentialStatus), evidence types, revocation (CRSet), DID document
+  structure, and trust anchor services. Domain-specific participant
+  and credential types are defined in separate domain schemas
+  (e.g. gaiax-domain.yaml).
 
 prefixes:
   linkml: https://w3id.org/linkml/
   harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
   core: https://w3id.org/reachhaven/harbour/core/v1/
-  gx: https://w3id.org/gaia-x/development#
   xsd: http://www.w3.org/2001/XMLSchema#
   cs: https://www.w3.org/ns/credentials/status#
   cred: https://www.w3.org/2018/credentials#
@@ -21,7 +23,6 @@ default_range: string
 imports:
   - linkml:types
   - ./core
-  - ../../service-characteristics/linkml/gaia-x
 
 slots:
   # --- DID Slots ---
@@ -66,6 +67,31 @@ slots:
     slot_uri: schema:contactType
     range: string
 
+  name:
+    description: A human-readable name for the entity.
+    slot_uri: schema:name
+    range: string
+
+  description:
+    description: A human-readable description of the entity.
+    slot_uri: schema:description
+    range: string
+
+  url:
+    description: A URL associated with the entity.
+    slot_uri: schema:url
+    range: uri
+
+  email:
+    description: An email address.
+    slot_uri: schema:email
+    range: string
+
+  contactPoint:
+    description: A contact point for the entity.
+    slot_uri: schema:contactPoint
+    range: string
+
   # --- Credential / Evidence Slots ---
   evidence:
     slot_uri: cred:evidence
@@ -82,13 +108,12 @@ slots:
     range: Any
     required: false
 
-  vp:
-    description: >
-      DEPRECATED: Use verifiablePresentation instead.
-      A Verifiable Presentation embedded as evidence (nested JSON-LD object).
-    slot_uri: harbour:vp
-    range: Any
-    required: false
+  # --- Credential Envelope Slots ---
+  issuer:
+    slot_uri: cred:issuer
+    range: string
+    required: true
+    description: DID of the credential issuer.
 
   # --- W3C VC v2 Envelope Slots (harbour constrains these) ---
   validFrom:
@@ -105,9 +130,6 @@ classes:
   Any:
     class_uri: linkml:Any
     description: "Generic class for any type of value."
-
-  # TermsAndConditions is defined upstream in Gaia-X service-offering.yaml
-  # with url (gx:url) and hash (gx:hash) slots — reused as-is.
 
   # ==========================================
   # 1. ROOT DOCUMENT
@@ -186,7 +208,34 @@ classes:
       - implementation
 
   # ==========================================
-  # 3. CREDENTIALS & EVIDENCE
+  # 3. CREDENTIAL TYPES
+  # ==========================================
+  # Harbour credential types add mandatory credentialStatus (CRSetEntry)
+  # and optional evidence to W3C VerifiableCredential.
+
+  HarbourCredential:
+    abstract: true
+    description: >
+      Abstract base for all Harbour credentials. Requires issuer, validFrom,
+      and credentialStatus with at least one CRSetEntry for revocation support.
+    class_uri: harbour:HarbourCredential
+    slots:
+      - id
+      - type
+      - issuer
+      - validFrom
+      - validUntil
+      - evidence
+    attributes:
+      credentialStatus:
+        slot_uri: cred:credentialStatus
+        range: CRSetEntry
+        multivalued: true
+        required: true
+        description: Status entries for revocation checking (CRSet).
+
+  # ==========================================
+  # 4. EVIDENCE TYPES
   # ==========================================
   Evidence:
     abstract: true
@@ -200,6 +249,9 @@ classes:
     class_uri: harbour:EmailVerification
     slots:
       - verifiablePresentation
+    slot_usage:
+      verifiablePresentation:
+        required: true
 
   IssuanceEvidence:
     is_a: Evidence
@@ -207,6 +259,9 @@ classes:
     class_uri: harbour:IssuanceEvidence
     slots:
       - verifiablePresentation
+    slot_usage:
+      verifiablePresentation:
+        required: true
 
   CRSetEntry:
     class_uri: harbour:CRSetEntry
@@ -216,7 +271,7 @@ classes:
       - statusPurpose
 
   # ==========================================
-  # 4. HELPERS
+  # 5. HELPERS
   # ==========================================
   VerificationMethod:
     class_uri: https://www.w3.org/ns/did#VerificationMethod
@@ -226,4 +281,5 @@ classes:
       - controller
     attributes:
       blockchainAccountId:
+        slot_uri: harbour:blockchainAccountId
         range: string

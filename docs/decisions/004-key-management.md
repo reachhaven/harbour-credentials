@@ -1,6 +1,6 @@
 # ADR-004: Key Management — ES256 (P-256) + X.509 + DID
 
-**Status:** Proposed (supersedes Ed25519-only approach)
+**Status:** Accepted
 **Date:** 2026-02-17
 **Updated:** 2026-02-17 (ES256 required by EUDI HAIP, EdDSA deprecated by RFC 9864)
 **Depends on:** [ADR-001](001-vc-securing-mechanism.md)

@@ -29,8 +29,8 @@ jobs:
       - name: Run pre-commit
         run: pre-commit run --all-files
 
-  lint-js:
-    name: Lint (JS)
+  lint-ts:
+    name: Lint (TypeScript)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,13 +39,43 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
-        working-directory: js
-        run: npm ci
+        working-directory: src/typescript/harbour
+        run: yarn install --immutable
 
       - name: Type check
-        working-directory: js
-        run: npx tsc --noEmit
+        working-directory: src/typescript/harbour
+        run: yarn lint
+
+  generate-validate:
+    name: Generate & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install -e ".[dev]" linkml
+          python3 -m pip install -e "./submodules/ontology-management-base"
+
+      - name: Generate artifacts
+        run: make generate
+
+      - name: Validate credentials
+        run: make validate
+
+      - name: Validate examples (SHACL conformance)
+        run: make validate-shacl
 
   test-python:
     name: Test (Python)
@@ -62,10 +92,10 @@ jobs:
         run: python3 -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short --cov
+        run: PYTHONPATH=src/python:$PYTHONPATH pytest tests/ -v --tb=short --cov
 
-  test-js:
-    name: Test (JS)
+  test-ts:
+    name: Test (TypeScript)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,18 +104,21 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install dependencies
-        working-directory: js
-        run: npm ci
+        working-directory: src/typescript/harbour
+        run: yarn install --immutable
 
       - name: Run tests
-        working-directory: js
-        run: npx vitest run
+        working-directory: src/typescript/harbour
+        run: yarn test
 
   test-interop:
     name: Cross-Runtime Interop
     runs-on: ubuntu-latest
-    needs: [test-python, test-js]
+    needs: [test-python, test-ts]
     steps:
       - uses: actions/checkout@v4
 
@@ -98,12 +131,15 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install Python dependencies
         run: python3 -m pip install -e ".[dev]"
 
-      - name: Install JS dependencies
-        working-directory: js
-        run: npm ci
+      - name: Install TypeScript dependencies
+        working-directory: src/typescript/harbour
+        run: yarn install --immutable
 
       - name: Run interop tests
-        run: pytest tests/test_interop.py -v --tb=short
+        run: PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v --tb=short

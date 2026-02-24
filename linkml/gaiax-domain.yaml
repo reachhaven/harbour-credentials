@@ -1,0 +1,144 @@
+id: https://w3id.org/reachhaven/harbour/gaiax-domain/v1
+name: gaiax-domain
+description: >
+  Gaia-X domain layer for Harbour credentials.
+  Defines participant and service offering types that wrap Gaia-X
+  compliance data via composition. Harbour outer nodes carry
+  harbour-specific properties; nested gx blank nodes carry only gx
+  properties, keeping gx closed SHACL shapes intact.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
+  core: https://w3id.org/reachhaven/harbour/core/v1/
+  xsd: http://www.w3.org/2001/XMLSchema#
+  cred: https://www.w3.org/2018/credentials#
+  schema: http://schema.org/
+
+default_prefix: harbour
+default_range: string
+
+imports:
+  - linkml:types
+  - ./harbour
+
+# ==========================================
+# Composition Slots
+# ==========================================
+# These slots link harbour outer nodes to Gaia-X inner blank nodes.
+
+slots:
+  gxParticipant:
+    description: >
+      Nested Gaia-X participant compliance data
+      (gx:LegalPerson or gx:Participant blank node).
+    slot_uri: harbour:gxParticipant
+    range: Any
+    required: false
+
+  gxServiceOffering:
+    description: >
+      Nested Gaia-X service offering compliance data
+      (gx:ServiceOffering blank node).
+    slot_uri: harbour:gxServiceOffering
+    range: Any
+    required: false
+
+classes:
+  # ==========================================
+  # 1. PARTICIPANT TYPES
+  # ==========================================
+  # Harbour wraps Gaia-X participant types via composition.
+  # Gaia-X data lives in nested blank nodes (gxParticipant /
+  # gxServiceOffering) to keep gx closed shapes intact.
+
+  LegalPerson:
+    description: >
+      A legal person (organization) participating in the harbour ecosystem.
+      Gaia-X compliance data is nested in the gxParticipant slot as a
+      gx:LegalPerson blank node, keeping the gx closed shape intact.
+    class_uri: harbour:LegalPerson
+    slots:
+      - name
+      - gxParticipant
+    slot_usage:
+      name:
+        required: true
+
+  NaturalPerson:
+    description: >
+      A natural person (individual) participating in the harbour ecosystem.
+      Gaia-X participant data is nested in the gxParticipant slot.
+    class_uri: harbour:NaturalPerson
+    slots:
+      - name
+      - gxParticipant
+    slot_usage:
+      name:
+        required: true
+    attributes:
+      givenName:
+        slot_uri: schema:givenName
+        range: string
+      familyName:
+        slot_uri: schema:familyName
+        range: string
+      email:
+        slot_uri: schema:email
+        range: string
+      memberOf:
+        description: Organization (LegalPerson) the natural person belongs to.
+        slot_uri: schema:memberOf
+        range: uri
+
+  ServiceOffering:
+    description: >
+      A service offering available in the harbour ecosystem.
+      Gaia-X compliance data is nested in the gxServiceOffering slot.
+    class_uri: harbour:ServiceOffering
+    slots:
+      - name
+      - description
+      - gxServiceOffering
+    slot_usage:
+      name:
+        required: true
+
+  # ==========================================
+  # 2. CREDENTIAL TYPES
+  # ==========================================
+
+  LegalPersonCredential:
+    is_a: HarbourCredential
+    description: >
+      Credential attesting to a harbour:LegalPerson (organization) identity.
+      The credentialSubject wraps a gx:LegalPerson via the gxParticipant slot.
+    class_uri: harbour:LegalPersonCredential
+    slot_usage:
+      validFrom:
+        required: true
+      evidence:
+        required: true
+
+  NaturalPersonCredential:
+    is_a: HarbourCredential
+    description: >
+      Credential attesting to a harbour:NaturalPerson (individual) identity.
+      The credentialSubject wraps gx:Participant via the gxParticipant slot.
+    class_uri: harbour:NaturalPersonCredential
+    slot_usage:
+      validFrom:
+        required: true
+      evidence:
+        required: true
+
+  ServiceOfferingCredential:
+    is_a: HarbourCredential
+    description: >
+      Credential attesting to a harbour:ServiceOffering.
+      The credentialSubject wraps a gx:ServiceOffering via the
+      gxServiceOffering slot.
+    class_uri: harbour:ServiceOfferingCredential
+    slot_usage:
+      validFrom:
+        required: true
