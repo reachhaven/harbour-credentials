@@ -55,6 +55,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-python@v5
         with:
@@ -62,13 +64,18 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: python3 -m pip install -e ".[dev]" linkml
+        run: |
+          python3 -m pip install -e ".[dev]" linkml
+          python3 -m pip install -e "./submodules/ontology-management-base"
 
       - name: Generate artifacts
         run: make generate
 
       - name: Validate credentials
         run: make validate
+
+      - name: Validate examples (SHACL conformance)
+        run: make validate-shacl
 
   test-python:
     name: Test (Python)

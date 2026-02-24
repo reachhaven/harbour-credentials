@@ -33,6 +33,7 @@ class TestHarbourLegalPersonMapping:
 
         assert claims["iss"] == "did:web:trust-anchor.example.com"
         assert claims["sub"] == "did:web:participant.example.com"
+        assert claims["name"] == "Example Corporation GmbH"
         assert claims["legalName"] == "Example Corporation GmbH"
         assert "registrationNumber" in claims
         assert "registrationNumber" in disclosable
@@ -45,11 +46,22 @@ class TestHarbourLegalPersonMapping:
         assert status["statusPurpose"] == "revocation"
 
     def test_subject_is_harbour_legal_person(self):
-        """Verify the subject uses harbour:LegalPerson (wraps gx:LegalPerson)."""
+        """Verify the subject uses harbour:LegalPerson (outer node only)."""
         vc = _load_fixture("legal-person-credential.json")
-        types = vc["credentialSubject"]["type"]
-        assert "harbour:LegalPerson" in types
-        assert "gx:LegalPerson" in types
+        subject_type = vc["credentialSubject"]["type"]
+        assert subject_type == "harbour:LegalPerson"
+
+    def test_gx_inner_node_exists(self):
+        """Verify gx:LegalPerson data lives in the gxParticipant inner node."""
+        vc = _load_fixture("legal-person-credential.json")
+        subject = vc["credentialSubject"]
+        gx = subject["gxParticipant"]
+        assert gx["type"] == "gx:LegalPerson"
+        assert "gx:legalName" in gx
+        assert "gx:registrationNumber" in gx
+        # gx properties must NOT be on the outer node
+        assert "gx:legalName" not in subject
+        assert "gx:registrationNumber" not in subject
 
     def test_roundtrip(self):
         vc = _load_fixture("legal-person-credential.json")
@@ -59,8 +71,8 @@ class TestHarbourLegalPersonMapping:
             claims, mapping, "harbour:LegalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["gx:legalName"]
-            == vc["credentialSubject"]["gx:legalName"]
+            reconstructed["credentialSubject"]["gxParticipant"]["gx:legalName"]
+            == vc["credentialSubject"]["gxParticipant"]["gx:legalName"]
         )
 
 
@@ -89,11 +101,17 @@ class TestHarbourNaturalPersonMapping:
         assert evidence["type"] == "harbour:EmailVerification"
 
     def test_subject_is_harbour_natural_person(self):
-        """Verify the subject uses harbour:NaturalPerson (extends gx:Participant)."""
+        """Verify the subject uses harbour:NaturalPerson (outer node only)."""
         vc = _load_fixture("natural-person-credential.json")
-        types = vc["credentialSubject"]["type"]
-        assert "harbour:NaturalPerson" in types
-        assert "gx:Participant" in types
+        subject_type = vc["credentialSubject"]["type"]
+        assert subject_type == "harbour:NaturalPerson"
+
+    def test_gx_inner_node_exists(self):
+        """Verify gx:Participant data lives in the gxParticipant inner node."""
+        vc = _load_fixture("natural-person-credential.json")
+        subject = vc["credentialSubject"]
+        gx = subject["gxParticipant"]
+        assert gx["type"] == "gx:Participant"
 
     def test_roundtrip(self):
         vc = _load_fixture("natural-person-credential.json")
@@ -116,6 +134,7 @@ class TestHarbourServiceOfferingMapping:
 
         assert claims["sub"] == "did:web:provider.example.com:services:data-api"
         assert claims["name"] == "Example Data API"
+        assert claims["providedBy"] == "did:web:provider.example.com"
         assert "description" in disclosable
 
     def test_has_credential_status(self):
@@ -125,13 +144,20 @@ class TestHarbourServiceOfferingMapping:
         assert status["type"] == "harbour:CRSetEntry"
 
     def test_subject_is_harbour_service_offering(self):
-        """Verify the subject uses harbour:ServiceOffering (wraps gx:ServiceOffering)."""
+        """Verify the subject uses harbour:ServiceOffering (outer node only)."""
         vc = _load_fixture("service-offering-credential.json")
-        types = vc["credentialSubject"]["type"]
-        assert "harbour:ServiceOffering" in types
-        assert "gx:ServiceOffering" in types
-        status = vc["credentialStatus"][0]
-        assert status["type"] == "harbour:CRSetEntry"
+        subject_type = vc["credentialSubject"]["type"]
+        assert subject_type == "harbour:ServiceOffering"
+
+    def test_gx_inner_node_exists(self):
+        """Verify gx:ServiceOffering data lives in the gxServiceOffering inner node."""
+        vc = _load_fixture("service-offering-credential.json")
+        subject = vc["credentialSubject"]
+        gx = subject["gxServiceOffering"]
+        assert gx["type"] == "gx:ServiceOffering"
+        assert "gx:providedBy" in gx
+        # gx properties must NOT be on the outer node
+        assert "gx:providedBy" not in subject
 
 
 class TestMappingDiscovery:

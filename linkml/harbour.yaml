@@ -1,20 +1,21 @@
 id: https://w3id.org/reachhaven/harbour/credentials/v1
 name: harbour
 description: >
-  LinkML schema for Harbour credentials vocabulary.
-  Defines constraints on the W3C VC envelope (cred:), evidence types,
-  status, trust anchors, and revocation registries.
+  Base LinkML schema for Harbour credentials.
+  Defines the W3C VC envelope constraints (issuer, validFrom,
+  credentialStatus), evidence types, revocation (CRSet), DID document
+  structure, and trust anchor services. Domain-specific participant
+  and credential types are defined in separate domain schemas
+  (e.g. gaiax-domain.yaml).
 
 prefixes:
   linkml: https://w3id.org/linkml/
   harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
   core: https://w3id.org/reachhaven/harbour/core/v1/
-  gx: https://w3id.org/gaia-x/development#
   xsd: http://www.w3.org/2001/XMLSchema#
   cs: https://www.w3.org/ns/credentials/status#
   cred: https://www.w3.org/2018/credentials#
   schema: http://schema.org/
-  did: https://www.w3.org/ns/did#
 
 default_prefix: harbour
 default_range: string
@@ -115,6 +116,13 @@ slots:
     range: Any
     required: false
 
+  # --- Credential Envelope Slots ---
+  issuer:
+    slot_uri: cred:issuer
+    range: string
+    required: true
+    description: DID of the credential issuer.
+
   # --- W3C VC v2 Envelope Slots (harbour constrains these) ---
   validFrom:
     slot_uri: cred:validFrom
@@ -130,9 +138,6 @@ classes:
   Any:
     class_uri: linkml:Any
     description: "Generic class for any type of value."
-
-  # TermsAndConditions is defined upstream in Gaia-X service-offering.yaml
-  # with url (gx:url) and hash (gx:hash) slots — reused as-is.
 
   # ==========================================
   # 1. ROOT DOCUMENT
@@ -211,98 +216,7 @@ classes:
       - implementation
 
   # ==========================================
-  # 3. PARTICIPANT TYPES
-  # ==========================================
-  # Harbour provides abstraction layers over Gaia-X participant types.
-  # In JSON-LD credentials, use both harbour: and gx: types for compatibility.
-
-  LegalPerson:
-    description: >
-      A legal person (organization) that is onboarded to Gaia-X.
-      This harbour abstraction wraps gx:LegalPerson for consistency.
-      In JSON-LD credentials, use type: ["harbour:LegalPerson", "gx:LegalPerson"]
-      to indicate compatibility with Gaia-X.
-    class_uri: harbour:LegalPerson
-    slots:
-      - name
-      - description
-    slot_usage:
-      name:
-        required: true
-    attributes:
-      legalName:
-        description: The official legal name of the organization.
-        slot_uri: gx:legalName
-        range: string
-      registrationNumber:
-        description: Registration number identifying the legal entity.
-        slot_uri: gx:registrationNumber
-        range: string
-      headquartersAddress:
-        description: Physical location of the headquarters.
-        slot_uri: gx:headquartersAddress
-        range: string
-      legalAddress:
-        description: Official legal address of the organization.
-        slot_uri: gx:legalAddress
-        range: string
-
-  NaturalPerson:
-    description: >
-      A natural person (individual) that is onboarded to Gaia-X.
-      This is a harbour placeholder for gx:NaturalPerson until Gaia-X
-      officially adds the class (ref: service-characteristics#350).
-      In JSON-LD credentials, use type: ["harbour:NaturalPerson", "gx:Participant"]
-      to indicate compatibility with gx:Participant.
-    class_uri: harbour:NaturalPerson
-    slots:
-      - name
-      - description
-    slot_usage:
-      name:
-        required: true
-    attributes:
-      givenName:
-        slot_uri: schema:givenName
-        range: string
-      familyName:
-        slot_uri: schema:familyName
-        range: string
-      email:
-        slot_uri: schema:email
-        range: string
-      memberOf:
-        description: Organization (LegalPerson) the natural person belongs to.
-        slot_uri: schema:memberOf
-        range: uri
-
-  ServiceOffering:
-    description: >
-      A service offering that can be consumed within Gaia-X.
-      This harbour abstraction wraps gx:ServiceOffering for consistency.
-      In JSON-LD credentials, use type: ["harbour:ServiceOffering", "gx:ServiceOffering"]
-      to indicate compatibility with Gaia-X.
-    class_uri: harbour:ServiceOffering
-    slots:
-      - name
-      - description
-    slot_usage:
-      name:
-        required: true
-    attributes:
-      providedBy:
-        description: Reference to the provider (LegalPerson) of this service.
-        slot_uri: gx:providedBy
-        range: uri
-      termsAndConditions:
-        description: >
-          Terms and conditions for this service offering. In Gaia-X, this is
-          an object with gx:url and gx:hash properties.
-        slot_uri: gx:serviceOfferingTermsAndConditions
-        range: Any
-
-  # ==========================================
-  # 4. CREDENTIAL TYPES
+  # 3. CREDENTIAL TYPES
   # ==========================================
   # Harbour credential types add mandatory credentialStatus (CRSetEntry)
   # and optional evidence to W3C VerifiableCredential.
@@ -310,12 +224,13 @@ classes:
   HarbourCredential:
     abstract: true
     description: >
-      Abstract base for all Harbour credentials. Requires validFrom and
-      credentialStatus with at least one CRSetEntry for revocation support.
+      Abstract base for all Harbour credentials. Requires issuer, validFrom,
+      and credentialStatus with at least one CRSetEntry for revocation support.
     class_uri: harbour:HarbourCredential
     slots:
       - id
       - type
+      - issuer
       - validFrom
       - validUntil
       - evidence
@@ -327,40 +242,8 @@ classes:
         required: true
         description: Status entries for revocation checking (CRSet).
 
-  LegalPersonCredential:
-    is_a: HarbourCredential
-    description: >
-      Credential attesting to a gx:LegalPerson (organization) identity.
-      The credentialSubject contains a gx:LegalPerson with registration
-      number, addresses, and organizational details.
-    class_uri: harbour:LegalPersonCredential
-    slot_usage:
-      validFrom:
-        required: true
-
-  NaturalPersonCredential:
-    is_a: HarbourCredential
-    description: >
-      Credential attesting to a harbour:NaturalPerson (individual) identity.
-      The credentialSubject contains personal information like name and email.
-    class_uri: harbour:NaturalPersonCredential
-    slot_usage:
-      validFrom:
-        required: true
-
-  ServiceOfferingCredential:
-    is_a: HarbourCredential
-    description: >
-      Credential attesting to a gx:ServiceOffering.
-      The credentialSubject describes a service with its provider,
-      terms and conditions, and service characteristics.
-    class_uri: harbour:ServiceOfferingCredential
-    slot_usage:
-      validFrom:
-        required: true
-
   # ==========================================
-  # 5. EVIDENCE TYPES
+  # 4. EVIDENCE TYPES
   # ==========================================
   Evidence:
     abstract: true
@@ -396,7 +279,7 @@ classes:
       - statusPurpose
 
   # ==========================================
-  # 6. HELPERS
+  # 5. HELPERS
   # ==========================================
   VerificationMethod:
     class_uri: https://www.w3.org/ns/did#VerificationMethod

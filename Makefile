@@ -1,7 +1,7 @@
 # Harbour Credentials Makefile
 # ============================
 
-.PHONY: setup install install-dev submodule-setup ts-bootstrap generate validate lint format test test-cov test-ts build-ts lint-ts test-all all clean help
+.PHONY: setup install install-dev submodule-setup ts-bootstrap generate validate validate-shacl lint format test test-cov test-ts build-ts lint-ts test-all all clean help
 
 TS_DIR := src/typescript/harbour
 OMB_SUBMODULE_DIR := submodules/ontology-management-base
@@ -51,7 +51,7 @@ endef
 
 # LinkML schema files
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
-DOMAINS := harbour core
+DOMAINS := harbour core gaiax-domain
 ifdef CI
     GEN_OWL := gen-owl
     GEN_SHACL := gen-shacl
@@ -74,8 +74,9 @@ help:
 	@echo "  make ts-bootstrap - Enable corepack and install TypeScript dependencies"
 	@echo ""
 	@echo "Artifacts:"
-	@echo "  make generate    - Generate OWL/SHACL/context from LinkML"
-	@echo "  make validate    - Validate credentials against SHACL shapes"
+	@echo "  make generate        - Generate OWL/SHACL/context from LinkML"
+	@echo "  make validate        - Validate credentials against SHACL shapes"
+	@echo "  make validate-shacl  - Run SHACL conformance on examples (via ontology-management-base)"
 	@echo ""
 	@echo "Linting:"
 	@echo "  make lint        - Run pre-commit checks (Python)"
@@ -186,6 +187,16 @@ validate:
 	@echo "🔧 Validating harbour credentials..."
 	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTEST) tests/python/credentials/test_validation.py -v
 	@echo "✅ Validation complete"
+
+# Validate example credentials against SHACL shapes via ontology-management-base
+validate-shacl:
+	$(call check_dev_setup)
+	@echo "🔧 Running SHACL data conformance check on examples..."
+	@cd $(OMB_SUBMODULE_DIR) && $(abspath $(PYTHON)) -m src.tools.validators.validation_suite \
+		--run check-data-conformance \
+		--data-paths ../../examples/ \
+		--artifacts ../../artifacts ./artifacts
+	@echo "✅ SHACL validation complete"
 
 # Run pre-commit hooks on all files
 lint:

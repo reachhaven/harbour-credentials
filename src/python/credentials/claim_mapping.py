@@ -31,12 +31,13 @@ GAIAX_NS = "https://w3id.org/gaia-x/development#"
 HARBOUR_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}LegalPersonCredential",
     "claims": {
-        "credentialSubject.gx:legalName": "legalName",
-        "credentialSubject.gx:registrationNumber": "registrationNumber",
-        "credentialSubject.gx:headquartersAddress": "headquartersAddress",
-        "credentialSubject.gx:legalAddress": "legalAddress",
+        "credentialSubject.name": "name",
+        "credentialSubject.gxParticipant.gx:legalName": "legalName",
+        "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
+        "credentialSubject.gxParticipant.gx:headquartersAddress": "headquartersAddress",
+        "credentialSubject.gxParticipant.gx:legalAddress": "legalAddress",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "legalName"],
+    "always_disclosed": ["iss", "vct", "iat", "exp", "name", "legalName"],
     "selectively_disclosed": [
         "registrationNumber",
         "headquartersAddress",
@@ -59,10 +60,10 @@ HARBOUR_NATURAL_PERSON_MAPPING = {
 HARBOUR_SERVICE_OFFERING_MAPPING = {
     "vct": f"{HARBOUR_NS}ServiceOfferingCredential",
     "claims": {
-        "credentialSubject.gx:providedBy": "providedBy",
         "credentialSubject.name": "name",
         "credentialSubject.description": "description",
-        "credentialSubject.gx:serviceOfferingTermsAndConditions": "termsAndConditions",
+        "credentialSubject.gxServiceOffering.gx:providedBy": "providedBy",
+        "credentialSubject.gxServiceOffering.gx:serviceOfferingTermsAndConditions": "termsAndConditions",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp", "providedBy", "name"],
     "selectively_disclosed": ["description", "termsAndConditions"],
