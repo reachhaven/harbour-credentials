@@ -64,14 +64,14 @@ describe("KB-JWT creation", () => {
     const withKb = await createKbJwt(sdJwt, holderPrivateKey, {
       nonce: "test-nonce",
       audience: "did:web:verifier.example.com",
-      transactionData: ["tx1", "tx2"],
+      transaction_data: ["tx1", "tx2"],
     });
 
     // Verify and check payload
     const payload = await verifyKbJwt(withKb, holderPublicKey, {
       expectedNonce: "test-nonce",
       expectedAudience: "did:web:verifier.example.com",
-      expectedTransactionData: ["tx1", "tx2"],
+      expected_transaction_data: ["tx1", "tx2"],
     });
 
     expect(payload.transaction_data_hashes).toBeDefined();
@@ -152,14 +152,14 @@ describe("KB-JWT verification", () => {
     const withKb = await createKbJwt(sdJwt, holderPrivateKey, {
       nonce: "nonce",
       audience: "aud",
-      transactionData: ["tx1", "tx2"],
+      transaction_data: ["tx1", "tx2"],
     });
 
     await expect(
       verifyKbJwt(withKb, holderPublicKey, {
         expectedNonce: "nonce",
         expectedAudience: "aud",
-        expectedTransactionData: ["tx1", "WRONG"],
+        expected_transaction_data: ["tx1", "WRONG"],
       })
     ).rejects.toThrow(KbJwtVerificationError);
   });

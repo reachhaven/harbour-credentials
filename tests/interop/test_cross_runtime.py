@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 from harbour.delegation import (
     TransactionData,
+    compute_transaction_data_param_hash,
     create_delegation_challenge,
+    encode_transaction_data_param,
 )
 from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.signer import sign_vc_jose, sign_vp_jose
@@ -292,6 +294,63 @@ for (let i = 0; i < inputs.length; i++) {{
   if (challenge !== expected[i]) {{
     console.error("MISMATCH at index " + i);
     console.error("Got:      " + challenge);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+        """
+        assert _run_node(script) == "OK"
+
+    def test_transaction_data_param_matches(self, vectors):
+        """Both runtimes produce the same base64url transaction_data request strings."""
+        for v in vectors:
+            td = TransactionData.from_dict(v["input"])
+            assert (
+                encode_transaction_data_param(td) == v["transaction_data_param"]
+            ), f"Python mismatch for {v['name']}"
+
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["transaction_data_param"] for v in vectors])
+
+        script = f"""
+import {{ encodeTransactionDataParam }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+for (let i = 0; i < inputs.length; i++) {{
+  const encoded = encodeTransactionDataParam(inputs[i]);
+  if (encoded !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + encoded);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+"""
+        assert _run_node(script) == "OK"
+
+    def test_transaction_data_param_hash_matches(self, vectors):
+        """Both runtimes produce the same OID4VP transaction_data_hashes values."""
+        for v in vectors:
+            td = TransactionData.from_dict(v["input"])
+            assert (
+                compute_transaction_data_param_hash(td)
+                == v["transaction_data_param_hash"]
+            ), f"Python mismatch for {v['name']}"
+
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["transaction_data_param_hash"] for v in vectors])
+
+        script = f"""
+import {{ computeTransactionDataParamHash }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+for (let i = 0; i < inputs.length; i++) {{
+  const hash = await computeTransactionDataParamHash(inputs[i]);
+  if (hash !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + hash);
     console.error("Expected: " + expected[i]);
     process.exit(1);
   }}

@@ -18,6 +18,7 @@ Evidence creates an **audit trail** — allowing third parties to verify not jus
 Proves that the issuer verified claims using a prior credential or verifiable presentation. The embedded VP contains the credentials the issuer relied upon (e.g., email verification, notary attestation).
 
 **Use case (email verification)**: A `NaturalPersonCredential` includes evidence that the user's email was verified via an email verification service (e.g., Altme EmailPass).
+The EmailPass proof is modeled as a VC issued by a `did:webs` issuer DID.
 
 ```json
 {
@@ -25,11 +26,11 @@ Proves that the issuer verified claims using a prior credential or verifiable pr
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation"],
-    "holder": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "holder": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
     "verifiableCredential": [
       {
         "type": ["VerifiableCredential"],
-        "issuer": "did:web:altme.io",
+        "issuer": "did:webs:issuers.altme.example:legal-persons:altme_sas:EMtR9m3wZ5xV2k8sP4jQ7nH1cD6bL0fYgAaUu2hCqK9M",
         "credentialSubject": {
           "type": "EmailPass",
           "email": "alice@example.com"
@@ -48,7 +49,7 @@ Proves that the issuer verified claims using a prior credential or verifiable pr
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation"],
-    "holder": "did:web:participant.example.com",
+    "holder": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
     "verifiableCredential": [
       {
         "type": ["VerifiableCredential"],
@@ -77,19 +78,20 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
   "type": "harbour:DelegatedSignatureEvidence",
   "verifiablePresentation": "<SD-JWT VP with redacted PII>",
   "delegatedTo": "did:web:signing-service.envited.io",
-  "transactionData": {
+  "transaction_data": {
     "type": "harbour_delegate:data.purchase",
     "credential_ids": ["simpulse_id"],
     "transaction_data_hashes_alg": ["sha-256"],
     "nonce": "da9b1009",
     "iat": 1771934400,
     "txn": {
-      "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+      "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
       "price": "100",
       "currency": "ENVITED",
       "marketplace": "did:web:dataspace.envited.io"
     }
-  }
+  },
+  "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f"
 }
 ```
 
@@ -209,13 +211,13 @@ DelegatedSignatureEvidence:
   slots:
     - verifiablePresentation
     - delegatedTo
-    - transactionData
+    - transaction_data
   slot_usage:
     verifiablePresentation:
       required: true
     delegatedTo:
       required: true
-    transactionData:
+    transaction_data:
       required: true
 ```
 

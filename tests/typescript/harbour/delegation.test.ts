@@ -21,9 +21,11 @@ import {
   TYPE_PREFIX,
   ChallengeError,
   type TransactionData,
+  computeTransactionDataParamHash,
   computeTransactionHash,
   createDelegationChallenge,
   createTransactionData,
+  encodeTransactionDataParam,
   getAction,
   parseDelegationChallenge,
   renderTransactionDisplay,
@@ -42,12 +44,12 @@ describe("TransactionData", () => {
   it("creates basic transaction data", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "urn:uuid:test", price: "100" },
+      txn: { asset_id: "urn:uuid:test", price: "100" },
     });
 
     expect(tx.type).toBe("harbour_delegate:data.purchase");
     expect(tx.credential_ids).toEqual(["default"]);
-    expect(tx.txn).toEqual({ assetId: "urn:uuid:test", price: "100" });
+    expect(tx.txn).toEqual({ asset_id: "urn:uuid:test", price: "100" });
     expect(tx.exp).toBeUndefined();
     expect(tx.description).toBeUndefined();
     expect(tx.transaction_data_hashes_alg).toEqual(["sha-256"]);
@@ -58,7 +60,7 @@ describe("TransactionData", () => {
   it("creates with custom nonce", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       nonce: "custom123",
     });
     expect(tx.nonce).toBe("custom123");
@@ -67,7 +69,7 @@ describe("TransactionData", () => {
   it("creates with custom iat", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       iat: 1771934400,
     });
     expect(tx.iat).toBe(1771934400);
@@ -76,7 +78,7 @@ describe("TransactionData", () => {
   it("creates with optional fields", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       exp: 1771935300,
       description: "Test purchase",
       credentialIds: ["simpulse_id"],
@@ -90,7 +92,7 @@ describe("TransactionData", () => {
   it("extracts action from type", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
     });
     expect(getAction(tx)).toBe("data.purchase");
   });
@@ -127,7 +129,7 @@ describe("Canonical JSON", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test", price: "100" },
+      txn: { asset_id: "test", price: "100" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -147,7 +149,7 @@ describe("Canonical JSON", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test", price: "100" },
+      txn: { asset_id: "test", price: "100" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -156,7 +158,7 @@ describe("Canonical JSON", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { price: "100", assetId: "test" },
+      txn: { price: "100", asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -171,13 +173,13 @@ describe("Canonical JSON", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test", price: "100" },
+      txn: { asset_id: "test", price: "100" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
     const tx2: TransactionData = {
       ...tx1,
-      txn: { assetId: "test", price: "200" },
+      txn: { asset_id: "test", price: "200" },
     };
 
     expect(await computeTransactionHash(tx1)).not.toBe(
@@ -215,6 +217,18 @@ describe("Shared canonicalization vectors", () => {
       const challenge = await createDelegationChallenge(td);
       expect(challenge).toBe(v.challenge);
     });
+
+    it(`transaction_data param encoding matches for '${v.name}'`, () => {
+      const td = v.input as TransactionData;
+      const encoded = encodeTransactionDataParam(td);
+      expect(encoded).toBe(v.transaction_data_param);
+    });
+
+    it(`transaction_data_hashes value matches for '${v.name}'`, async () => {
+      const td = v.input as TransactionData;
+      const hash = await computeTransactionDataParamHash(td);
+      expect(hash).toBe(v.transaction_data_param_hash);
+    });
   }
 });
 
@@ -229,7 +243,7 @@ describe("createDelegationChallenge", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test", price: "100" },
+      txn: { asset_id: "test", price: "100" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -278,7 +292,7 @@ describe("parseDelegationChallenge", () => {
   it("round-trips with createDelegationChallenge", async () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
     });
 
     const challenge = await createDelegationChallenge(tx);
@@ -301,7 +315,7 @@ describe("verifyChallenge", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -315,7 +329,7 @@ describe("verifyChallenge", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -330,7 +344,7 @@ describe("verifyChallenge", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 
@@ -347,7 +361,7 @@ describe("validateTransactionData", () => {
   it("validates a valid transaction", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
     });
     expect(() => validateTransactionData(tx)).not.toThrow();
   });
@@ -358,7 +372,7 @@ describe("validateTransactionData", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: Math.floor(Date.now() / 1000),
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
     expect(() => validateTransactionData(tx)).toThrow(ChallengeError);
@@ -370,7 +384,7 @@ describe("validateTransactionData", () => {
       credential_ids: ["default"],
       nonce: "abc",
       iat: Math.floor(Date.now() / 1000),
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
     expect(() => validateTransactionData(tx)).toThrow(/Nonce too short/);
@@ -382,7 +396,7 @@ describe("validateTransactionData", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: Math.floor(Date.now() / 1000) - 600,
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
     expect(() => validateTransactionData(tx, { maxAgeSeconds: 300 })).toThrow(
@@ -396,7 +410,7 @@ describe("validateTransactionData", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: Math.floor(Date.now() / 1000) + 300,
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       transaction_data_hashes_alg: ["sha-256"],
     };
     expect(() => validateTransactionData(tx)).toThrow(/future/);
@@ -405,7 +419,7 @@ describe("validateTransactionData", () => {
   it("throws for expired transaction", () => {
     const tx = createTransactionData({
       action: "data.purchase",
-      txn: { assetId: "test" },
+      txn: { asset_id: "test" },
       exp: Math.floor(Date.now() / 1000) - 300,
     });
     expect(() => validateTransactionData(tx)).toThrow(/expired/);
@@ -423,7 +437,7 @@ describe("renderTransactionDisplay", () => {
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
-      txn: { assetId: "urn:uuid:test", price: "100", currency: "ENVITED" },
+      txn: { asset_id: "urn:uuid:test", price: "100", currency: "ENVITED" },
       transaction_data_hashes_alg: ["sha-256"],
     };
 

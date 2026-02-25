@@ -3,11 +3,16 @@
  */
 
 import { describe, expect, it, beforeAll } from "vitest";
+import { SignJWT, type JWTPayload } from "jose";
 
 import {
   generateP256Keypair,
   p256PublicKeyToDidKey,
 } from "../../../src/typescript/harbour/keys.js";
+import {
+  computeTransactionDataParamHash,
+  createDelegationChallenge,
+} from "../../../src/typescript/harbour/delegation.js";
 import { issueSdJwtVc } from "../../../src/typescript/harbour/sd-jwt.js";
 import {
   issueSdJwtVp,
@@ -22,6 +27,29 @@ let holderPrivate: CryptoKey;
 let holderPublic: CryptoKey;
 let holderDid: string;
 let sampleSdJwtVc: string;
+
+function decodeJwtPayload(token: string): any {
+  return JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+}
+
+function decodeJwtHeader(token: string): any {
+  return JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString());
+}
+
+async function resignJwt(
+  token: string,
+  payload: Record<string, unknown>,
+  privateKey: CryptoKey
+): Promise<string> {
+  const header = decodeJwtHeader(token);
+  const protectedHeader: { alg: string; typ?: string } = {
+    alg: String(header.alg),
+    ...(typeof header.typ === "string" ? { typ: header.typ } : {}),
+  };
+  return new SignJWT(payload as unknown as JWTPayload)
+    .setProtectedHeader(protectedHeader)
+    .sign(privateKey);
+}
 
 beforeAll(async () => {
   const issuerKp = await generateP256Keypair();
@@ -92,36 +120,69 @@ describe("issueSdJwtVp", () => {
   });
 
   it("issues with evidence", async () => {
+    const txNonce = "tx-consent-nonce";
+    const audience = "did:web:signing-service.example.com";
     const evidence = [
       {
         type: "DelegatedSignatureEvidence",
-        transactionData: {
+        transaction_data: {
           type: "harbour_delegate:data.purchase",
           credential_ids: ["simpulse_id"],
-          nonce: "tx-nonce",
+          nonce: txNonce,
           iat: 1771934400,
-          txn: { assetId: "tx:abc123", price: "100" },
+          txn: { asset_id: "tx:abc123", price: "100" },
         },
-        delegatedTo: "did:web:signing-service.example.com",
+        delegatedTo: audience,
       },
     ];
 
     const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
       evidence,
-      nonce: "tx-consent-nonce",
-      audience: "did:web:signing-service.example.com",
+      nonce: txNonce,
+      audience,
     });
 
-    // Parse VP payload to check evidence
+    // Parse VP/KB payloads to check evidence-derived bindings
     const parts = vp.split("~");
-    const vpPayload = JSON.parse(
-      Buffer.from(parts[0].split(".")[1], "base64url").toString()
+    const vpPayload = decodeJwtPayload(parts[0]);
+    const kbPayload = decodeJwtPayload(parts[parts.length - 1]);
+    const expectedChallenge = await createDelegationChallenge(
+      evidence[0].transaction_data
+    );
+    const expectedHash = await computeTransactionDataParamHash(
+      evidence[0].transaction_data
     );
 
     expect(vpPayload.vp.evidence).toHaveLength(1);
     expect(vpPayload.vp.evidence[0].type).toBe(
       "DelegatedSignatureEvidence"
     );
+    expect(vpPayload.vp.evidence[0].challenge).toBe(expectedChallenge);
+    expect(vpPayload.nonce).toBe(txNonce);
+    expect(vpPayload.aud).toBe(audience);
+    expect(kbPayload.transaction_data_hashes).toEqual([expectedHash]);
+    expect(kbPayload.transaction_data_hashes_alg).toBe("sha-256");
+  });
+
+  it("keeps delegated evidence transaction_data unchanged", async () => {
+    const evidence = [
+      {
+        type: "DelegatedSignatureEvidence",
+        transaction_data: {
+          type: "harbour_delegate:data.purchase",
+          credential_ids: ["default"],
+          nonce: "snake-nonce",
+          iat: 1771934400,
+          txn: { asset_id: "tx:snake" },
+        },
+      },
+    ];
+
+    const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, { evidence });
+    const vpPayload = decodeJwtPayload(vp.split("~")[0]);
+    const delegated = vpPayload.vp.evidence[0];
+    expect(delegated.transaction_data).toBeDefined();
+    expect(delegated.transaction_data.nonce).toBe("snake-nonce");
   });
 
   it("issues with holder DID", async () => {
@@ -193,7 +254,7 @@ describe("verifySdJwtVp", () => {
     const evidence = [
       {
         type: "DelegatedSignatureEvidence",
-        transactionData: {
+        transaction_data: {
           type: "harbour_delegate:blockchain.approve",
           credential_ids: ["default"],
           nonce: "consent-nonce",
@@ -208,6 +269,89 @@ describe("verifySdJwtVp", () => {
 
     expect(result.evidence).toHaveLength(1);
     expect(result.evidence![0].type).toBe("DelegatedSignatureEvidence");
+  });
+
+  it("fails when transaction_data_hashes is tampered", async () => {
+    const nonce = "tx-hash-nonce";
+    const evidence = [
+      {
+        type: "DelegatedSignatureEvidence",
+        transaction_data: {
+          type: "harbour_delegate:data.purchase",
+          credential_ids: ["default"],
+          nonce,
+          iat: 1771934400,
+          txn: { asset_id: "tx:abc123", price: "100" },
+        },
+      },
+    ];
+
+    const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
+      evidence,
+      nonce,
+    });
+    const parts = vp.split("~");
+    const kbPayload = decodeJwtPayload(parts[parts.length - 1]);
+    kbPayload.transaction_data_hashes = ["00".repeat(32)];
+    const tamperedKbJwt = await resignJwt(
+      parts[parts.length - 1],
+      kbPayload,
+      holderPrivate
+    );
+    const tamperedVp = [...parts.slice(0, -1), tamperedKbJwt].join("~");
+
+    await expect(
+      verifySdJwtVp(tamperedVp, issuerPublic, holderPublic)
+    ).rejects.toThrow(/transaction_data_hashes mismatch/);
+  });
+
+  it("fails when VP and KB audiences differ", async () => {
+    const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
+      nonce: "aud-nonce",
+      audience: "did:web:signing-service.example.com",
+    });
+    const parts = vp.split("~");
+    const kbPayload = decodeJwtPayload(parts[parts.length - 1]);
+    kbPayload.aud = "did:web:evil.example.com";
+    const tamperedKbJwt = await resignJwt(
+      parts[parts.length - 1],
+      kbPayload,
+      holderPrivate
+    );
+    const tamperedVp = [...parts.slice(0, -1), tamperedKbJwt].join("~");
+
+    await expect(
+      verifySdJwtVp(tamperedVp, issuerPublic, holderPublic)
+    ).rejects.toThrow(/Audience mismatch between VP and KB-JWT/);
+  });
+
+  it("fails when delegated evidence omits transaction_data", async () => {
+    const nonce = "snake-verify-nonce";
+    const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
+      evidence: [
+        {
+          type: "DelegatedSignatureEvidence",
+          transaction_data: {
+            type: "harbour_delegate:data.purchase",
+            credential_ids: ["default"],
+            nonce,
+            iat: 1771934400,
+            txn: { asset_id: "tx:snake-verify" },
+          },
+        },
+      ],
+    });
+
+    const parts = vp.split("~");
+    const vpPayload = decodeJwtPayload(parts[0]);
+    const delegated = vpPayload.vp.evidence[0];
+    delete delegated.transaction_data;
+    const tamperedVpJwt = await resignJwt(parts[0], vpPayload, holderPrivate);
+    const tamperedVp = [tamperedVpJwt, ...parts.slice(1)].join("~");
+
+    await expect(
+      verifySdJwtVp(tamperedVp, issuerPublic, holderPublic)
+    ).rejects.toThrow(/requires transaction_data/);
   });
 
   it("fails with wrong issuer key", async () => {

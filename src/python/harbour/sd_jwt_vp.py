@@ -27,6 +27,7 @@ import hashlib
 import json
 import sys
 import time
+from copy import deepcopy
 from pathlib import Path
 
 from harbour._crypto import import_private_key as _import_private_key
@@ -35,12 +36,122 @@ from harbour._crypto import load_private_key as _load_private_key
 from harbour._crypto import load_public_key as _load_public_key
 from harbour._crypto import resolve_private_key_alg as _resolve_alg
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
+from harbour.delegation import (
+    TransactionData,
+    compute_transaction_data_param_hash,
+    create_delegation_challenge,
+)
 from harbour.keys import PrivateKey, PublicKeyType
 from harbour.verifier import VerificationError
 from joserfc import jws
 
 # SD-JWT uses ~-delimited format
 SD_JWT_SEPARATOR = "~"
+DELEGATED_EVIDENCE_TYPES = {
+    "DelegatedSignatureEvidence",
+    "harbour:DelegatedSignatureEvidence",
+}
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    """Return values in first-seen order without duplicates."""
+    return list(dict.fromkeys(values))
+
+
+def _get_transaction_data(
+    evidence_item: dict, exception_type: type[Exception]
+) -> dict[str, object]:
+    """Extract transaction data from delegated signing evidence."""
+    transaction_data = evidence_item.get("transaction_data")
+    if transaction_data is None:
+        raise exception_type("DelegatedSignatureEvidence requires transaction_data")
+    if not isinstance(transaction_data, dict):
+        raise exception_type(
+            "DelegatedSignatureEvidence transaction data must be an object"
+        )
+    return transaction_data
+
+
+def _normalize_delegation_evidence(
+    evidence: list[dict] | None,
+) -> tuple[list[dict] | None, list[str], list[str], list[str]]:
+    """Derive and inject challenge/hash bindings for delegated evidence."""
+    if evidence is None:
+        return None, [], [], []
+
+    normalized: list[dict] = []
+    tx_hashes: list[str] = []
+    tx_nonces: list[str] = []
+    delegated_to_values: list[str] = []
+
+    for item in evidence:
+        ev = deepcopy(item)
+        if ev.get("type") in DELEGATED_EVIDENCE_TYPES:
+            transaction_data = _get_transaction_data(ev, ValueError)
+            tx = TransactionData.from_dict(transaction_data)
+            challenge = create_delegation_challenge(tx)
+            existing_challenge = ev.get("challenge")
+            if (
+                existing_challenge is not None
+                and isinstance(existing_challenge, str)
+                and existing_challenge != challenge
+            ):
+                raise ValueError(
+                    "DelegatedSignatureEvidence challenge does not match transaction_data"
+                )
+            ev["challenge"] = challenge
+
+            tx_hashes.append(compute_transaction_data_param_hash(tx))
+            tx_nonces.append(tx.nonce)
+
+            delegated_to = ev.get("delegatedTo")
+            if isinstance(delegated_to, str):
+                delegated_to_values.append(delegated_to)
+
+        normalized.append(ev)
+
+    return (
+        normalized,
+        _dedupe(tx_hashes),
+        _dedupe(tx_nonces),
+        _dedupe(delegated_to_values),
+    )
+
+
+def _derive_delegation_bindings(
+    evidence: list[dict] | None,
+) -> tuple[list[str], list[str], list[str]]:
+    """Derive expected hash/nonce/audience bindings from delegated evidence."""
+    if not evidence:
+        return [], [], []
+
+    tx_hashes: list[str] = []
+    tx_nonces: list[str] = []
+    delegated_to_values: list[str] = []
+
+    for item in evidence:
+        if item.get("type") in DELEGATED_EVIDENCE_TYPES:
+            transaction_data = _get_transaction_data(item, VerificationError)
+            tx = TransactionData.from_dict(transaction_data)
+            expected_challenge = create_delegation_challenge(tx)
+            provided_challenge = item.get("challenge")
+            if (
+                provided_challenge is not None
+                and isinstance(provided_challenge, str)
+                and provided_challenge != expected_challenge
+            ):
+                raise VerificationError(
+                    "Delegation challenge mismatch in evidence transaction_data"
+                )
+
+            tx_hashes.append(compute_transaction_data_param_hash(tx))
+            tx_nonces.append(tx.nonce)
+
+            delegated_to = item.get("delegatedTo")
+            if isinstance(delegated_to, str):
+                delegated_to_values.append(delegated_to)
+
+    return _dedupe(tx_hashes), _dedupe(tx_nonces), _dedupe(delegated_to_values)
 
 
 def issue_sd_jwt_vp(
@@ -68,7 +179,7 @@ def issue_sd_jwt_vp(
                      If empty list [], includes no disclosures (max privacy).
         evidence: Evidence objects to include in the VP. Supported types:
                   - CredentialEvidence: prior credential/VP the issuer relied upon
-                  - DelegatedSignatureEvidence: consent proof with transactionData
+                  - DelegatedSignatureEvidence: consent proof with transaction_data
         nonce: Challenge nonce for replay protection.
         audience: Intended verifier (DID or URL).
         holder_did: Holder's DID for the VP. If not provided, will not be included.
@@ -115,6 +226,38 @@ def issue_sd_jwt_vp(
             if name in disclosure_map:
                 selected_disclosures.append(disclosure_map[name])
 
+    normalized_evidence, tx_hashes, tx_nonces, delegated_to_values = (
+        _normalize_delegation_evidence(evidence)
+    )
+
+    resolved_nonce = nonce
+    if tx_nonces:
+        if resolved_nonce is None:
+            if len(tx_nonces) != 1:
+                raise ValueError(
+                    "DelegatedSignatureEvidence contains multiple transaction_data nonce values; "
+                    "pass explicit nonce"
+                )
+            resolved_nonce = tx_nonces[0]
+        elif any(tx_nonce != resolved_nonce for tx_nonce in tx_nonces):
+            raise ValueError(
+                "Nonce must match DelegatedSignatureEvidence transaction_data.nonce"
+            )
+
+    resolved_audience = audience
+    if delegated_to_values:
+        if resolved_audience is None:
+            if len(delegated_to_values) != 1:
+                raise ValueError(
+                    "DelegatedSignatureEvidence contains multiple delegatedTo values; "
+                    "pass explicit audience"
+                )
+            resolved_audience = delegated_to_values[0]
+        elif any(value != resolved_audience for value in delegated_to_values):
+            raise ValueError(
+                "Audience must match DelegatedSignatureEvidence delegatedTo"
+            )
+
     # Build VP payload
     vp_payload = {
         "vp": {
@@ -128,14 +271,14 @@ def issue_sd_jwt_vp(
         vp_payload["vp"]["holder"] = holder_did
         vp_payload["iss"] = holder_did
 
-    if nonce:
-        vp_payload["nonce"] = nonce
+    if resolved_nonce:
+        vp_payload["nonce"] = resolved_nonce
 
-    if audience:
-        vp_payload["aud"] = audience
+    if resolved_audience:
+        vp_payload["aud"] = resolved_audience
 
-    if evidence:
-        vp_payload["vp"]["evidence"] = evidence
+    if normalized_evidence:
+        vp_payload["vp"]["evidence"] = normalized_evidence
 
     # Include reference to the VC (the issuer JWT will be reconstructed on verify)
     # We store a hash of the issuer JWT for binding
@@ -168,10 +311,13 @@ def issue_sd_jwt_vp(
         .decode(),
     }
 
-    if nonce:
-        kb_payload["nonce"] = nonce
-    if audience:
-        kb_payload["aud"] = audience
+    if resolved_nonce:
+        kb_payload["nonce"] = resolved_nonce
+    if resolved_audience:
+        kb_payload["aud"] = resolved_audience
+    if tx_hashes:
+        kb_payload["transaction_data_hashes"] = tx_hashes
+        kb_payload["transaction_data_hashes_alg"] = "sha-256"
 
     kb_header = {"alg": alg, "typ": "kb+jwt"}
     kb_payload_bytes = json.dumps(kb_payload, ensure_ascii=False).encode("utf-8")
@@ -293,22 +439,72 @@ def verify_sd_jwt_vp(
     if kb_payload.get("sd_hash") != expected_sd_hash:
         raise VerificationError("SD hash mismatch in KB-JWT")
 
+    vp_nonce = vp_payload.get("nonce")
+    kb_nonce = kb_payload.get("nonce")
+    if vp_nonce != kb_nonce and (vp_nonce is not None or kb_nonce is not None):
+        raise VerificationError("Nonce mismatch between VP and KB-JWT")
+
+    vp_audience = vp_payload.get("aud")
+    kb_audience = kb_payload.get("aud")
+    if vp_audience != kb_audience and (
+        vp_audience is not None or kb_audience is not None
+    ):
+        raise VerificationError("Audience mismatch between VP and KB-JWT")
+
+    vp_obj = vp_payload.get("vp", {})
+    evidence = vp_obj.get("evidence") if isinstance(vp_obj, dict) else None
+    evidence_list = evidence if isinstance(evidence, list) else None
+    tx_hashes, tx_nonces, delegated_to_values = _derive_delegation_bindings(
+        evidence_list
+    )
+
+    if tx_hashes:
+        kb_hashes = kb_payload.get("transaction_data_hashes")
+        if not isinstance(kb_hashes, list) or not all(
+            isinstance(item, str) for item in kb_hashes
+        ):
+            raise VerificationError(
+                "Missing transaction_data_hashes in KB-JWT for delegated evidence"
+            )
+        if kb_hashes != tx_hashes:
+            raise VerificationError("transaction_data_hashes mismatch")
+        if kb_payload.get("transaction_data_hashes_alg") != "sha-256":
+            raise VerificationError("transaction_data_hashes_alg must be 'sha-256'")
+
+    if len(tx_nonces) > 1:
+        raise VerificationError(
+            "DelegatedSignatureEvidence contains multiple transaction_data nonce values"
+        )
+    if tx_nonces and vp_nonce != tx_nonces[0]:
+        raise VerificationError(
+            "Nonce mismatch: VP/KB nonce does not match transaction_data nonce"
+        )
+
+    if len(delegated_to_values) > 1:
+        raise VerificationError(
+            "DelegatedSignatureEvidence contains multiple delegatedTo values"
+        )
+    if delegated_to_values and vp_audience != delegated_to_values[0]:
+        raise VerificationError(
+            "Audience mismatch: VP/KB audience does not match delegatedTo"
+        )
+
     # 6. Verify nonce
     if expected_nonce is not None:
-        if vp_payload.get("nonce") != expected_nonce:
+        if vp_nonce != expected_nonce:
             raise VerificationError(
-                f"Nonce mismatch: expected {expected_nonce!r}, got {vp_payload.get('nonce')!r}"
+                f"Nonce mismatch: expected {expected_nonce!r}, got {vp_nonce!r}"
             )
-        if kb_payload.get("nonce") != expected_nonce:
+        if kb_nonce != expected_nonce:
             raise VerificationError("Nonce mismatch in KB-JWT")
 
     # 7. Verify audience
     if expected_audience is not None:
-        if vp_payload.get("aud") != expected_audience:
+        if vp_audience != expected_audience:
             raise VerificationError(
-                f"Audience mismatch: expected {expected_audience!r}, got {vp_payload.get('aud')!r}"
+                f"Audience mismatch: expected {expected_audience!r}, got {vp_audience!r}"
             )
-        if kb_payload.get("aud") != expected_audience:
+        if kb_audience != expected_audience:
             raise VerificationError("Audience mismatch in KB-JWT")
 
     # 8. Process disclosures
@@ -340,7 +536,6 @@ def verify_sd_jwt_vp(
         disclosed_claims[claim_name] = claim_value
 
     # Build result
-    vp_obj = vp_payload.get("vp", {})
     result = {
         "credential": disclosed_claims,
     }

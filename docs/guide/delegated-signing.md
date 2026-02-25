@@ -96,6 +96,23 @@ The user's DID document (`did:web:carlo.simpulse.io`) must contain a verificatio
 }
 ```
 
+### Repository Boundary (did:web / did:webs)
+
+This repository verifies signatures and hash bindings, but it does **not** host or publish DID documents.
+
+- Integrators must publish DID documents at the correct HTTPS location for the chosen method (`did:web` or `did:webs`).
+- Integrators must run DID resolution and pass the resolved holder key into `verify_sd_jwt_vp(...)`.
+- Repository examples now use `did:webs` identifiers for person subjects. See `examples/did-webs/` for static example DID documents used by `examples/*.json`.
+- Naming policy in examples:
+  - Natural persons use UUID-based path segments (no real names in DID path).
+  - Legal persons may use organization suffixes (for example `bmw_ag`).
+
+Current integration hooks and TODOs:
+
+- `issue_sd_jwt_vp(..., holder_did=...)` allows the wallet DID to be embedded in the consent VP.
+- `verify_sd_jwt_vp(..., holder_public_key=...)` accepts the DID-resolved public key from your resolver stack.
+- TODO: Add optional resolver callback adapters for `did:web`/`did:webs` so verification can resolve keys in-process.
+
 ## OID4VP Transaction Data
 
 The signing service creates an OID4VP-aligned transaction data object (see [Delegation Challenge Encoding](../specs/delegation-challenge-encoding.md)):
@@ -108,13 +125,17 @@ The signing service creates an OID4VP-aligned transaction data object (see [Dele
   "nonce": "da9b1009",
   "iat": 1771934400,
   "txn": {
-    "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
     "marketplace": "did:web:dataspace.envited.io"
   }
 }
 ```
+
+Naming note:
+- `transaction_data` and `credential_ids` are OID4VP-defined snake_case fields.
+- `txn` is profile-defined payload; Harbour v1 standardizes snake_case keys such as `asset_id`.
 
 ## Creating the Consent VP
 
@@ -136,13 +157,13 @@ sd_jwt_vc = "eyJ...~disclosure1~disclosure2~..."
 # Transaction evidence (OID4VP-aligned)
 evidence = [{
     "type": "DelegatedSignatureEvidence",
-    "transactionData": {
+    "transaction_data": {
         "type": "harbour_delegate:data.purchase",
         "credential_ids": ["simpulse_id"],
         "nonce": "da9b1009",
         "iat": 1771934400,
         "txn": {
-            "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+            "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
             "price": "100",
             "currency": "ENVITED"
         }
@@ -170,13 +191,13 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
   disclosures: ['memberOf'],
   evidence: [{
     type: 'DelegatedSignatureEvidence',
-    transactionData: {
+    transaction_data: {
       type: 'harbour_delegate:data.purchase',
       credential_ids: ['simpulse_id'],
       nonce: 'da9b1009',
       iat: 1771934400,
       txn: {
-        assetId: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
+        asset_id: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
         price: '100',
         currency: 'ENVITED'
       }
@@ -187,6 +208,8 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
   audience: 'did:web:signing-service.envited.io'
 });
 ```
+
+`issue_sd_jwt_vp` / `issueSdJwtVp` derives the delegation challenge (`<nonce> HARBOUR_DELEGATE <sha256(canonical(transaction_data))>`) and writes it to `evidence[].challenge`. It also computes the OID4VP `transaction_data_hashes` value (base64url(SHA-256(transaction_data request string))) and binds/verifies that in KB-JWT on `verify_sd_jwt_vp` / `verifySdJwtVp`.
 
 ## Verification
 
@@ -204,9 +227,9 @@ result = verify_sd_jwt_vp(
 )
 
 # Check transaction data matches original request
-tx = result["evidence"][0]["transactionData"]
+tx = result["evidence"][0]["transaction_data"]
 assert tx["type"] == "harbour_delegate:data.purchase"
-assert tx["txn"]["assetId"] == "urn:uuid:550e8400-e29b-41d4-a716-446655440000"
+assert tx["txn"]["asset_id"] == "urn:uuid:550e8400-e29b-41d4-a716-446655440000"
 
 # Check credential is still valid (CRSet)
 # ... revocation check ...
@@ -226,7 +249,7 @@ After executing the transaction, the signing service issues a **receipt credenti
     "type": "harbour:DelegatedSignatureEvidence",
     "verifiablePresentation": "<consent VP with PII redacted>",
     "delegatedTo": "did:web:signing-service.envited.io",
-    "transactionData": { "..." }
+    "transaction_data": { "..." }
   }],
   "credentialStatus": [{
     "type": "harbour:CRSetEntry",

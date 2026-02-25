@@ -5,10 +5,40 @@ import json
 import secrets
 
 import pytest
+from harbour._crypto import import_private_key as _import_private_key
+from harbour.delegation import (
+    TransactionData,
+    compute_transaction_data_param_hash,
+    create_delegation_challenge,
+)
 from harbour.keys import generate_p256_keypair, p256_public_key_to_did_key
 from harbour.sd_jwt import issue_sd_jwt_vc
 from harbour.sd_jwt_vp import issue_sd_jwt_vp, verify_sd_jwt_vp
 from harbour.verifier import VerificationError
+from joserfc import jws
+
+
+def _decode_jwt_payload(token: str) -> dict:
+    """Decode JWT payload without verifying signature."""
+    payload_b64 = token.split(".")[1]
+    payload = base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4))
+    return json.loads(payload)
+
+
+def _decode_jwt_header(token: str) -> dict:
+    """Decode JWT header without verifying signature."""
+    header_b64 = token.split(".")[0]
+    header = base64.urlsafe_b64decode(header_b64 + "=" * (-len(header_b64) % 4))
+    return json.loads(header)
+
+
+def _resign_jwt(token: str, payload: dict, private_key) -> str:
+    """Re-sign a JWT payload with the original protected header."""
+    header = _decode_jwt_header(token)
+    alg = header["alg"]
+    key = _import_private_key(private_key, alg)
+    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    return jws.serialize_compact(header, payload_bytes, key, algorithms=[alg])
 
 
 @pytest.fixture
@@ -122,18 +152,20 @@ class TestIssueSDJWTVP:
     def test_issue_with_evidence(self, sample_sd_jwt_vc, holder_keypair):
         """Test VP issuance with DelegatedSignatureEvidence."""
         holder_private, _ = holder_keypair
+        tx_nonce = "tx-consent-nonce"
+        audience = "did:web:signing-service.example.com"
 
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionData": {
+                "transaction_data": {
                     "type": "harbour_delegate:data.purchase",
                     "credential_ids": ["simpulse_id"],
-                    "nonce": secrets.token_urlsafe(16),
+                    "nonce": tx_nonce,
                     "iat": 1771934400,
-                    "txn": {"assetId": "tx:abc123", "price": "100"},
+                    "txn": {"asset_id": "tx:abc123", "price": "100"},
                 },
-                "delegatedTo": "did:web:signing-service.example.com",
+                "delegatedTo": audience,
             }
         ]
 
@@ -141,22 +173,52 @@ class TestIssueSDJWTVP:
             sample_sd_jwt_vc,
             holder_private,
             evidence=evidence,
-            nonce="tx-consent-nonce",
-            audience="did:web:signing-service.example.com",
+            nonce=tx_nonce,
+            audience=audience,
         )
 
-        # Parse VP JWT payload to check evidence
+        # Parse VP/KB payloads to check evidence-derived bindings
         parts = vp.split("~")
         vp_jwt = parts[0]
-        payload_b64 = vp_jwt.split(".")[1]
-        payload = json.loads(
-            base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4))
-        )
+        kb_jwt = parts[-1]
+        vp_payload = _decode_jwt_payload(vp_jwt)
+        kb_payload = _decode_jwt_payload(kb_jwt)
 
-        assert "vp" in payload
-        assert "evidence" in payload["vp"]
-        assert len(payload["vp"]["evidence"]) == 1
-        assert payload["vp"]["evidence"][0]["type"] == "DelegatedSignatureEvidence"
+        expected_tx = TransactionData.from_dict(evidence[0]["transaction_data"])
+        expected_challenge = create_delegation_challenge(expected_tx)
+        expected_hash = compute_transaction_data_param_hash(expected_tx)
+
+        assert "vp" in vp_payload
+        assert "evidence" in vp_payload["vp"]
+        assert len(vp_payload["vp"]["evidence"]) == 1
+        assert vp_payload["vp"]["evidence"][0]["type"] == "DelegatedSignatureEvidence"
+        assert vp_payload["vp"]["evidence"][0]["challenge"] == expected_challenge
+        assert vp_payload["nonce"] == tx_nonce
+        assert vp_payload["aud"] == audience
+        assert kb_payload["transaction_data_hashes"] == [expected_hash]
+        assert kb_payload["transaction_data_hashes_alg"] == "sha-256"
+
+    def test_issue_keeps_transaction_data_field(self, sample_sd_jwt_vc, holder_keypair):
+        """Issue keeps delegated evidence transaction_data unchanged."""
+        holder_private, _ = holder_keypair
+        evidence = [
+            {
+                "type": "DelegatedSignatureEvidence",
+                "transaction_data": {
+                    "type": "harbour_delegate:data.purchase",
+                    "credential_ids": ["default"],
+                    "nonce": "snake-nonce",
+                    "iat": 1771934400,
+                    "txn": {"asset_id": "tx:snake"},
+                },
+            }
+        ]
+
+        vp = issue_sd_jwt_vp(sample_sd_jwt_vc, holder_private, evidence=evidence)
+        vp_payload = _decode_jwt_payload(vp.split("~")[0])
+        delegated = vp_payload["vp"]["evidence"][0]
+        assert "transaction_data" in delegated
+        assert delegated["transaction_data"]["nonce"] == "snake-nonce"
 
     def test_issue_with_holder_did(self, sample_sd_jwt_vc, holder_keypair):
         """Test VP issuance with holder DID."""
@@ -267,7 +329,7 @@ class TestVerifySDJWTVP:
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionData": {
+                "transaction_data": {
                     "type": "harbour_delegate:blockchain.approve",
                     "credential_ids": ["default"],
                     "nonce": "unique-consent-nonce",
@@ -288,6 +350,94 @@ class TestVerifySDJWTVP:
         assert "evidence" in result
         assert len(result["evidence"]) == 1
         assert result["evidence"][0]["type"] == "DelegatedSignatureEvidence"
+
+    def test_verify_fails_transaction_hash_mismatch(
+        self, sample_sd_jwt_vc, issuer_keypair, holder_keypair
+    ):
+        """Verification fails if KB transaction_data_hashes is tampered."""
+        _, issuer_public = issuer_keypair
+        holder_private, holder_public = holder_keypair
+        nonce = "tx-hash-nonce"
+
+        evidence = [
+            {
+                "type": "DelegatedSignatureEvidence",
+                "transaction_data": {
+                    "type": "harbour_delegate:data.purchase",
+                    "credential_ids": ["default"],
+                    "nonce": nonce,
+                    "iat": 1771934400,
+                    "txn": {"asset_id": "tx:abc123", "price": "100"},
+                },
+            }
+        ]
+
+        vp = issue_sd_jwt_vp(
+            sample_sd_jwt_vc, holder_private, evidence=evidence, nonce=nonce
+        )
+        parts = vp.split("~")
+        kb_payload = _decode_jwt_payload(parts[-1])
+        kb_payload["transaction_data_hashes"] = ["00" * 32]
+        tampered_kb_jwt = _resign_jwt(parts[-1], kb_payload, holder_private)
+        tampered_vp = "~".join(parts[:-1] + [tampered_kb_jwt])
+
+        with pytest.raises(VerificationError, match="transaction_data_hashes mismatch"):
+            verify_sd_jwt_vp(tampered_vp, issuer_public, holder_public)
+
+    def test_verify_fails_internal_audience_mismatch(
+        self, sample_sd_jwt_vc, issuer_keypair, holder_keypair
+    ):
+        """Verification fails when VP and KB-JWT audiences differ."""
+        _, issuer_public = issuer_keypair
+        holder_private, holder_public = holder_keypair
+
+        vp = issue_sd_jwt_vp(
+            sample_sd_jwt_vc,
+            holder_private,
+            nonce="aud-nonce",
+            audience="did:web:signing-service.example.com",
+        )
+        parts = vp.split("~")
+        kb_payload = _decode_jwt_payload(parts[-1])
+        kb_payload["aud"] = "did:web:evil.example.com"
+        tampered_kb_jwt = _resign_jwt(parts[-1], kb_payload, holder_private)
+        tampered_vp = "~".join(parts[:-1] + [tampered_kb_jwt])
+
+        with pytest.raises(
+            VerificationError, match="Audience mismatch between VP and KB-JWT"
+        ):
+            verify_sd_jwt_vp(tampered_vp, issuer_public, holder_public)
+
+    def test_verify_fails_when_transaction_data_missing(
+        self, sample_sd_jwt_vc, issuer_keypair, holder_keypair
+    ):
+        """Verification fails when delegated evidence omits transaction_data."""
+        _, issuer_public = issuer_keypair
+        holder_private, holder_public = holder_keypair
+        nonce = "snake-verify-nonce"
+
+        evidence = [
+            {
+                "type": "DelegatedSignatureEvidence",
+                "transaction_data": {
+                    "type": "harbour_delegate:data.purchase",
+                    "credential_ids": ["default"],
+                    "nonce": nonce,
+                    "iat": 1771934400,
+                    "txn": {"asset_id": "tx:snake-verify"},
+                },
+            }
+        ]
+        vp = issue_sd_jwt_vp(sample_sd_jwt_vc, holder_private, evidence=evidence)
+        parts = vp.split("~")
+        vp_payload = _decode_jwt_payload(parts[0])
+        delegated = vp_payload["vp"]["evidence"][0]
+        del delegated["transaction_data"]
+        tampered_vp_jwt = _resign_jwt(parts[0], vp_payload, holder_private)
+        tampered_vp = "~".join([tampered_vp_jwt] + parts[1:])
+
+        with pytest.raises(VerificationError, match="requires transaction_data"):
+            verify_sd_jwt_vp(tampered_vp, issuer_public, holder_public)
 
     def test_verify_fails_wrong_issuer_key(self, sample_sd_jwt_vc, holder_keypair):
         """Test that verification fails with wrong issuer key."""
@@ -398,7 +548,7 @@ class TestDelegatedSigningFlow:
             "iat": 1771934400,
             "description": "Purchase data asset XYZ for 100 ENVITED tokens",
             "txn": {
-                "assetId": "tx:0xabc123def456",
+                "asset_id": "tx:0xabc123def456",
                 "price": "100",
                 "currency": "ENVITED",
             },
@@ -407,12 +557,12 @@ class TestDelegatedSigningFlow:
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionData": transaction_data,
+                "transaction_data": transaction_data,
                 "delegatedTo": signing_service_did,
             }
         ]
 
-        challenge_nonce = secrets.token_urlsafe(16)
+        challenge_nonce = consent_nonce
 
         # Create VP with:
         # - Only organization and role disclosed (not PII)
@@ -451,8 +601,11 @@ class TestDelegatedSigningFlow:
         assert len(result["evidence"]) == 1
         ev = result["evidence"][0]
         assert ev["type"] == "DelegatedSignatureEvidence"
-        assert ev["transactionData"]["type"] == "harbour_delegate:data.purchase"
-        assert ev["transactionData"]["nonce"] == consent_nonce
+        assert ev["transaction_data"]["type"] == "harbour_delegate:data.purchase"
+        assert ev["transaction_data"]["nonce"] == consent_nonce
+        assert ev["challenge"] == create_delegation_challenge(
+            TransactionData.from_dict(transaction_data)
+        )
         assert ev["delegatedTo"] == signing_service_did
 
     def test_public_audit_privacy(self, issuer_keypair, holder_keypair):
@@ -481,7 +634,7 @@ class TestDelegatedSigningFlow:
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionData": {
+                "transaction_data": {
                     "type": "harbour_delegate:blockchain.transfer",
                     "credential_ids": ["default"],
                     "nonce": "public-audit-nonce",
@@ -559,7 +712,16 @@ class TestEdgeCases:
         holder_private, _ = holder_keypair
 
         evidence = [
-            {"type": "DelegatedSignatureEvidence", "transactionData": {}},
+            {
+                "type": "DelegatedSignatureEvidence",
+                "transaction_data": {
+                    "type": "harbour_delegate:data.share",
+                    "credential_ids": ["default"],
+                    "nonce": "multi-evidence-nonce",
+                    "iat": 1771934400,
+                    "txn": {"resource_id": "asset:xyz"},
+                },
+            },
             {"type": "CredentialEvidence", "verifiablePresentation": "eyJ..."},
         ]
 

@@ -57,7 +57,7 @@ class TestEvidenceSigning:
         vp = {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiablePresentation"],
-            "holder": "did:web:participant.example.com",
+            "holder": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
             "verifiableCredential": [
                 {
                     "@context": ["https://www.w3.org/ns/credentials/v2"],
@@ -65,7 +65,7 @@ class TestEvidenceSigning:
                     "issuer": "did:web:notary.example.com",
                     "validFrom": "2024-01-10T00:00:00Z",
                     "credentialSubject": {
-                        "id": "did:web:participant.example.com",
+                        "id": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
                         "type": "gx:LegalPerson",
                     },
                 }
@@ -203,11 +203,11 @@ class TestProcessExample:
         vc_payload = verify_vc_jose(vc_jwt, public_key)
         assert "harbour:DelegatedSigningReceipt" in vc_payload["type"]
 
-        # Evidence should contain DelegatedSignatureEvidence with transactionData
+        # Evidence should contain DelegatedSignatureEvidence with transaction_data
         evidence = vc_payload["evidence"][0]
         assert evidence["type"] == "harbour:DelegatedSignatureEvidence"
-        assert "transactionData" in evidence
-        assert evidence["transactionData"]["type"] == "harbour_delegate:data.purchase"
+        assert "transaction_data" in evidence
+        assert evidence["transaction_data"]["type"] == "harbour_delegate:data.purchase"
         assert evidence["delegatedTo"] == "did:web:signing-service.envited.io"
 
         # Evidence VP should be a signed JWT

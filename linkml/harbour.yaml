@@ -109,13 +109,13 @@ slots:
     required: false
 
   # --- Delegated Signature Evidence Slots ---
-  transactionData:
+  transaction_data:
     description: >
       OID4VP-aligned transaction data object (§8.4). Contains action type,
       credential IDs, timestamps, and action-specific details in the txn field.
       On the receipt SD-JWT-VC this is a selectively disclosable claim enabling
       three-layer privacy (public / authorized / full audit).
-    slot_uri: harbour:transactionData
+    slot_uri: harbour:transaction_data
     range: Any
     required: false
 
@@ -284,13 +284,13 @@ classes:
     slots:
       - verifiablePresentation
       - delegatedTo
-      - transactionData
+      - transaction_data
     slot_usage:
       verifiablePresentation:
         required: true
       delegatedTo:
         required: true
-      transactionData:
+      transaction_data:
         required: true
 
   CRSetEntry:

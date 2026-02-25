@@ -22,7 +22,7 @@ Following the OID4VP pattern:
 | Component | Purpose | Location |
 |-----------|---------|----------|
 | **Full transaction data** | Human review, business logic | Request body OR external reference |
-| **Transaction data hash** | Cryptographic binding | `proof.challenge` (signed by holder) |
+| **Transaction data binding** | Cryptographic integrity | `proof.challenge` (Harbour challenge hash) + KB-JWT `transaction_data_hashes` (OID4VP hash) |
 | **Verifier identity** | Trust anchor | `proof.domain` |
 | **Replay protection** | Freshness | `proof.nonce` / timestamp in challenge |
 
@@ -48,7 +48,7 @@ Where:
 ### 2.2 Example
 
 ```
-da9b1009 HARBOUR_DELEGATE d0450062b3c4c9168ac8266f0806d62f5d95ed96894d5a9a0aaddf4298317eaa
+da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f
 ```
 
 This format is inspired by [simpulse-id-credentials](https://github.com/ASCS-eV/simpulse-id-credentials) which uses:
@@ -127,9 +127,21 @@ This structure aligns with [OID4VP §5.1 `transaction_data`](https://openid.net/
 |-------------|--------------|
 | `harbour_delegate:blockchain.transfer` | `chain`, `contract`, `recipient`, `amount`, `token` |
 | `harbour_delegate:blockchain.execute` | `chain`, `contract`, `method`, `params`, `value` |
-| `harbour_delegate:data.purchase` | `assetId`, `price`, `currency`, `marketplace` |
-| `harbour_delegate:contract.sign` | `documentHash`, `documentUri`, `parties` |
-| `harbour_delegate:credential.issue` | `credentialType`, `subject`, `claims` |
+| `harbour_delegate:data.purchase` | `asset_id`, `price`, `currency`, `marketplace` |
+| `harbour_delegate:contract.sign` | `document_hash`, `document_uri`, `parties` |
+| `harbour_delegate:credential.issue` | `credential_type`, `subject`, `claims` |
+
+#### Naming Conventions and Compatibility Boundary
+
+Different standards in this flow use different naming conventions by design:
+
+| Layer | Source | Naming Rule |
+|-------|--------|-------------|
+| VC envelope/evidence terms | W3C VC Data Model | Use VC-defined terms as-is (`credentialStatus`, `validFrom`, `evidence`, etc.) |
+| OID4VP protocol fields | OpenID4VP / OAuth parameters and KB-JWT profile claims | Use snake_case exactly (`transaction_data`, `credential_ids`, `transaction_data_hashes`, `transaction_data_hashes_alg`) |
+| Harbour action payload (`txn`) | Harbour transaction type profile | Profile-defined keys; Harbour v1 uses snake_case action keys (for example `asset_id`) |
+
+Important: `txn` keys are part of canonicalization and hashing. Renaming a key (for example `asset_id` to `assetId`) changes the canonical JSON and therefore changes the challenge/hash binding.
 
 ### 3.5 Example Transaction Data
 
@@ -143,7 +155,7 @@ This structure aligns with [OID4VP §5.1 `transaction_data`](https://openid.net/
   "exp": 1771935300,
   "description": "Purchase sensor data package from BMW",
   "txn": {
-    "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
     "marketplace": "did:web:dataspace.envited.io"
@@ -168,7 +180,7 @@ def compute_transaction_hash(transaction_data: dict) -> str:
 
 The resulting challenge:
 ```
-da9b1009 HARBOUR_DELEGATE d0450062b3c4c9168ac8266f0806d62f5d95ed96894d5a9a0aaddf4298317eaa
+da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f
 ```
 
 ---
@@ -193,7 +205,7 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
     "verifiablePresentation": {
       "@context": ["https://www.w3.org/ns/credentials/v2"],
       "type": ["VerifiablePresentation"],
-      "holder": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      "holder": "did:web:user.example.com",
       "verifiableCredential": [
         "<SD-JWT-VC with PII redacted>"
       ],
@@ -201,9 +213,9 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
         "type": "DataIntegrityProof",
         "cryptosuite": "ecdsa-rdfc-2019",
         "proofPurpose": "authentication",
-        "challenge": "da9b1009 HARBOUR_DELEGATE d0450062b3c4c9168ac8266f0806d62f5d95ed96894d5a9a0aaddf4298317eaa",
+        "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f",
         "domain": "did:web:harbour.signing-service.example.com",
-        "verificationMethod": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+        "verificationMethod": "did:web:user.example.com#key-1",
         "created": "2026-02-24T12:00:05Z",
         "proofValue": "z5vgFc..."
       }
@@ -226,7 +238,7 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
 
 The full transaction data object (§3) can be stored in one of:
 
-1. **VP `evidence[].transactionData`** — Inline (increases VP size)
+1. **VP `evidence[].transaction_data`** — Inline (increases VP size)
 2. **External reference** — VP contains hash, full data at `ref` URL
 3. **Request context** — OID4VP `transaction_data` parameter (recommended)
 
@@ -275,7 +287,7 @@ This specification is designed for seamless integration with [OpenID for Verifia
   "nonce": "da9b1009",
   "iat": 1771934400,
   "txn": {
-    "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
     "marketplace": "did:web:dataspace.envited.io"
@@ -293,19 +305,19 @@ Per OID4VP Appendix B.3.3, the KB-JWT includes:
   "aud": "did:web:harbour.signing-service.example.com",
   "iat": 1709838604,
   "sd_hash": "Dy-RYwZfaaoC3inJbLslgPvMp09bH-clYP_3qbRqtW4",
-  "transaction_data_hashes": ["d0450062b3c4c9168ac8266f0806d62f5d95ed96894d5a9a0aaddf4298317eaa"],
+  "transaction_data_hashes": ["7W0LFUTpMvb6nJK7ngamNNY0zNvxqJ-2jNXTmLzhWQE"],
   "transaction_data_hashes_alg": "sha-256"
 }
 ```
 
 ### 5.4 Dual Support
 
-Our challenge format supports both:
+Our challenge profile and OID4VP binding support both:
 
-1. **OID4VP flow** — Hash in `transaction_data_hashes` (KB-JWT claim)
-2. **Direct VP flow** — Hash in `proof.challenge` (W3C proof)
+1. **OID4VP flow** — Hash in `transaction_data_hashes` (KB-JWT claim; hash over `transaction_data` request string)
+2. **Direct VP flow** — Hash in `proof.challenge` (W3C proof; hash over canonical decoded object)
 
-The same hash can appear in both locations for maximum compatibility.
+These are two related but distinct representations and MUST be verified according to their respective rules.
 
 ---
 
@@ -364,7 +376,7 @@ from harbour.delegation import TransactionData, create_delegation_challenge, ver
 tx = TransactionData.create(
     action="data.purchase",
     txn={
-        "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+        "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
         "price": "100",
         "currency": "ENVITED",
         "marketplace": "did:web:dataspace.envited.io",
@@ -393,7 +405,7 @@ import {
 const tx = createTransactionData({
   action: 'data.purchase',
   txn: {
-    assetId: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
+    asset_id: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
     price: '100',
     currency: 'ENVITED',
     marketplace: 'did:web:dataspace.envited.io',
@@ -463,7 +475,7 @@ from harbour.delegation import TransactionData, render_transaction_display
 
 tx = TransactionData.create(
     action="data.purchase",
-    txn={"assetId": "urn:uuid:550e8400...", "price": "100", "currency": "ENVITED"},
+    txn={"asset_id": "urn:uuid:550e8400...", "price": "100", "currency": "ENVITED"},
 )
 print(render_transaction_display(tx))
 ```
@@ -475,7 +487,7 @@ import { createTransactionData, renderTransactionDisplay } from '@reachhaven/har
 
 const tx = createTransactionData({
   action: 'data.purchase',
-  txn: { assetId: 'urn:uuid:550e8400...', price: '100', currency: 'ENVITED' },
+  txn: { asset_id: 'urn:uuid:550e8400...', price: '100', currency: 'ENVITED' },
 });
 console.log(renderTransactionDisplay(tx));
 ```
@@ -497,7 +509,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
   "nonce": "da9b1009",
   "iat": 1771934400,
   "txn": {
-    "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
     "marketplace": "did:web:dataspace.envited.io"
@@ -507,7 +519,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
 
 **Challenge:**
 ```
-da9b1009 HARBOUR_DELEGATE 86a3e927a80d9e858a71b37f574aa65cab184c5fc65e8c7824771f84ad6ed97e
+da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f
 ```
 
 ### 10.2 Blockchain Transfer Transaction
@@ -547,7 +559,7 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
   "exp": 1771935300,
   "description": "Sign partnership agreement",
   "txn": {
-    "documentHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "document_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "parties": ["did:web:alice.example", "did:web:bob.example"]
   }
 }
@@ -555,7 +567,7 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
 
 **Challenge:**
 ```
-ab12cd34 HARBOUR_DELEGATE daccac20a99de56e2a5d108fcfa53d0d03faa7d4cd29552ae1dbdc486120d3ec
+ab12cd34 HARBOUR_DELEGATE 0863ac13bc5f15c7dfcdee71b8beea1aead4b822d0a7c03154405da4f192af08
 ```
 
 ---
@@ -588,7 +600,7 @@ This specification aligns with [OID4VP Transaction Data (§8.4)](https://openid.
 | `transaction_data` request param | Transaction Data Object (§3) |
 | `transaction_data.type` | `"harbour_delegate:<action>"` |
 | `transaction_data.txn` | Action-specific transaction details |
-| `transaction_data_hashes` in KB-JWT | Same hash as in `proof.challenge` |
+| `transaction_data_hashes` in KB-JWT | OID4VP hash over transaction_data request string |
 | `transaction_data_hashes_alg` | `"sha-256"` |
 
 ### Integration Example
@@ -606,7 +618,7 @@ OID4VP authorization request:
     "nonce": "da9b1009",
     "iat": 1771934400,
     "txn": {
-      "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+      "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
       "price": "100",
       "currency": "ENVITED",
       "marketplace": "did:web:dataspace.envited.io"

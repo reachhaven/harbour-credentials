@@ -11,9 +11,18 @@
  */
 
 import { CompactSign, compactVerify } from "jose";
+import {
+  computeTransactionDataParamHash,
+  createDelegationChallenge,
+  type TransactionData,
+} from "./delegation.js";
 import { VerificationError } from "./verifier.js";
 
 const SD_JWT_SEPARATOR = "~";
+const DELEGATED_EVIDENCE_TYPES = new Set([
+  "DelegatedSignatureEvidence",
+  "harbour:DelegatedSignatureEvidence",
+]);
 
 export interface IssueSdJwtVpOptions {
   /** Which disclosures to include by claim name. null = all, [] = none. */
@@ -91,13 +100,49 @@ export async function issueSdJwtVp(
     }
   }
 
+  const delegationBindings = await normalizeDelegationEvidenceForIssue(
+    options.evidence
+  );
+
+  let resolvedNonce = options.nonce;
+  if (delegationBindings.txNonces.length > 0) {
+    if (resolvedNonce === undefined) {
+      if (delegationBindings.txNonces.length !== 1) {
+        throw new Error(
+          "DelegatedSignatureEvidence contains multiple transaction_data nonce values; pass explicit nonce"
+        );
+      }
+      resolvedNonce = delegationBindings.txNonces[0];
+    } else if (delegationBindings.txNonces.some((n) => n !== resolvedNonce)) {
+      throw new Error(
+        "Nonce must match DelegatedSignatureEvidence transaction_data.nonce"
+      );
+    }
+  }
+
+  let resolvedAudience = options.audience;
+  if (delegationBindings.delegatedTo.length > 0) {
+    if (resolvedAudience === undefined) {
+      if (delegationBindings.delegatedTo.length !== 1) {
+        throw new Error(
+          "DelegatedSignatureEvidence contains multiple delegatedTo values; pass explicit audience"
+        );
+      }
+      resolvedAudience = delegationBindings.delegatedTo[0];
+    } else if (delegationBindings.delegatedTo.some((a) => a !== resolvedAudience)) {
+      throw new Error("Audience must match DelegatedSignatureEvidence delegatedTo");
+    }
+  }
+
   // Build VP payload
   const vpPayload: Record<string, unknown> = {
     vp: {
       "@context": ["https://www.w3.org/ns/credentials/v2"],
       type: ["VerifiablePresentation"],
       ...(options.holderDid ? { holder: options.holderDid } : {}),
-      ...(options.evidence ? { evidence: options.evidence } : {}),
+      ...(delegationBindings.evidence && delegationBindings.evidence.length > 0
+        ? { evidence: delegationBindings.evidence }
+        : {}),
     },
     iat: Math.floor(Date.now() / 1000),
   };
@@ -105,11 +150,11 @@ export async function issueSdJwtVp(
   if (options.holderDid) {
     vpPayload.iss = options.holderDid;
   }
-  if (options.nonce) {
-    vpPayload.nonce = options.nonce;
+  if (resolvedNonce) {
+    vpPayload.nonce = resolvedNonce;
   }
-  if (options.audience) {
-    vpPayload.aud = options.audience;
+  if (resolvedAudience) {
+    vpPayload.aud = resolvedAudience;
   }
 
   // Hash of the issuer JWT for binding
@@ -138,8 +183,12 @@ export async function issueSdJwtVp(
     iat: Math.floor(Date.now() / 1000),
     sd_hash: base64urlEncode(new Uint8Array(sdHashBuffer)),
   };
-  if (options.nonce) kbPayload.nonce = options.nonce;
-  if (options.audience) kbPayload.aud = options.audience;
+  if (resolvedNonce) kbPayload.nonce = resolvedNonce;
+  if (resolvedAudience) kbPayload.aud = resolvedAudience;
+  if (delegationBindings.txHashes.length > 0) {
+    kbPayload.transaction_data_hashes = delegationBindings.txHashes;
+    kbPayload.transaction_data_hashes_alg = "sha-256";
+  }
 
   const kbPayloadBytes = new TextEncoder().encode(JSON.stringify(kbPayload));
   const kbSigner = new CompactSign(kbPayloadBytes);
@@ -193,7 +242,9 @@ export async function verifySdJwtVp(
     );
   }
 
-  const vpPayload = JSON.parse(new TextDecoder().decode(vpResult.payload));
+  const vpPayload = JSON.parse(
+    new TextDecoder().decode(vpResult.payload)
+  ) as Record<string, unknown>;
 
   // 2. Verify issuer JWT (issuer)
   let vcResult;
@@ -211,7 +262,9 @@ export async function verifySdJwtVp(
     );
   }
 
-  const vcPayload = JSON.parse(new TextDecoder().decode(vcResult.payload));
+  const vcPayload = JSON.parse(
+    new TextDecoder().decode(vcResult.payload)
+  ) as Record<string, unknown>;
 
   // 3. Verify KB-JWT (holder)
   let kbResult;
@@ -229,7 +282,9 @@ export async function verifySdJwtVp(
     );
   }
 
-  const kbPayload = JSON.parse(new TextDecoder().decode(kbResult.payload));
+  const kbPayload = JSON.parse(
+    new TextDecoder().decode(kbResult.payload)
+  ) as Record<string, unknown>;
 
   // 4. Verify VC hash binding
   const expectedVcHash = base64urlEncode(
@@ -265,32 +320,102 @@ export async function verifySdJwtVp(
     throw new VerificationError("SD hash mismatch in KB-JWT");
   }
 
-  // 6. Verify nonce
-  if (options.expectedNonce !== undefined) {
-    if (vpPayload.nonce !== options.expectedNonce) {
+  const vpNonce = typeof vpPayload.nonce === "string" ? vpPayload.nonce : undefined;
+  const kbNonce = typeof kbPayload.nonce === "string" ? kbPayload.nonce : undefined;
+  if (vpNonce !== kbNonce && (vpNonce !== undefined || kbNonce !== undefined)) {
+    throw new VerificationError("Nonce mismatch between VP and KB-JWT");
+  }
+
+  const vpAudience = typeof vpPayload.aud === "string" ? vpPayload.aud : undefined;
+  const kbAudience =
+    typeof kbPayload.aud === "string" ? kbPayload.aud : undefined;
+  if (
+    vpAudience !== kbAudience &&
+    (vpAudience !== undefined || kbAudience !== undefined)
+  ) {
+    throw new VerificationError("Audience mismatch between VP and KB-JWT");
+  }
+
+  const vpObj = isRecord(vpPayload.vp) ? vpPayload.vp : {};
+  const evidence = Array.isArray(vpObj.evidence)
+    ? (vpObj.evidence as unknown[])
+    : undefined;
+  const delegationBindings = await deriveDelegationBindingsForVerify(evidence);
+
+  if (delegationBindings.txHashes.length > 0) {
+    const kbHashes = kbPayload.transaction_data_hashes;
+    if (
+      !Array.isArray(kbHashes) ||
+      !kbHashes.every((value) => typeof value === "string")
+    ) {
       throw new VerificationError(
-        `Nonce mismatch: expected '${options.expectedNonce}', got '${vpPayload.nonce}'`
+        "Missing transaction_data_hashes in KB-JWT for delegated evidence"
       );
     }
-    if (kbPayload.nonce !== options.expectedNonce) {
+    if (!stringArraysEqual(kbHashes as string[], delegationBindings.txHashes)) {
+      throw new VerificationError("transaction_data_hashes mismatch");
+    }
+    if (kbPayload.transaction_data_hashes_alg !== "sha-256") {
+      throw new VerificationError("transaction_data_hashes_alg must be 'sha-256'");
+    }
+  }
+
+  if (delegationBindings.txNonces.length > 1) {
+    throw new VerificationError(
+      "DelegatedSignatureEvidence contains multiple transaction_data nonce values"
+    );
+  }
+  if (
+    delegationBindings.txNonces.length === 1 &&
+    vpNonce !== delegationBindings.txNonces[0]
+  ) {
+    throw new VerificationError(
+      "Nonce mismatch: VP/KB nonce does not match transaction_data nonce"
+    );
+  }
+
+  if (delegationBindings.delegatedTo.length > 1) {
+    throw new VerificationError(
+      "DelegatedSignatureEvidence contains multiple delegatedTo values"
+    );
+  }
+  if (
+    delegationBindings.delegatedTo.length === 1 &&
+    vpAudience !== delegationBindings.delegatedTo[0]
+  ) {
+    throw new VerificationError(
+      "Audience mismatch: VP/KB audience does not match delegatedTo"
+    );
+  }
+
+  // 6. Verify nonce
+  if (options.expectedNonce !== undefined) {
+    if (vpNonce !== options.expectedNonce) {
+      throw new VerificationError(
+        `Nonce mismatch: expected '${options.expectedNonce}', got '${vpNonce}'`
+      );
+    }
+    if (kbNonce !== options.expectedNonce) {
       throw new VerificationError("Nonce mismatch in KB-JWT");
     }
   }
 
   // 7. Verify audience
   if (options.expectedAudience !== undefined) {
-    if (vpPayload.aud !== options.expectedAudience) {
+    if (vpAudience !== options.expectedAudience) {
       throw new VerificationError(
-        `Audience mismatch: expected '${options.expectedAudience}', got '${vpPayload.aud}'`
+        `Audience mismatch: expected '${options.expectedAudience}', got '${vpAudience}'`
       );
     }
-    if (kbPayload.aud !== options.expectedAudience) {
+    if (kbAudience !== options.expectedAudience) {
       throw new VerificationError("Audience mismatch in KB-JWT");
     }
   }
 
   // 8. Process disclosures
-  const sdDigests = new Set<string>(vcPayload._sd ?? []);
+  const sdDigests = new Set<string>(
+    Array.isArray(vcPayload._sd) ? (vcPayload._sd as string[]) : []
+  );
   const disclosedClaims: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(vcPayload)) {
     if (k !== "_sd" && k !== "_sd_alg") {
@@ -328,16 +453,15 @@ export async function verifySdJwtVp(
   }
 
   // Build result
-  const vpObj = (vpPayload.vp ?? {}) as Record<string, unknown>;
   const result: SdJwtVpResult = {
     credential: disclosedClaims,
   };
 
-  if (vpObj.holder) result.holder = vpObj.holder as string;
-  if (vpObj.evidence)
+  if (typeof vpObj.holder === "string") result.holder = vpObj.holder;
+  if (Array.isArray(vpObj.evidence))
     result.evidence = vpObj.evidence as Record<string, unknown>[];
-  if (vpPayload.nonce) result.nonce = vpPayload.nonce as string;
-  if (vpPayload.aud) result.audience = vpPayload.aud as string;
+  if (vpNonce) result.nonce = vpNonce;
+  if (vpAudience) result.audience = vpAudience;
 
   return result;
 }
@@ -360,4 +484,136 @@ function base64urlEncode(bytes: Uint8Array): string {
 
 function base64urlDecode(s: string): Uint8Array {
   return new Uint8Array(Buffer.from(s, "base64url"));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function dedupe(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function stringArraysEqual(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+interface DelegationBindings {
+  evidence?: Record<string, unknown>[];
+  txHashes: string[];
+  txNonces: string[];
+  delegatedTo: string[];
+}
+
+function getTransactionDataFromEvidence(
+  evidenceItem: Record<string, unknown>,
+  errorFactory: (message: string) => Error
+): Record<string, unknown> {
+  const transactionData = evidenceItem.transaction_data;
+  if (transactionData === undefined) {
+    throw errorFactory("DelegatedSignatureEvidence requires transaction_data");
+  }
+  if (!isRecord(transactionData)) {
+    throw errorFactory("DelegatedSignatureEvidence transaction data must be an object");
+  }
+  return transactionData;
+}
+
+async function normalizeDelegationEvidenceForIssue(
+  evidence?: Record<string, unknown>[]
+): Promise<DelegationBindings> {
+  if (evidence === undefined) {
+    return { txHashes: [], txNonces: [], delegatedTo: [] };
+  }
+
+  const normalized: Record<string, unknown>[] = evidence.map((item) => ({
+    ...item,
+  }));
+  const txHashes: string[] = [];
+  const txNonces: string[] = [];
+  const delegatedTo: string[] = [];
+
+  for (const item of normalized) {
+    if (!DELEGATED_EVIDENCE_TYPES.has(String(item.type))) {
+      continue;
+    }
+    const transactionData = getTransactionDataFromEvidence(
+      item,
+      (message) => new Error(message)
+    );
+    const tx = transactionData as unknown as TransactionData;
+    const challenge = await createDelegationChallenge(tx);
+    if (
+      typeof item.challenge === "string" &&
+      item.challenge !== challenge
+    ) {
+      throw new Error(
+        "DelegatedSignatureEvidence challenge does not match transaction_data"
+      );
+    }
+    item.challenge = challenge;
+
+    txHashes.push(await computeTransactionDataParamHash(tx));
+    txNonces.push(tx.nonce);
+
+    if (typeof item.delegatedTo === "string") {
+      delegatedTo.push(item.delegatedTo);
+    }
+  }
+
+  return {
+    evidence: normalized,
+    txHashes: dedupe(txHashes),
+    txNonces: dedupe(txNonces),
+    delegatedTo: dedupe(delegatedTo),
+  };
+}
+
+async function deriveDelegationBindingsForVerify(
+  evidence?: unknown[]
+): Promise<Omit<DelegationBindings, "evidence">> {
+  if (!evidence) {
+    return { txHashes: [], txNonces: [], delegatedTo: [] };
+  }
+
+  const txHashes: string[] = [];
+  const txNonces: string[] = [];
+  const delegatedTo: string[] = [];
+
+  for (const evidenceItem of evidence) {
+    if (!isRecord(evidenceItem)) continue;
+    if (!DELEGATED_EVIDENCE_TYPES.has(String(evidenceItem.type))) continue;
+
+    const transactionData = getTransactionDataFromEvidence(
+      evidenceItem,
+      (message) => new VerificationError(message)
+    );
+    const tx = transactionData as unknown as TransactionData;
+
+    const expectedChallenge = await createDelegationChallenge(tx);
+    if (
+      typeof evidenceItem.challenge === "string" &&
+      evidenceItem.challenge !== expectedChallenge
+    ) {
+      throw new VerificationError(
+        "Delegation challenge mismatch in evidence transaction_data"
+      );
+    }
+
+    txHashes.push(await computeTransactionDataParamHash(tx));
+    txNonces.push(tx.nonce);
+
+    if (typeof evidenceItem.delegatedTo === "string") {
+      delegatedTo.push(evidenceItem.delegatedTo);
+    }
+  }
+
+  return {
+    txHashes: dedupe(txHashes),
+    txNonces: dedupe(txNonces),
+    delegatedTo: dedupe(delegatedTo),
+  };
 }

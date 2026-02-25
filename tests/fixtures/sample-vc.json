@@ -8,7 +8,7 @@
   "issuer": "did:web:trust.harbour.example.com",
   "validFrom": "2025-08-06T10:15:22Z",
   "credentialSubject": {
-    "id": "did:web:participant.example.com",
+    "id": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH"
   }

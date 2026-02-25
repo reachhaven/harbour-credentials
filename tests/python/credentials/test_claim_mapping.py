@@ -32,7 +32,10 @@ class TestHarbourLegalPersonMapping:
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
         assert claims["iss"] == "did:web:trust-anchor.example.com"
-        assert claims["sub"] == "did:web:participant.example.com"
+        assert (
+            claims["sub"]
+            == "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
+        )
         assert claims["name"] == "Example Corporation GmbH"
         assert claims["legalName"] == "Example Corporation GmbH"
         assert "registrationNumber" in claims

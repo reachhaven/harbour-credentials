@@ -21,6 +21,7 @@ CLI Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import secrets
@@ -199,7 +200,7 @@ def create_delegation_challenge(transaction_data: TransactionData) -> str:
     Example:
         >>> tx = TransactionData.create(
         ...     action="data.purchase",
-        ...     txn={"assetId": "urn:uuid:...", "price": "100"},
+        ...     txn={"asset_id": "urn:uuid:...", "price": "100"},
         ... )
         >>> challenge = create_delegation_challenge(tx)
         >>> print(challenge)
@@ -207,6 +208,29 @@ def create_delegation_challenge(transaction_data: TransactionData) -> str:
     """
     tx_hash = transaction_data.compute_hash()
     return f"{transaction_data.nonce} {ACTION_TYPE} {tx_hash}"
+
+
+def encode_transaction_data_param(transaction_data: TransactionData) -> str:
+    """Encode transaction_data object to OID4VP request parameter string.
+
+    OID4VP transmits transaction_data as base64url-encoded JSON strings.
+    Harbour uses canonical JSON serialization to ensure deterministic outputs
+    across Python and TypeScript when generating this value.
+    """
+    canonical = transaction_data.to_json(canonical=True).encode("utf-8")
+    return base64.urlsafe_b64encode(canonical).rstrip(b"=").decode("ascii")
+
+
+def compute_transaction_data_param_hash(transaction_data: TransactionData) -> str:
+    """Compute OID4VP transaction_data_hashes value for a transaction_data object.
+
+    Per OID4VP Appendix B.3.3.1, the hash is computed over the transaction_data
+    request string itself (the base64url-encoded JSON object), and then
+    base64url-encoded.
+    """
+    transaction_data_param = encode_transaction_data_param(transaction_data)
+    digest = hashlib.sha256(transaction_data_param.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
 def parse_delegation_challenge(challenge: str) -> tuple[str, str, str]:
@@ -455,7 +479,7 @@ Examples:
             # Build transaction dict from args
             txn = {}
             if args.asset_id:
-                txn["assetId"] = args.asset_id
+                txn["asset_id"] = args.asset_id
             if args.price:
                 txn["price"] = args.price
             if args.currency:

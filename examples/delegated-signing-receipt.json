@@ -11,9 +11,9 @@
   "issuer": "did:web:signing-service.envited.io",
   "validFrom": "2025-06-25T10:00:00Z",
   "credentialSubject": {
-    "id": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "id": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
     "type": "harbour:TransactionReceipt",
-    "transactionHash": "86a3e927a80d9e858a71b37f574aa65cab184c5fc65e8c7824771f84ad6ed97e",
+    "transactionHash": "c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f",
     "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   },
   "credentialStatus": [
@@ -27,39 +27,51 @@
     {
       "type": "harbour:DelegatedSignatureEvidence",
       "verifiablePresentation": {
-        "@context": ["https://www.w3.org/ns/credentials/v2"],
-        "type": ["VerifiablePresentation"],
-        "holder": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2"
+        ],
+        "type": [
+          "VerifiablePresentation"
+        ],
+        "holder": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
         "verifiableCredential": [
           {
             "@context": [
               "https://www.w3.org/ns/credentials/v2",
               "https://w3id.org/reachhaven/harbour/credentials/v1/"
             ],
-            "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
+            "type": [
+              "VerifiableCredential",
+              "harbour:NaturalPersonCredential"
+            ],
             "issuer": "did:web:issuer.example.com",
             "credentialSubject": {
-              "id": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+              "id": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
               "type": "harbour:NaturalPerson",
-              "memberOf": "did:web:participant.example.com"
+              "memberOf": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
             }
           }
         ]
       },
       "delegatedTo": "did:web:signing-service.envited.io",
-      "transactionData": {
+      "transaction_data": {
         "type": "harbour_delegate:data.purchase",
-        "credential_ids": ["simpulse_id"],
-        "transaction_data_hashes_alg": ["sha-256"],
+        "credential_ids": [
+          "simpulse_id"
+        ],
+        "transaction_data_hashes_alg": [
+          "sha-256"
+        ],
         "nonce": "da9b1009",
         "iat": 1771934400,
         "txn": {
-          "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+          "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
           "price": "100",
           "currency": "ENVITED",
           "marketplace": "did:web:dataspace.envited.io"
         }
-      }
+      },
+      "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f"
     }
   ]
 }

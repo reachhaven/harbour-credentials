@@ -142,6 +142,40 @@ export async function computeTransactionHash(
 }
 
 /**
+ * Encode transaction_data object to OID4VP request parameter string.
+ *
+ * OID4VP transmits transaction_data as base64url-encoded JSON strings.
+ * Harbour uses canonical JSON serialization to ensure deterministic outputs
+ * across Python and TypeScript when generating this value.
+ */
+export function encodeTransactionDataParam(td: TransactionData): string {
+  const canonical = toCanonicalJson(td);
+  return Buffer.from(canonical, "utf-8")
+    .toString("base64url")
+    .replace(/=+$/, "");
+}
+
+/**
+ * Compute OID4VP transaction_data_hashes value for a transaction_data object.
+ *
+ * Per OID4VP Appendix B.3.3.1, the hash is computed over the transaction_data
+ * request string itself (the base64url-encoded JSON object), and then
+ * base64url-encoded.
+ */
+export async function computeTransactionDataParamHash(
+  td: TransactionData
+): Promise<string> {
+  const transactionDataParam = encodeTransactionDataParam(td);
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(transactionDataParam)
+  );
+  return Buffer.from(new Uint8Array(digest))
+    .toString("base64url")
+    .replace(/=+$/, "");
+}
+
+/**
  * Create a Harbour delegation challenge string.
  *
  * Format: <nonce> HARBOUR_DELEGATE <sha256-hash>

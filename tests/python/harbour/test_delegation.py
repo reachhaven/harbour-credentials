@@ -26,7 +26,9 @@ from harbour.delegation import (
     ACTION_TYPE,
     ChallengeError,
     TransactionData,
+    compute_transaction_data_param_hash,
     create_delegation_challenge,
+    encode_transaction_data_param,
     parse_delegation_challenge,
     render_transaction_display,
     validate_transaction_data,
@@ -48,12 +50,12 @@ class TestTransactionData:
         """Test basic TransactionData creation."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "urn:uuid:test", "price": "100"},
+            txn={"asset_id": "urn:uuid:test", "price": "100"},
         )
 
         assert tx.type == "harbour_delegate:data.purchase"
         assert tx.credential_ids == ["default"]
-        assert tx.txn == {"assetId": "urn:uuid:test", "price": "100"}
+        assert tx.txn == {"asset_id": "urn:uuid:test", "price": "100"}
         assert tx.exp is None
         assert tx.description is None
         assert tx.transaction_data_hashes_alg == ["sha-256"]
@@ -64,7 +66,7 @@ class TestTransactionData:
         """Test TransactionData with custom nonce."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             nonce="custom123",
         )
 
@@ -74,7 +76,7 @@ class TestTransactionData:
         """Test TransactionData with custom iat."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             iat=1771934400,
         )
 
@@ -84,7 +86,7 @@ class TestTransactionData:
         """Test TransactionData with optional fields."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             exp=1771935300,
             description="Test purchase",
             credential_ids=["simpulse_id"],
@@ -98,7 +100,7 @@ class TestTransactionData:
         """Test action extraction from type field."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         assert tx.action == "data.purchase"
@@ -110,7 +112,7 @@ class TestTransactionData:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         d = tx.to_dict()
@@ -119,7 +121,7 @@ class TestTransactionData:
         assert d["credential_ids"] == ["default"]
         assert d["nonce"] == "da9b1009"
         assert d["iat"] == 1771934400
-        assert d["txn"] == {"assetId": "test", "price": "100"}
+        assert d["txn"] == {"asset_id": "test", "price": "100"}
         assert "exp" not in d
         assert "description" not in d
 
@@ -130,7 +132,7 @@ class TestTransactionData:
             credential_ids=["simpulse_id"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             exp=1771935300,
             description="Test purchase",
         )
@@ -165,7 +167,7 @@ class TestTransactionData:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         json_str = tx.to_json(canonical=False)
@@ -183,7 +185,7 @@ class TestTransactionData:
             "iat": 1771934400,
             "exp": 1771935300,
             "description": "Sign agreement",
-            "txn": {"documentHash": "sha256:abc123"},
+            "txn": {"document_hash": "sha256:abc123"},
             "transaction_data_hashes_alg": ["sha-256"],
         }
 
@@ -195,7 +197,7 @@ class TestTransactionData:
         assert tx.iat == 1771934400
         assert tx.exp == 1771935300
         assert tx.description == "Sign agreement"
-        assert tx.txn["documentHash"] == "sha256:abc123"
+        assert tx.txn["document_hash"] == "sha256:abc123"
 
     def test_from_json(self):
         """Test TransactionData.from_json()."""
@@ -205,7 +207,7 @@ class TestTransactionData:
                 "credential_ids": ["default"],
                 "nonce": "abc12345",
                 "iat": 1771934400,
-                "txn": {"assetId": "test"},
+                "txn": {"asset_id": "test"},
             }
         )
 
@@ -246,7 +248,7 @@ class TestHashComputation:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         tx2 = TransactionData(
@@ -254,7 +256,7 @@ class TestHashComputation:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         assert tx1.compute_hash() == tx2.compute_hash()
@@ -266,7 +268,7 @@ class TestHashComputation:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         tx2 = TransactionData(
@@ -274,7 +276,7 @@ class TestHashComputation:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"price": "100", "assetId": "test"},  # Different order
+            txn={"price": "100", "asset_id": "test"},  # Different order
         )
 
         # Hashes should be equal since canonical JSON sorts keys
@@ -284,7 +286,7 @@ class TestHashComputation:
         """Test that hash is 64 hex characters (SHA-256)."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         hash_value = tx.compute_hash()
@@ -299,7 +301,7 @@ class TestHashComputation:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         tx2 = TransactionData(
@@ -307,7 +309,7 @@ class TestHashComputation:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "200"},  # Different price
+            txn={"asset_id": "test", "price": "200"},  # Different price
         )
 
         assert tx1.compute_hash() != tx2.compute_hash()
@@ -319,7 +321,7 @@ class TestHashComputation:
             "credential_ids": ["default"],
             "nonce": "da9b1009",
             "iat": 1771934400,
-            "txn": {"assetId": "test"},
+            "txn": {"asset_id": "test"},
         }
 
         base_tx = TransactionData(**base)
@@ -331,7 +333,7 @@ class TestHashComputation:
             {"credential_ids": ["other"]},
             {"nonce": "different"},
             {"iat": 9999999999},
-            {"txn": {"assetId": "other"}},
+            {"txn": {"asset_id": "other"}},
         ]
 
         for change in variations:
@@ -384,6 +386,28 @@ class TestSharedVectors:
                 f"  expected: {v['challenge']}"
             )
 
+    def test_transaction_data_param_matches(self, vectors):
+        """Test base64url-encoded transaction_data request strings."""
+        for v in vectors:
+            tx = TransactionData.from_dict(v["input"])
+            encoded = encode_transaction_data_param(tx)
+            assert encoded == v["transaction_data_param"], (
+                f"transaction_data param mismatch for '{v['name']}':\n"
+                f"  got:      {encoded}\n"
+                f"  expected: {v['transaction_data_param']}"
+            )
+
+    def test_transaction_data_param_hash_matches(self, vectors):
+        """Test OID4VP transaction_data_hashes values."""
+        for v in vectors:
+            tx = TransactionData.from_dict(v["input"])
+            hash_value = compute_transaction_data_param_hash(tx)
+            assert hash_value == v["transaction_data_param_hash"], (
+                f"transaction_data_hashes mismatch for '{v['name']}':\n"
+                f"  got:      {hash_value}\n"
+                f"  expected: {v['transaction_data_param_hash']}"
+            )
+
 
 # =============================================================================
 # Challenge Creation Tests
@@ -400,7 +424,7 @@ class TestCreateDelegationChallenge:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -418,7 +442,7 @@ class TestCreateDelegationChallenge:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -483,7 +507,7 @@ class TestParseDelegationChallenge:
         """Test create -> parse round-trip."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -509,7 +533,7 @@ class TestVerifyChallenge:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -523,7 +547,7 @@ class TestVerifyChallenge:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         # Create challenge with different nonce
@@ -538,7 +562,7 @@ class TestVerifyChallenge:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         # Create challenge with wrong hash
@@ -553,7 +577,7 @@ class TestVerifyChallenge:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
-            txn={"assetId": "test", "price": "100"},
+            txn={"asset_id": "test", "price": "100"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -576,7 +600,7 @@ class TestValidateTransactionData:
         """Test validation of valid transaction."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         # Should not raise
@@ -589,7 +613,7 @@ class TestValidateTransactionData:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=int(time.time()),
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -604,7 +628,7 @@ class TestValidateTransactionData:
             credential_ids=["default"],
             nonce="abc",  # Too short (< 8 chars)
             iat=int(time.time()),
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -620,7 +644,7 @@ class TestValidateTransactionData:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=old_iat,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -636,7 +660,7 @@ class TestValidateTransactionData:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=future_iat,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -649,7 +673,7 @@ class TestValidateTransactionData:
         now = int(time.time())
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             exp=now - 300,  # Expired 5 minutes ago
         )
 
@@ -667,7 +691,7 @@ class TestValidateTransactionData:
             credential_ids=["default"],
             nonce="da9b1009",
             iat=old_iat,
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         # Should fail with 60s max age
@@ -694,7 +718,7 @@ class TestRenderTransactionDisplay:
             nonce="da9b1009",
             iat=1771934400,
             txn={
-                "assetId": "urn:uuid:test",
+                "asset_id": "urn:uuid:test",
                 "price": "100",
                 "currency": "ENVITED",
             },
@@ -711,7 +735,7 @@ class TestRenderTransactionDisplay:
         """Test display with custom service name."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
         )
 
         display = render_transaction_display(tx, service_name="Custom Service")
@@ -737,7 +761,7 @@ class TestRenderTransactionDisplay:
         """Test display includes expiration if present."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             exp=1771935300,
         )
 
@@ -750,7 +774,7 @@ class TestRenderTransactionDisplay:
         """Test display includes description if present."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "test"},
+            txn={"asset_id": "test"},
             description="Purchase sensor data from BMW",
         )
 
@@ -763,7 +787,7 @@ class TestRenderTransactionDisplay:
         """Test display truncates very long values."""
         tx = TransactionData.create(
             action="data.purchase",
-            txn={"assetId": "a" * 100},  # Very long value
+            txn={"asset_id": "a" * 100},  # Very long value
         )
 
         display = render_transaction_display(tx)
@@ -874,7 +898,7 @@ class TestIntegration:
         tx = TransactionData.create(
             action="data.purchase",
             txn={
-                "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+                "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
                 "price": "100",
                 "currency": "ENVITED",
             },
@@ -906,7 +930,7 @@ class TestIntegration:
         # Create and serialize
         original_tx = TransactionData.create(
             action="contract.sign",
-            txn={"documentHash": "sha256:abc123"},
+            txn={"document_hash": "sha256:abc123"},
         )
         challenge = create_delegation_challenge(original_tx)
         tx_json = original_tx.to_json()
@@ -924,7 +948,7 @@ class TestIntegration:
         for i in range(10):
             tx = TransactionData.create(
                 action="data.purchase",
-                txn={"assetId": f"asset-{i}"},
+                txn={"asset_id": f"asset-{i}"},
             )
             hashes.add(tx.compute_hash())
 

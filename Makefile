@@ -86,7 +86,7 @@ help:
 	@echo "Testing:"
 	@echo "  make test        - Run Python pytest suite"
 	@echo "  make test-ts     - Run TypeScript vitest suite"
-	@echo "  make test-all    - Run all tests (Python + TypeScript)"
+	@echo "  make test-all    - Run Python tests + SHACL conformance + TypeScript tests"
 	@echo "  make test-cov    - Run Python tests with coverage report"
 	@echo ""
 	@echo "TypeScript:"
@@ -192,10 +192,31 @@ validate:
 validate-shacl:
 	$(call check_dev_setup)
 	@echo "🔧 Running SHACL data conformance check on examples..."
-	@cd $(OMB_SUBMODULE_DIR) && $(shell which $(PYTHON)) -m src.tools.validators.validation_suite \
-		--run check-data-conformance \
-		--data-paths ../../examples/ \
-		--artifacts ../../artifacts ./artifacts
+	@cd $(OMB_SUBMODULE_DIR) && \
+		tmp_output=$$(mktemp) && \
+		$(PYTHON) -m src.tools.validators.validation_suite \
+			--run check-data-conformance \
+			--data-paths ../../examples/ ../../tests/validation-probe/ontology-loading-probe.json \
+			--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
+		status=$$? ; \
+		cat $$tmp_output ; \
+		if [ $$status -ne 0 ]; then \
+			rm -f $$tmp_output ; \
+			exit $$status ; \
+		fi ; \
+		for required in \
+			"imports/cs/cs.owl.ttl" \
+			"imports/cred/cred.owl.ttl" \
+			"../../artifacts/core/core.owl.ttl" \
+			"../../artifacts/harbour/harbour.owl.ttl" \
+			"artifacts/gx/gx.owl.ttl" ; do \
+			if ! grep -q "$$required" $$tmp_output ; then \
+				echo "❌ Required ontology not loaded by validation suite: $$required" >&2 ; \
+				rm -f $$tmp_output ; \
+				exit 1 ; \
+			fi ; \
+		done ; \
+		rm -f $$tmp_output
 	@echo "✅ SHACL validation complete"
 
 # Run pre-commit hooks on all files
@@ -252,8 +273,9 @@ all:
 
 # Run all tests (Python + TypeScript)
 test-all:
-	@echo "🔧 Running all tests (Python + TypeScript)..."
+	@echo "🔧 Running all tests (Python + SHACL + TypeScript)..."
 	@$(MAKE) --no-print-directory test
+	@$(MAKE) --no-print-directory validate-shacl
 	@$(MAKE) --no-print-directory test-ts
 	@echo "✅ All tests complete"
 

@@ -9,7 +9,7 @@ JOSE signing and verification library for W3C Verifiable Credentials, supporting
 - **ES256 (P-256)**: EUDI HAIP compliant algorithm
 - **EdDSA (Ed25519)**: Supported (deprecated per RFC 9864, use ES256 for production)
 - **X.509 Support**: Certificate chains via `x5c` header
-- **DID Support**: `did:key` and `did:web` resolution
+- **DID Support**: `did:key` key identifiers plus `did:web` / `did:webs` subject identifiers (resolution handled by integrators)
 - **Selective Disclosure**: Native SD-JWT-VC with disclosable claims
 - **Key Binding**: KB-JWT for holder binding in presentations
 - **Harbour Credential Types**: Base credential framework with composition slots for Gaia-X compliance
@@ -127,7 +127,7 @@ The composition pattern keeps harbour properties on the harbour-typed outer node
   "issuer": "did:web:trust-anchor.example.com",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSubject": {
-    "id": "did:web:participant.example.com",
+    "id": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH",
     "gxParticipant": {
@@ -174,8 +174,11 @@ make validate
 ### Run Tests
 
 ```bash
-# Run all fixture validations via pytest
+# Run Python tests only
 make test
+
+# Run full pipeline (Python + SHACL conformance via validation_suite.py + TypeScript)
+make test-all
 ```
 
 ## CLI Usage
@@ -232,7 +235,8 @@ submodules/
 examples/
 ├── legal-person-credential.json       # Harbour credential examples
 ├── natural-person-credential.json     # (canonical unsigned JSON-LD)
-└── service-offering-credential.json
+├── service-offering-credential.json
+└── did-webs/                          # Example did:webs DID documents used by examples
 
 tests/
 ├── fixtures/                      # Shared test fixtures
