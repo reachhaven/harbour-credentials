@@ -1,19 +1,23 @@
 """Tests for harbour.delegation module.
 
-This module tests the Harbour Delegated Signing Evidence Specification v2.
+This module tests the Harbour Delegated Signing Evidence Specification v2
+with OID4VP-aligned TransactionData.
 
 Tests cover:
-- TransactionData creation and serialization
+- TransactionData creation and serialization (OID4VP fields)
 - Challenge creation and parsing
 - Hash computation determinism
 - Challenge verification
 - Validation (timestamp, nonce, expiration)
 - Human-readable display rendering
+- Shared canonicalization test vectors
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import json
+import time
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -29,6 +33,9 @@ from harbour.delegation import (
     verify_challenge,
 )
 
+FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures"
+
+
 # =============================================================================
 # TransactionData Tests
 # =============================================================================
@@ -41,78 +48,105 @@ class TestTransactionData:
         """Test basic TransactionData creation."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "urn:uuid:test", "price": "100"},
+            txn={"assetId": "urn:uuid:test", "price": "100"},
         )
 
-        assert tx.action == "data.purchase"
-        assert tx.type == "HarbourDelegatedTransaction"
-        assert tx.version == "1.0"
-        assert tx.transaction == {"assetId": "urn:uuid:test", "price": "100"}
-        assert tx.metadata == {}
+        assert tx.type == "harbour_delegate:data.purchase"
+        assert tx.credential_ids == ["default"]
+        assert tx.txn == {"assetId": "urn:uuid:test", "price": "100"}
+        assert tx.exp is None
+        assert tx.description is None
+        assert tx.transaction_data_hashes_alg == ["sha-256"]
         assert len(tx.nonce) == 8  # Default hex nonce is 8 chars
-        assert tx.timestamp.endswith("Z")
+        assert isinstance(tx.iat, int)
 
     def test_create_with_custom_nonce(self):
         """Test TransactionData with custom nonce."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
+            txn={"assetId": "test"},
             nonce="custom123",
         )
 
         assert tx.nonce == "custom123"
 
-    def test_create_with_custom_timestamp(self):
-        """Test TransactionData with custom timestamp."""
-        ts = datetime(2026, 2, 24, 12, 0, 0, tzinfo=timezone.utc)
+    def test_create_with_custom_iat(self):
+        """Test TransactionData with custom iat."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
-            timestamp=ts,
+            txn={"assetId": "test"},
+            iat=1771934400,
         )
 
-        assert tx.timestamp == "2026-02-24T12:00:00Z"
+        assert tx.iat == 1771934400
 
-    def test_create_with_metadata(self):
-        """Test TransactionData with metadata."""
+    def test_create_with_optional_fields(self):
+        """Test TransactionData with optional fields."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
-            metadata={
-                "description": "Test purchase",
-                "expiresAt": "2026-02-24T13:00:00Z",
-            },
+            txn={"assetId": "test"},
+            exp=1771935300,
+            description="Test purchase",
+            credential_ids=["simpulse_id"],
         )
 
-        assert tx.metadata["description"] == "Test purchase"
-        assert tx.metadata["expiresAt"] == "2026-02-24T13:00:00Z"
+        assert tx.exp == 1771935300
+        assert tx.description == "Test purchase"
+        assert tx.credential_ids == ["simpulse_id"]
 
-    def test_to_dict(self):
-        """Test TransactionData.to_dict()."""
+    def test_action_property(self):
+        """Test action extraction from type field."""
+        tx = TransactionData.create(
+            action="data.purchase",
+            txn={"assetId": "test"},
+        )
+
+        assert tx.action == "data.purchase"
+
+    def test_to_dict_omits_none(self):
+        """Test TransactionData.to_dict() omits None values."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         d = tx.to_dict()
 
-        assert d["type"] == "HarbourDelegatedTransaction"
-        assert d["version"] == "1.0"
-        assert d["action"] == "data.purchase"
-        assert d["timestamp"] == "2026-02-24T12:00:00Z"
+        assert d["type"] == "harbour_delegate:data.purchase"
+        assert d["credential_ids"] == ["default"]
         assert d["nonce"] == "da9b1009"
-        assert d["transaction"] == {"assetId": "test", "price": "100"}
-        assert d["metadata"] == {}
+        assert d["iat"] == 1771934400
+        assert d["txn"] == {"assetId": "test", "price": "100"}
+        assert "exp" not in d
+        assert "description" not in d
+
+    def test_to_dict_includes_optional_when_present(self):
+        """Test TransactionData.to_dict() includes optional fields when set."""
+        tx = TransactionData(
+            type="harbour_delegate:data.purchase",
+            credential_ids=["simpulse_id"],
+            nonce="da9b1009",
+            iat=1771934400,
+            txn={"assetId": "test"},
+            exp=1771935300,
+            description="Test purchase",
+        )
+
+        d = tx.to_dict()
+        assert d["exp"] == 1771935300
+        assert d["description"] == "Test purchase"
 
     def test_to_json_canonical(self):
         """Test canonical JSON output (sorted keys, no whitespace)."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"zzzField": "last", "aaaField": "first"},
+            iat=1771934400,
+            txn={"zzzField": "last", "aaaField": "first"},
         )
 
         json_str = tx.to_json(canonical=True)
@@ -127,10 +161,11 @@ class TestTransactionData:
     def test_to_json_pretty(self):
         """Test pretty JSON output."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=1771934400,
+            txn={"assetId": "test"},
         )
 
         json_str = tx.to_json(canonical=False)
@@ -142,27 +177,37 @@ class TestTransactionData:
     def test_from_dict(self):
         """Test TransactionData.from_dict()."""
         data = {
-            "type": "HarbourDelegatedTransaction",
-            "version": "1.0",
-            "action": "contract.sign",
-            "timestamp": "2026-02-24T12:00:00Z",
+            "type": "harbour_delegate:contract.sign",
+            "credential_ids": ["org_credential"],
             "nonce": "ab12cd34",
-            "transaction": {"documentHash": "sha256:abc123"},
-            "metadata": {"expiresAt": "2026-02-24T13:00:00Z"},
+            "iat": 1771934400,
+            "exp": 1771935300,
+            "description": "Sign agreement",
+            "txn": {"documentHash": "sha256:abc123"},
+            "transaction_data_hashes_alg": ["sha-256"],
         }
 
         tx = TransactionData.from_dict(data)
 
-        assert tx.type == "HarbourDelegatedTransaction"
-        assert tx.version == "1.0"
-        assert tx.action == "contract.sign"
+        assert tx.type == "harbour_delegate:contract.sign"
+        assert tx.credential_ids == ["org_credential"]
         assert tx.nonce == "ab12cd34"
-        assert tx.transaction["documentHash"] == "sha256:abc123"
-        assert tx.metadata["expiresAt"] == "2026-02-24T13:00:00Z"
+        assert tx.iat == 1771934400
+        assert tx.exp == 1771935300
+        assert tx.description == "Sign agreement"
+        assert tx.txn["documentHash"] == "sha256:abc123"
 
     def test_from_json(self):
         """Test TransactionData.from_json()."""
-        json_str = '{"action":"data.purchase","nonce":"abc12345","timestamp":"2026-02-24T12:00:00Z","transaction":{"assetId":"test"},"type":"HarbourDelegatedTransaction","version":"1.0"}'
+        json_str = json.dumps(
+            {
+                "type": "harbour_delegate:data.purchase",
+                "credential_ids": ["default"],
+                "nonce": "abc12345",
+                "iat": 1771934400,
+                "txn": {"assetId": "test"},
+            }
+        )
 
         tx = TransactionData.from_json(json_str)
 
@@ -173,19 +218,22 @@ class TestTransactionData:
         """Test serialization round-trip preserves data."""
         original = TransactionData.create(
             action="blockchain.transfer",
-            transaction={"recipient": "0xabc", "amount": "1000"},
-            metadata={"description": "Test transfer"},
+            txn={"recipient": "0xabc", "amount": "1000"},
+            description="Test transfer",
+            credential_ids=["wallet_cred"],
         )
 
         # Round-trip through JSON
         json_str = original.to_json(canonical=True)
         restored = TransactionData.from_json(json_str)
 
+        assert restored.type == original.type
         assert restored.action == original.action
         assert restored.nonce == original.nonce
-        assert restored.timestamp == original.timestamp
-        assert restored.transaction == original.transaction
-        assert restored.metadata == original.metadata
+        assert restored.iat == original.iat
+        assert restored.txn == original.txn
+        assert restored.description == original.description
+        assert restored.credential_ids == original.credential_ids
 
 
 class TestHashComputation:
@@ -194,17 +242,19 @@ class TestHashComputation:
     def test_compute_hash_deterministic(self):
         """Test that hash computation is deterministic."""
         tx1 = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         tx2 = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         assert tx1.compute_hash() == tx2.compute_hash()
@@ -212,17 +262,19 @@ class TestHashComputation:
     def test_compute_hash_key_order_independent(self):
         """Test that hash is independent of transaction dict key order."""
         tx1 = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         tx2 = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"price": "100", "assetId": "test"},  # Different order
+            iat=1771934400,
+            txn={"price": "100", "assetId": "test"},  # Different order
         )
 
         # Hashes should be equal since canonical JSON sorts keys
@@ -232,7 +284,7 @@ class TestHashComputation:
         """Test that hash is 64 hex characters (SHA-256)."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
+            txn={"assetId": "test"},
         )
 
         hash_value = tx.compute_hash()
@@ -243,17 +295,19 @@ class TestHashComputation:
     def test_compute_hash_changes_with_data(self):
         """Test that hash changes when data changes."""
         tx1 = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         tx2 = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "200"},  # Different price
+            iat=1771934400,
+            txn={"assetId": "test", "price": "200"},  # Different price
         )
 
         assert tx1.compute_hash() != tx2.compute_hash()
@@ -261,10 +315,11 @@ class TestHashComputation:
     def test_compute_hash_sensitive_to_all_fields(self):
         """Test that hash changes for any field change."""
         base = {
-            "action": "data.purchase",
-            "timestamp": "2026-02-24T12:00:00Z",
+            "type": "harbour_delegate:data.purchase",
+            "credential_ids": ["default"],
             "nonce": "da9b1009",
-            "transaction": {"assetId": "test"},
+            "iat": 1771934400,
+            "txn": {"assetId": "test"},
         }
 
         base_tx = TransactionData(**base)
@@ -272,10 +327,11 @@ class TestHashComputation:
 
         # Test each field change produces different hash
         variations = [
-            {"action": "data.share"},
-            {"timestamp": "2026-02-24T13:00:00Z"},
+            {"type": "harbour_delegate:data.share"},
+            {"credential_ids": ["other"]},
             {"nonce": "different"},
-            {"transaction": {"assetId": "other"}},
+            {"iat": 9999999999},
+            {"txn": {"assetId": "other"}},
         ]
 
         for change in variations:
@@ -284,6 +340,49 @@ class TestHashComputation:
             assert (
                 modified_tx.compute_hash() != base_hash
             ), f"Hash unchanged for {change}"
+
+
+class TestSharedVectors:
+    """Tests using shared canonicalization test vectors."""
+
+    @pytest.fixture
+    def vectors(self):
+        """Load shared test vectors."""
+        vectors_path = FIXTURES_DIR / "canonicalization-vectors.json"
+        return json.loads(vectors_path.read_text())["vectors"]
+
+    def test_canonical_json_matches(self, vectors):
+        """Test that Python canonical JSON matches expected output."""
+        for v in vectors:
+            tx = TransactionData.from_dict(v["input"])
+            canonical = tx.to_json(canonical=True)
+            assert canonical == v["canonical_json"], (
+                f"Canonical JSON mismatch for '{v['name']}':\n"
+                f"  got:      {canonical}\n"
+                f"  expected: {v['canonical_json']}"
+            )
+
+    def test_sha256_hash_matches(self, vectors):
+        """Test that Python SHA-256 hash matches expected output."""
+        for v in vectors:
+            tx = TransactionData.from_dict(v["input"])
+            hash_value = tx.compute_hash()
+            assert hash_value == v["sha256_hash"], (
+                f"SHA-256 hash mismatch for '{v['name']}':\n"
+                f"  got:      {hash_value}\n"
+                f"  expected: {v['sha256_hash']}"
+            )
+
+    def test_challenge_matches(self, vectors):
+        """Test that challenge string matches expected output."""
+        for v in vectors:
+            tx = TransactionData.from_dict(v["input"])
+            challenge = create_delegation_challenge(tx)
+            assert challenge == v["challenge"], (
+                f"Challenge mismatch for '{v['name']}':\n"
+                f"  got:      {challenge}\n"
+                f"  expected: {v['challenge']}"
+            )
 
 
 # =============================================================================
@@ -297,10 +396,11 @@ class TestCreateDelegationChallenge:
     def test_basic_challenge(self):
         """Test basic challenge creation."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -314,10 +414,11 @@ class TestCreateDelegationChallenge:
     def test_challenge_matches_hash(self):
         """Test that challenge hash matches computed hash."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=1771934400,
+            txn={"assetId": "test"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -382,7 +483,7 @@ class TestParseDelegationChallenge:
         """Test create -> parse round-trip."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
+            txn={"assetId": "test"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -404,10 +505,11 @@ class TestVerifyChallenge:
     def test_verify_matching_challenge(self):
         """Test verification of matching challenge."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=1771934400,
+            txn={"assetId": "test"},
         )
 
         challenge = create_delegation_challenge(tx)
@@ -417,10 +519,11 @@ class TestVerifyChallenge:
     def test_verify_mismatched_nonce(self):
         """Test verification fails for mismatched nonce."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=1771934400,
+            txn={"assetId": "test"},
         )
 
         # Create challenge with different nonce
@@ -431,10 +534,11 @@ class TestVerifyChallenge:
     def test_verify_mismatched_hash(self):
         """Test verification fails for mismatched hash."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=1771934400,
+            txn={"assetId": "test"},
         )
 
         # Create challenge with wrong hash
@@ -445,16 +549,17 @@ class TestVerifyChallenge:
     def test_verify_tampered_data(self):
         """Test verification fails for tampered transaction data."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test", "price": "100"},
+            iat=1771934400,
+            txn={"assetId": "test", "price": "100"},
         )
 
         challenge = create_delegation_challenge(tx)
 
         # Tamper with transaction data
-        tx.transaction["price"] = "999"
+        tx.txn["price"] = "999"
 
         assert verify_challenge(challenge, tx) is False
 
@@ -471,20 +576,20 @@ class TestValidateTransactionData:
         """Test validation of valid transaction."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
+            txn={"assetId": "test"},
         )
 
         # Should not raise
         validate_transaction_data(tx)
 
     def test_validate_invalid_type(self):
-        """Test validation fails for invalid type."""
+        """Test validation fails for invalid type prefix."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            type="wrong_prefix:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
-            type="WrongType",
+            iat=int(time.time()),
+            txn={"assetId": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -495,10 +600,11 @@ class TestValidateTransactionData:
     def test_validate_short_nonce(self):
         """Test validation fails for short nonce."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="abc",  # Too short (< 8 chars)
-            transaction={"assetId": "test"},
+            iat=int(time.time()),
+            txn={"assetId": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -508,12 +614,13 @@ class TestValidateTransactionData:
 
     def test_validate_old_timestamp(self):
         """Test validation fails for old timestamp."""
-        old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+        old_iat = int(time.time()) - 600  # 10 minutes ago
         tx = TransactionData(
-            action="data.purchase",
-            timestamp=old_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=old_iat,
+            txn={"assetId": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -523,12 +630,13 @@ class TestValidateTransactionData:
 
     def test_validate_future_timestamp(self):
         """Test validation fails for future timestamp."""
-        future_time = datetime.now(timezone.utc) + timedelta(minutes=5)
+        future_iat = int(time.time()) + 300  # 5 minutes in future
         tx = TransactionData(
-            action="data.purchase",
-            timestamp=future_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=future_iat,
+            txn={"assetId": "test"},
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -538,11 +646,11 @@ class TestValidateTransactionData:
 
     def test_validate_expired_transaction(self):
         """Test validation fails for expired transaction."""
-        past_expiry = datetime.now(timezone.utc) - timedelta(minutes=5)
+        now = int(time.time())
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
-            metadata={"expiresAt": past_expiry.strftime("%Y-%m-%dT%H:%M:%SZ")},
+            txn={"assetId": "test"},
+            exp=now - 300,  # Expired 5 minutes ago
         )
 
         with pytest.raises(ChallengeError) as excinfo:
@@ -553,12 +661,13 @@ class TestValidateTransactionData:
     def test_validate_custom_max_age(self):
         """Test validation with custom max age."""
         # 2 minutes old
-        old_time = datetime.now(timezone.utc) - timedelta(seconds=120)
+        old_iat = int(time.time()) - 120
         tx = TransactionData(
-            action="data.purchase",
-            timestamp=old_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"assetId": "test"},
+            iat=old_iat,
+            txn={"assetId": "test"},
         )
 
         # Should fail with 60s max age
@@ -580,10 +689,11 @@ class TestRenderTransactionDisplay:
     def test_render_basic(self):
         """Test basic display rendering."""
         tx = TransactionData(
-            action="data.purchase",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:data.purchase",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={
+            iat=1771934400,
+            txn={
                 "assetId": "urn:uuid:test",
                 "price": "100",
                 "currency": "ENVITED",
@@ -595,13 +705,13 @@ class TestRenderTransactionDisplay:
         assert "requests your authorization" in display
         assert "Purchase data asset" in display  # Human-readable label
         assert "da9b1009" in display
-        assert "2026-02-24T12:00:00Z" in display
+        assert "1771934400" in display
 
     def test_render_custom_service_name(self):
         """Test display with custom service name."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
+            txn={"assetId": "test"},
         )
 
         display = render_transaction_display(tx, service_name="Custom Service")
@@ -611,10 +721,11 @@ class TestRenderTransactionDisplay:
     def test_render_unknown_action(self):
         """Test display with unknown action type."""
         tx = TransactionData(
-            action="unknown.action",
-            timestamp="2026-02-24T12:00:00Z",
+            type="harbour_delegate:unknown.action",
+            credential_ids=["default"],
             nonce="da9b1009",
-            transaction={"someField": "value"},
+            iat=1771934400,
+            txn={"someField": "value"},
         )
 
         display = render_transaction_display(tx)
@@ -626,21 +737,21 @@ class TestRenderTransactionDisplay:
         """Test display includes expiration if present."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
-            metadata={"expiresAt": "2026-02-24T13:00:00Z"},
+            txn={"assetId": "test"},
+            exp=1771935300,
         )
 
         display = render_transaction_display(tx)
 
         assert "Expires:" in display
-        assert "2026-02-24T13:00:00Z" in display
+        assert "1771935300" in display
 
     def test_render_with_description(self):
         """Test display includes description if present."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "test"},
-            metadata={"description": "Purchase sensor data from BMW"},
+            txn={"assetId": "test"},
+            description="Purchase sensor data from BMW",
         )
 
         display = render_transaction_display(tx)
@@ -652,7 +763,7 @@ class TestRenderTransactionDisplay:
         """Test display truncates very long values."""
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={"assetId": "a" * 100},  # Very long value
+            txn={"assetId": "a" * 100},  # Very long value
         )
 
         display = render_transaction_display(tx)
@@ -665,7 +776,7 @@ class TestRenderTransactionDisplay:
         for action, label in ACTION_LABELS.items():
             tx = TransactionData.create(
                 action=action,
-                transaction={"testField": "value"},
+                txn={"testField": "value"},
             )
 
             display = render_transaction_display(tx)
@@ -762,12 +873,13 @@ class TestIntegration:
         # 1. Create transaction data
         tx = TransactionData.create(
             action="data.purchase",
-            transaction={
+            txn={
                 "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
                 "price": "100",
                 "currency": "ENVITED",
             },
-            metadata={"description": "Purchase sensor data"},
+            description="Purchase sensor data",
+            credential_ids=["simpulse_id"],
         )
 
         # 2. Create challenge
@@ -794,7 +906,7 @@ class TestIntegration:
         # Create and serialize
         original_tx = TransactionData.create(
             action="contract.sign",
-            transaction={"documentHash": "sha256:abc123"},
+            txn={"documentHash": "sha256:abc123"},
         )
         challenge = create_delegation_challenge(original_tx)
         tx_json = original_tx.to_json()
@@ -812,7 +924,7 @@ class TestIntegration:
         for i in range(10):
             tx = TransactionData.create(
                 action="data.purchase",
-                transaction={"assetId": f"asset-{i}"},
+                txn={"assetId": f"asset-{i}"},
             )
             hashes.add(tx.compute_hash())
 

@@ -30,28 +30,23 @@ def sample_sd_jwt_vc(issuer_keypair, holder_keypair):
     holder_private, holder_public = holder_keypair
     holder_did = p256_public_key_to_did_key(holder_public)
 
-    credential = {
-        "@context": [
-            "https://www.w3.org/ns/credentials/v2",
-            "https://www.w3.org/ns/credentials/examples/v2",
-        ],
-        "type": ["VerifiableCredential", "MembershipCredential"],
-        "issuer": "did:web:issuer.example.com",
-        "credentialSubject": {
-            "id": holder_did,
-            "givenName": "Alice",
-            "familyName": "Smith",
-            "email": "alice@example.com",
-            "memberOf": "Example Organization",
-            "role": "member",
-        },
+    # SD-JWT-VC uses flat claims (not nested credentialSubject)
+    claims = {
+        "iss": "did:web:issuer.example.com",
+        "sub": holder_did,
+        "givenName": "Alice",
+        "familyName": "Smith",
+        "email": "alice@example.com",
+        "memberOf": "Example Organization",
+        "role": "member",
     }
 
     # Create SD-JWT-VC with selective disclosure claims
     sd_jwt_vc = issue_sd_jwt_vc(
-        credential,
+        claims,
         private_key,
-        sd_claims=["givenName", "familyName", "email"],
+        vct="https://example.com/MembershipCredential",
+        disclosable=["givenName", "familyName", "email"],
     )
 
     return sd_jwt_vc
@@ -131,11 +126,12 @@ class TestIssueSDJWTVP:
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionIntent": {
-                    "actionType": "purchase",
-                    "actionReference": "tx:abc123",
-                    "consentTimestamp": "2024-01-15T10:30:00Z",
-                    "consentNonce": secrets.token_urlsafe(16),
+                "transactionData": {
+                    "type": "harbour_delegate:data.purchase",
+                    "credential_ids": ["simpulse_id"],
+                    "nonce": secrets.token_urlsafe(16),
+                    "iat": 1771934400,
+                    "txn": {"assetId": "tx:abc123", "price": "100"},
                 },
                 "delegatedTo": "did:web:signing-service.example.com",
             }
@@ -271,10 +267,12 @@ class TestVerifySDJWTVP:
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionIntent": {
-                    "actionType": "approve",
-                    "consentTimestamp": "2024-01-15T12:00:00Z",
-                    "consentNonce": "unique-consent-nonce",
+                "transactionData": {
+                    "type": "harbour_delegate:blockchain.approve",
+                    "credential_ids": ["default"],
+                    "nonce": "unique-consent-nonce",
+                    "iat": 1771934400,
+                    "txn": {"contract": "0x1234"},
                 },
             }
         ]
@@ -372,42 +370,44 @@ class TestDelegatedSigningFlow:
         holder_private, holder_public = holder_keypair
         holder_did = p256_public_key_to_did_key(holder_public)
 
-        # Step 1: Issue credential to holder
-        credential = {
-            "@context": ["https://www.w3.org/ns/credentials/v2"],
-            "type": ["VerifiableCredential", "IdentityCredential"],
-            "issuer": "did:web:trusted-issuer.example.com",
-            "credentialSubject": {
-                "id": holder_did,
-                "givenName": "Carlo",
-                "familyName": "Rossi",
-                "organization": "BMW",
-                "role": "Purchaser",
-            },
+        # Step 1: Issue credential to holder (SD-JWT-VC uses flat claims)
+        claims = {
+            "iss": "did:web:trusted-issuer.example.com",
+            "sub": holder_did,
+            "givenName": "Carlo",
+            "familyName": "Rossi",
+            "organization": "BMW",
+            "role": "Purchaser",
         }
 
         sd_jwt_vc = issue_sd_jwt_vc(
-            credential,
+            claims,
             issuer_private,
-            sd_claims=["givenName", "familyName"],  # PII is selectively disclosable
+            vct="https://example.com/IdentityCredential",
+            disclosable=["givenName", "familyName"],  # PII is selectively disclosable
         )
 
         # Step 2: Holder creates consent VP
         signing_service_did = "did:web:harbour.signing-service.example.com"
         consent_nonce = secrets.token_urlsafe(32)
 
-        transaction_intent = {
-            "actionType": "blockchain:purchase",
-            "actionReference": "tx:0xabc123def456",
-            "consentTimestamp": "2024-01-15T14:30:00Z",
-            "consentNonce": consent_nonce,
+        transaction_data = {
+            "type": "harbour_delegate:data.purchase",
+            "credential_ids": ["simpulse_id"],
+            "nonce": consent_nonce,
+            "iat": 1771934400,
             "description": "Purchase data asset XYZ for 100 ENVITED tokens",
+            "txn": {
+                "assetId": "tx:0xabc123def456",
+                "price": "100",
+                "currency": "ENVITED",
+            },
         }
 
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionIntent": transaction_intent,
+                "transactionData": transaction_data,
                 "delegatedTo": signing_service_did,
             }
         ]
@@ -447,12 +447,12 @@ class TestDelegatedSigningFlow:
         assert "givenName" not in cred  # PII hidden
         assert "familyName" not in cred  # PII hidden
 
-        # Evidence should contain transaction intent
+        # Evidence should contain transaction data
         assert len(result["evidence"]) == 1
         ev = result["evidence"][0]
         assert ev["type"] == "DelegatedSignatureEvidence"
-        assert ev["transactionIntent"]["actionType"] == "blockchain:purchase"
-        assert ev["transactionIntent"]["consentNonce"] == consent_nonce
+        assert ev["transactionData"]["type"] == "harbour_delegate:data.purchase"
+        assert ev["transactionData"]["nonce"] == consent_nonce
         assert ev["delegatedTo"] == signing_service_did
 
     def test_public_audit_privacy(self, issuer_keypair, holder_keypair):
@@ -461,34 +461,32 @@ class TestDelegatedSigningFlow:
         holder_private, holder_public = holder_keypair
         holder_did = p256_public_key_to_did_key(holder_public)
 
-        # Issue credential with PII
-        credential = {
-            "@context": ["https://www.w3.org/ns/credentials/v2"],
-            "type": ["VerifiableCredential"],
-            "issuer": "did:web:issuer.example.com",
-            "credentialSubject": {
-                "id": holder_did,
-                "name": "Confidential Person",
-                "email": "secret@example.com",
-                "publicRole": "Authorized Purchaser",
-            },
+        # Issue credential with PII (SD-JWT-VC uses flat claims)
+        claims = {
+            "iss": "did:web:issuer.example.com",
+            "sub": holder_did,
+            "name": "Confidential Person",
+            "email": "secret@example.com",
+            "publicRole": "Authorized Purchaser",
         }
 
         sd_jwt_vc = issue_sd_jwt_vc(
-            credential,
+            claims,
             issuer_private,
-            sd_claims=["name", "email"],  # PII hidden by default
+            vct="https://example.com/VerifiableCredential",
+            disclosable=["name", "email"],  # PII hidden by default
         )
 
         # Create VP with no PII disclosed
         evidence = [
             {
                 "type": "DelegatedSignatureEvidence",
-                "transactionIntent": {
-                    "actionType": "execute:transfer",
-                    "actionReference": "blockchain:tx:0x123",
-                    "consentTimestamp": "2024-01-15T15:00:00Z",
-                    "consentNonce": "public-audit-nonce",
+                "transactionData": {
+                    "type": "harbour_delegate:blockchain.transfer",
+                    "credential_ids": ["default"],
+                    "nonce": "public-audit-nonce",
+                    "iat": 1771934400,
+                    "txn": {"recipient": "0x123", "amount": "1000"},
                 },
             }
         ]
@@ -546,7 +544,7 @@ class TestEdgeCases:
             evidence=[],  # Empty but not None
         )
 
-        # Should work but evidence field still present
+        # Empty evidence list is treated as no evidence (not included in VP)
         parts = vp.split("~")
         vp_jwt = parts[0]
         payload_b64 = vp_jwt.split(".")[1]
@@ -554,15 +552,15 @@ class TestEdgeCases:
             base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4))
         )
 
-        assert payload["vp"]["evidence"] == []
+        assert "evidence" not in payload["vp"]
 
     def test_multiple_evidence_items(self, sample_sd_jwt_vc, holder_keypair):
         """Test VP with multiple evidence items."""
         holder_private, _ = holder_keypair
 
         evidence = [
-            {"type": "DelegatedSignatureEvidence", "transactionIntent": {}},
-            {"type": "EmailVerification", "verifiedEmail": "test@example.com"},
+            {"type": "DelegatedSignatureEvidence", "transactionData": {}},
+            {"type": "CredentialEvidence", "verifiablePresentation": "eyJ..."},
         ]
 
         vp = issue_sd_jwt_vp(

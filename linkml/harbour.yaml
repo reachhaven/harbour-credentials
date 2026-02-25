@@ -109,12 +109,14 @@ slots:
     required: false
 
   # --- Delegated Signature Evidence Slots ---
-  transactionIntent:
+  transactionData:
     description: >
-      The action or transaction the user is consenting to. Binds consent
-      to a specific action for auditability.
-    slot_uri: harbour:transactionIntent
-    range: TransactionIntent
+      OID4VP-aligned transaction data object (§8.4). Contains action type,
+      credential IDs, timestamps, and action-specific details in the txn field.
+      On the receipt SD-JWT-VC this is a selectively disclosable claim enabling
+      three-layer privacy (public / authorized / full audit).
+    slot_uri: harbour:transactionData
+    range: Any
     required: false
 
   delegatedTo:
@@ -122,34 +124,6 @@ slots:
     slot_uri: harbour:delegatedTo
     range: uri
     required: false
-
-  actionType:
-    description: >
-      Type of action being consented to (e.g., "purchase", "transfer",
-      "sign-contract", "grant-access").
-    slot_uri: harbour:actionType
-    range: string
-    required: true
-
-  actionReference:
-    description: >
-      URI or hash referencing the full transaction details. May be a URN,
-      IPFS hash, or URL to transaction specification.
-    slot_uri: harbour:actionReference
-    range: uri
-    required: false
-
-  consentTimestamp:
-    description: Timestamp when the user consented to the action.
-    slot_uri: harbour:consentTimestamp
-    range: datetime
-    required: true
-
-  consentNonce:
-    description: Unique nonce for replay protection.
-    slot_uri: harbour:consentNonce
-    range: string
-    required: true
 
   # --- Credential Envelope Slots ---
   issuer:
@@ -286,20 +260,13 @@ classes:
     slots:
       - type
 
-  EmailVerification:
+  CredentialEvidence:
     is_a: Evidence
-    description: Evidence that an email address was verified (e.g. via Altme EmailPass).
-    class_uri: harbour:EmailVerification
-    slots:
-      - verifiablePresentation
-    slot_usage:
-      verifiablePresentation:
-        required: true
-
-  IssuanceEvidence:
-    is_a: Evidence
-    description: Evidence referencing a previously issued credential.
-    class_uri: harbour:IssuanceEvidence
+    description: >
+      Evidence that the issuer verified claims using a prior credential
+      or verifiable presentation. The embedded VP contains the credentials
+      the issuer relied upon (e.g., email verification, notary attestation).
+    class_uri: harbour:CredentialEvidence
     slots:
       - verifiablePresentation
     slot_usage:
@@ -309,41 +276,21 @@ classes:
   DelegatedSignatureEvidence:
     is_a: Evidence
     description: >
-      Evidence of user consent for a delegated signature operation. The signing
-      service executes a transaction on behalf of the user, with the VP serving
-      as cryptographic proof of consent. For public auditability, the VP should
-      use SD-JWT format with PII claims redacted.
+      Evidence on a receipt credential (SD-JWT-VC) that a signing service
+      executed a transaction with the user's explicit consent. The consent VP
+      uses SD-JWT with PII redacted. Transaction data is a disclosable claim
+      enabling three-layer privacy (public / authorized / full audit).
     class_uri: harbour:DelegatedSignatureEvidence
     slots:
       - verifiablePresentation
-      - transactionIntent
       - delegatedTo
+      - transactionData
     slot_usage:
       verifiablePresentation:
         required: true
-        description: >
-          The consent VP signed by the user. Should be SD-JWT VP format for
-          privacy-preserving public audit.
-      transactionIntent:
+      delegatedTo:
         required: true
-
-  TransactionIntent:
-    description: >
-      Describes the action or transaction the user is consenting to. Included
-      in the VP evidence to bind consent to a specific action for auditability.
-    class_uri: harbour:TransactionIntent
-    slots:
-      - actionType
-      - actionReference
-      - description
-      - consentTimestamp
-      - consentNonce
-    slot_usage:
-      actionType:
-        required: true
-      consentTimestamp:
-        required: true
-      consentNonce:
+      transactionData:
         required: true
 
   CRSetEntry:

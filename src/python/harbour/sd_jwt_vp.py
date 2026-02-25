@@ -66,7 +66,9 @@ def issue_sd_jwt_vp(
         disclosures: Which disclosures to include (by claim name).
                      If None, includes all available disclosures.
                      If empty list [], includes no disclosures (max privacy).
-        evidence: Evidence objects to include in the VP (e.g., transaction intent).
+        evidence: Evidence objects to include in the VP. Supported types:
+                  - CredentialEvidence: prior credential/VP the issuer relied upon
+                  - DelegatedSignatureEvidence: consent proof with transactionData
         nonce: Challenge nonce for replay protection.
         audience: Intended verifier (DID or URL).
         holder_did: Holder's DID for the VP. If not provided, will not be included.

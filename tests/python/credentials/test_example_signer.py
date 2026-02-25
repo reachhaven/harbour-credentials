@@ -182,11 +182,44 @@ class TestProcessExample:
         vc_payload = verify_vc_jose(vc_jwt, public_key)
         assert "harbour:ServiceOfferingCredential" in vc_payload["type"]
 
+    def test_process_delegated_signing_receipt(self, signing_key, tmp_path):
+        """Process the delegated signing receipt with DelegatedSignatureEvidence."""
+        private_key, public_key, kid = signing_key
+
+        example_path = EXAMPLES_DIR / "delegated-signing-receipt.json"
+        if not example_path.exists():
+            pytest.skip("examples/ not populated")
+
+        output_dir = tmp_path / "signed"
+        jwt_path = process_example(example_path, private_key, kid, output_dir)
+
+        # Verify output files exist
+        assert jwt_path.exists()
+        assert (output_dir / "delegated-signing-receipt.decoded.json").exists()
+        assert (output_dir / "delegated-signing-receipt.evidence-vp.jwt").exists()
+
+        # Verify outer VC JWT
+        vc_jwt = jwt_path.read_text().strip()
+        vc_payload = verify_vc_jose(vc_jwt, public_key)
+        assert "harbour:DelegatedSigningReceipt" in vc_payload["type"]
+
+        # Evidence should contain DelegatedSignatureEvidence with transactionData
+        evidence = vc_payload["evidence"][0]
+        assert evidence["type"] == "harbour:DelegatedSignatureEvidence"
+        assert "transactionData" in evidence
+        assert evidence["transactionData"]["type"] == "harbour_delegate:data.purchase"
+        assert evidence["delegatedTo"] == "did:web:signing-service.envited.io"
+
+        # Evidence VP should be a signed JWT
+        vp_jwt_str = evidence["verifiablePresentation"]
+        assert isinstance(vp_jwt_str, str)
+        assert vp_jwt_str.count(".") == 2
+
     def test_process_all_examples(self, signing_key, tmp_path):
         """Process all examples and verify each produces a valid JWT."""
         private_key, public_key, kid = signing_key
 
-        example_files = sorted(EXAMPLES_DIR.glob("*.json"))
+        example_files = sorted(EXAMPLES_DIR.glob("*-credential.json"))
         if not example_files:
             pytest.skip("examples/ not populated")
 

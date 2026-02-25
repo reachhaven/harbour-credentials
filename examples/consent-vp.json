@@ -1,0 +1,41 @@
+{
+  "@context": ["https://www.w3.org/ns/credentials/v2"],
+  "type": ["VerifiablePresentation"],
+  "holder": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+  "verifiableCredential": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/reachhaven/harbour/credentials/v1/"
+      ],
+      "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
+      "issuer": "did:web:issuer.example.com",
+      "validFrom": "2024-01-15T00:00:00Z",
+      "credentialSubject": {
+        "id": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+        "type": "harbour:NaturalPerson",
+        "name": "Alice Smith",
+        "memberOf": "did:web:participant.example.com"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "type": "harbour:DelegatedSignatureEvidence",
+      "transactionData": {
+        "type": "harbour_delegate:data.purchase",
+        "credential_ids": ["simpulse_id"],
+        "transaction_data_hashes_alg": ["sha-256"],
+        "nonce": "da9b1009",
+        "iat": 1771934400,
+        "txn": {
+          "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+          "price": "100",
+          "currency": "ENVITED",
+          "marketplace": "did:web:dataspace.envited.io"
+        }
+      },
+      "delegatedTo": "did:web:signing-service.envited.io"
+    }
+  ]
+}

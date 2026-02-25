@@ -6,7 +6,7 @@ for creating and verifying delegation challenges used in VP proof.challenge fiel
 The challenge format is: <nonce> HARBOUR_DELEGATE <sha256-hash>
 
 Where the hash is computed over a canonical JSON representation of the
-transaction data object.
+OID4VP-aligned transaction data object (§8.4).
 
 See docs/specs/delegation-challenge-encoding.md for the full specification.
 
@@ -25,12 +25,16 @@ import hashlib
 import json
 import secrets
 import sys
+import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 # Action type identifier
 ACTION_TYPE = "HARBOUR_DELEGATE"
+
+# Type prefix for transaction data
+TYPE_PREFIX = "harbour_delegate"
 
 # Human-friendly labels for action types
 ACTION_LABELS = {
@@ -58,32 +62,45 @@ class ChallengeError(ValueError):
 
 @dataclass
 class TransactionData:
-    """Full transaction data object for delegated signing.
+    """OID4VP-aligned transaction data object for delegated signing.
 
-    This object contains all details about the transaction being authorized.
+    This object follows the OID4VP §8.4 transaction_data structure.
     The challenge contains only a hash of this object for compactness.
 
     Attributes:
-        action: The action being delegated (e.g., "data.purchase")
-        timestamp: ISO8601 timestamp when the transaction was created
+        type: Transaction data type identifier (harbour_delegate:<action>)
+        credential_ids: References to DCQL Credential Query id fields
         nonce: Unique identifier for replay protection
-        transaction: Action-specific transaction details
-        type: Fixed type identifier (HarbourDelegatedTransaction)
-        version: Schema version (1.0)
-        metadata: Optional additional context (description, expiration, etc.)
+        iat: Issued-at Unix timestamp (seconds since epoch)
+        txn: Action-specific transaction details
+        exp: Optional expiration Unix timestamp
+        description: Optional human-readable description
+        transaction_data_hashes_alg: Hash algorithms supported (default: ["sha-256"])
     """
 
-    action: str
-    timestamp: str
+    type: str
+    credential_ids: list[str]
     nonce: str
-    transaction: dict[str, Any]
-    type: str = "HarbourDelegatedTransaction"
-    version: str = "1.0"
-    metadata: dict[str, Any] = field(default_factory=dict)
+    iat: int
+    txn: dict[str, Any]
+    exp: int | None = None
+    description: str | None = None
+    transaction_data_hashes_alg: list[str] = field(default_factory=lambda: ["sha-256"])
+
+    @property
+    def action(self) -> str:
+        """Extract the action from the type field.
+
+        E.g., "harbour_delegate:data.purchase" -> "data.purchase"
+        """
+        if ":" in self.type:
+            return self.type.split(":", 1)[1]
+        return self.type
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
-        return asdict(self)
+        """Convert to dictionary representation, omitting None values."""
+        d = asdict(self)
+        return {k: v for k, v in d.items() if v is not None}
 
     def to_json(self, canonical: bool = True) -> str:
         """Convert to JSON string.
@@ -108,13 +125,16 @@ class TransactionData:
     def from_dict(cls, data: dict[str, Any]) -> TransactionData:
         """Create from dictionary."""
         return cls(
-            action=data["action"],
-            timestamp=data["timestamp"],
+            type=data["type"],
+            credential_ids=data["credential_ids"],
             nonce=data["nonce"],
-            transaction=data["transaction"],
-            type=data.get("type", "HarbourDelegatedTransaction"),
-            version=data.get("version", "1.0"),
-            metadata=data.get("metadata", {}),
+            iat=data["iat"],
+            txn=data["txn"],
+            exp=data.get("exp"),
+            description=data.get("description"),
+            transaction_data_hashes_alg=data.get(
+                "transaction_data_hashes_alg", ["sha-256"]
+            ),
         )
 
     @classmethod
@@ -126,33 +146,42 @@ class TransactionData:
     def create(
         cls,
         action: str,
-        transaction: dict[str, Any],
+        txn: dict[str, Any],
         *,
+        credential_ids: list[str] | None = None,
         nonce: str | None = None,
-        timestamp: datetime | None = None,
-        metadata: dict[str, Any] | None = None,
+        iat: int | None = None,
+        exp: int | None = None,
+        description: str | None = None,
     ) -> TransactionData:
         """Create a new transaction data object.
 
         Args:
-            action: The action being delegated
-            transaction: Action-specific transaction details
+            action: The action being delegated (e.g., "data.purchase")
+            txn: Action-specific transaction details
+            credential_ids: DCQL credential query IDs (default: ["default"])
             nonce: Unique identifier (auto-generated if not provided)
-            timestamp: Transaction timestamp (defaults to now)
-            metadata: Optional additional context
+            iat: Issued-at Unix timestamp (defaults to now)
+            exp: Optional expiration Unix timestamp
+            description: Optional human-readable description
         """
         if nonce is None:
             nonce = secrets.token_hex(4)  # 8 hex characters
 
-        if timestamp is None:
-            timestamp = datetime.now(timezone.utc)
+        if iat is None:
+            iat = int(time.time())
+
+        if credential_ids is None:
+            credential_ids = ["default"]
 
         return cls(
-            action=action,
-            timestamp=timestamp.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            type=f"{TYPE_PREFIX}:{action}",
+            credential_ids=credential_ids,
             nonce=nonce,
-            transaction=transaction,
-            metadata=metadata or {},
+            iat=iat,
+            txn=txn,
+            exp=exp,
+            description=description,
         )
 
 
@@ -170,7 +199,7 @@ def create_delegation_challenge(transaction_data: TransactionData) -> str:
     Example:
         >>> tx = TransactionData.create(
         ...     action="data.purchase",
-        ...     transaction={"assetId": "urn:uuid:...", "price": "100"},
+        ...     txn={"assetId": "urn:uuid:...", "price": "100"},
         ... )
         >>> challenge = create_delegation_challenge(tx)
         >>> print(challenge)
@@ -270,13 +299,13 @@ def render_transaction_display(
 
     lines = [
         f"{service_name} requests your authorization",
-        "─" * 50,
+        "\u2500" * 50,
         "",
         f"  Action:      {action_label}",
     ]
 
     # Add transaction-specific fields
-    for key, value in transaction_data.transaction.items():
+    for key, value in transaction_data.txn.items():
         display_key = key.replace("_", " ").replace("Id", " ID").title()
         display_value = str(value)
         if len(display_value) > 40:
@@ -286,17 +315,17 @@ def render_transaction_display(
     lines.extend(
         [
             "",
-            "─" * 50,
+            "\u2500" * 50,
             f"  Nonce:       {transaction_data.nonce}",
-            f"  Time:        {transaction_data.timestamp}",
+            f"  Issued at:   {transaction_data.iat}",
         ]
     )
 
-    if transaction_data.metadata.get("expiresAt"):
-        lines.append(f"  Expires:     {transaction_data.metadata['expiresAt']}")
+    if transaction_data.exp is not None:
+        lines.append(f"  Expires:     {transaction_data.exp}")
 
-    if transaction_data.metadata.get("description"):
-        lines.append(f"  Details:     {transaction_data.metadata['description']}")
+    if transaction_data.description:
+        lines.append(f"  Details:     {transaction_data.description}")
 
     return "\n".join(lines)
 
@@ -315,10 +344,10 @@ def validate_transaction_data(
     Raises:
         ChallengeError: If validation fails
     """
-    # Validate type
-    if transaction_data.type != "HarbourDelegatedTransaction":
+    # Validate type prefix
+    if not transaction_data.type.startswith(f"{TYPE_PREFIX}:"):
         raise ChallengeError(
-            f"Invalid type: expected 'HarbourDelegatedTransaction', got '{transaction_data.type}'"
+            f"Invalid type: expected '{TYPE_PREFIX}:*', got '{transaction_data.type}'"
         )
 
     # Validate nonce length (minimum 8 hex characters = 32 bits)
@@ -327,40 +356,22 @@ def validate_transaction_data(
             f"Nonce too short: {len(transaction_data.nonce)} chars (minimum 8)"
         )
 
-    # Parse and validate timestamp
-    try:
-        ts = datetime.strptime(
-            transaction_data.timestamp, "%Y-%m-%dT%H:%M:%SZ"
-        ).replace(tzinfo=timezone.utc)
-    except ValueError as e:
-        raise ChallengeError(f"Invalid timestamp format: {e}") from e
-
-    now = datetime.now(timezone.utc)
-    age = (now - ts).total_seconds()
+    # Validate iat (Unix timestamp)
+    now = int(time.time())
+    age = now - transaction_data.iat
 
     if age > max_age_seconds:
-        raise ChallengeError(
-            f"Transaction too old: {age:.0f}s (max {max_age_seconds}s)"
-        )
+        raise ChallengeError(f"Transaction too old: {age}s (max {max_age_seconds}s)")
 
     if age < -60:  # Allow 1 minute clock skew
         raise ChallengeError(
-            f"Transaction timestamp is in the future: {transaction_data.timestamp}"
+            f"Transaction timestamp is in the future: iat={transaction_data.iat}"
         )
 
     # Check expiration if present
-    if transaction_data.metadata.get("expiresAt"):
-        try:
-            exp = datetime.strptime(
-                transaction_data.metadata["expiresAt"], "%Y-%m-%dT%H:%M:%SZ"
-            ).replace(tzinfo=timezone.utc)
-        except ValueError as e:
-            raise ChallengeError(f"Invalid expiration format: {e}") from e
-
-        if now > exp:
-            raise ChallengeError(
-                f"Transaction expired at {transaction_data.metadata['expiresAt']}"
-            )
+    if transaction_data.exp is not None:
+        if now > transaction_data.exp:
+            raise ChallengeError(f"Transaction expired at {transaction_data.exp}")
 
 
 def main():
@@ -404,6 +415,9 @@ Examples:
     create_parser.add_argument("--contract", help="Contract address")
     create_parser.add_argument("--recipient", help="Recipient address")
     create_parser.add_argument("--desc", help="Description")
+    create_parser.add_argument(
+        "--credential-ids", nargs="*", help="DCQL credential query IDs"
+    )
     create_parser.add_argument("--exp-minutes", type=int, help="Expiration in minutes")
     create_parser.add_argument(
         "--output-json", action="store_true", help="Output full JSON"
@@ -439,33 +453,30 @@ Examples:
     try:
         if args.command == "create":
             # Build transaction dict from args
-            transaction = {}
+            txn = {}
             if args.asset_id:
-                transaction["assetId"] = args.asset_id
+                txn["assetId"] = args.asset_id
             if args.price:
-                transaction["price"] = args.price
+                txn["price"] = args.price
             if args.currency:
-                transaction["currency"] = args.currency
+                txn["currency"] = args.currency
             if args.chain:
-                transaction["chain"] = args.chain
+                txn["chain"] = args.chain
             if args.contract:
-                transaction["contract"] = args.contract
+                txn["contract"] = args.contract
             if args.recipient:
-                transaction["recipient"] = args.recipient
+                txn["recipient"] = args.recipient
 
-            metadata = {}
-            if args.desc:
-                metadata["description"] = args.desc
+            exp = None
             if args.exp_minutes:
-                from datetime import timedelta
-
-                exp = datetime.now(timezone.utc) + timedelta(minutes=args.exp_minutes)
-                metadata["expiresAt"] = exp.strftime("%Y-%m-%dT%H:%M:%SZ")
+                exp = int(time.time()) + args.exp_minutes * 60
 
             tx = TransactionData.create(
                 action=args.action,
-                transaction=transaction,
-                metadata=metadata if metadata else None,
+                txn=txn,
+                credential_ids=args.credential_ids,
+                description=args.desc,
+                exp=exp,
             )
 
             if args.output_json:
@@ -483,20 +494,24 @@ Examples:
             print(f"Hash: {tx_hash}")
 
         elif args.command == "display":
-            with open(args.json_file, "r") as f:
-                tx = TransactionData.from_json(f.read())
+            tx = TransactionData.from_json(
+                Path(args.json_file).read_text(encoding="utf-8")
+            )
             print(render_transaction_display(tx, args.service))
 
         elif args.command == "verify":
-            with open(args.json_file, "r") as f:
-                tx = TransactionData.from_json(f.read())
+            tx = TransactionData.from_json(
+                Path(args.json_file).read_text(encoding="utf-8")
+            )
 
             validate_transaction_data(tx, max_age_seconds=args.max_age)
 
             if verify_challenge(args.challenge, tx):
-                print("✓ Challenge is valid and matches transaction data")
+                print("\u2713 Challenge is valid and matches transaction data")
             else:
-                print("✗ Challenge does not match transaction data", file=sys.stderr)
+                print(
+                    "\u2717 Challenge does not match transaction data", file=sys.stderr
+                )
                 sys.exit(1)
 
     except ChallengeError as e:

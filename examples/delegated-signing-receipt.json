@@ -1,0 +1,65 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/reachhaven/harbour/credentials/v1/"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "harbour:DelegatedSigningReceipt"
+  ],
+  "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
+  "issuer": "did:web:signing-service.envited.io",
+  "validFrom": "2025-06-25T10:00:00Z",
+  "credentialSubject": {
+    "id": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "type": "harbour:TransactionReceipt",
+    "transactionHash": "86a3e927a80d9e858a71b37f574aa65cab184c5fc65e8c7824771f84ad6ed97e",
+    "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+  },
+  "credentialStatus": [
+    {
+      "id": "did:web:signing-service.envited.io:services:revocation-registry#f7e8d9c0b1a23456",
+      "type": "harbour:CRSetEntry",
+      "statusPurpose": "revocation"
+    }
+  ],
+  "evidence": [
+    {
+      "type": "harbour:DelegatedSignatureEvidence",
+      "verifiablePresentation": {
+        "@context": ["https://www.w3.org/ns/credentials/v2"],
+        "type": ["VerifiablePresentation"],
+        "holder": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+        "verifiableCredential": [
+          {
+            "@context": [
+              "https://www.w3.org/ns/credentials/v2",
+              "https://w3id.org/reachhaven/harbour/credentials/v1/"
+            ],
+            "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
+            "issuer": "did:web:issuer.example.com",
+            "credentialSubject": {
+              "id": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+              "type": "harbour:NaturalPerson",
+              "memberOf": "did:web:participant.example.com"
+            }
+          }
+        ]
+      },
+      "delegatedTo": "did:web:signing-service.envited.io",
+      "transactionData": {
+        "type": "harbour_delegate:data.purchase",
+        "credential_ids": ["simpulse_id"],
+        "transaction_data_hashes_alg": ["sha-256"],
+        "nonce": "da9b1009",
+        "iat": 1771934400,
+        "txn": {
+          "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+          "price": "100",
+          "currency": "ENVITED",
+          "marketplace": "did:web:dataspace.envited.io"
+        }
+      }
+    }
+  ]
+}

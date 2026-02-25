@@ -98,7 +98,7 @@ class TestHarbourNaturalPersonMapping:
         vc = _load_fixture("natural-person-credential.json")
         assert "evidence" in vc
         evidence = vc["evidence"][0]
-        assert evidence["type"] == "harbour:EmailVerification"
+        assert evidence["type"] == "harbour:CredentialEvidence"
 
     def test_subject_is_harbour_natural_person(self):
         """Verify the subject uses harbour:NaturalPerson (outer node only)."""

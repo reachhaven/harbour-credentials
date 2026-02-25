@@ -40,3 +40,28 @@ export {
   type KbJwtPayload,
   type KbJwtVerifyOptions,
 } from "./kb-jwt.js";
+
+export {
+  ACTION_TYPE,
+  TYPE_PREFIX,
+  ACTION_LABELS,
+  ChallengeError,
+  getAction,
+  toCanonicalJson,
+  computeTransactionHash,
+  createDelegationChallenge,
+  parseDelegationChallenge,
+  verifyChallenge,
+  createTransactionData,
+  renderTransactionDisplay,
+  validateTransactionData,
+  type TransactionData,
+} from "./delegation.js";
+
+export {
+  issueSdJwtVp,
+  verifySdJwtVp,
+  type IssueSdJwtVpOptions,
+  type VerifySdJwtVpOptions,
+  type SdJwtVpResult,
+} from "./sd-jwt-vp.js";

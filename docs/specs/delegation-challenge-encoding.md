@@ -151,7 +151,7 @@ This structure aligns with [OID4VP §5.1 `transaction_data`](https://openid.net/
 }
 ```
 
-### 3.5 Computing the Hash
+### 3.6 Computing the Hash
 
 ```python
 import hashlib
@@ -269,14 +269,16 @@ This specification is designed for seamless integration with [OpenID for Verifia
 
 ```json
 {
-  "type": "harbour_delegated_signing",
-  "credential_ids": ["user_identity_credential"],
+  "type": "harbour_delegate:data.purchase",
+  "credential_ids": ["simpulse_id"],
   "transaction_data_hashes_alg": ["sha-256"],
-  "action": "data.purchase",
-  "transaction": {
+  "nonce": "da9b1009",
+  "iat": 1771934400,
+  "txn": {
     "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
-    "currency": "ENVITED"
+    "currency": "ENVITED",
+    "marketplace": "did:web:dataspace.envited.io"
   }
 }
 ```
@@ -353,180 +355,56 @@ A verifier (signing service) MUST:
 
 ### 8.1 Python
 
+The implementation is in `src/python/harbour/delegation.py`:
+
 ```python
-import hashlib
-import json
-import secrets
-from datetime import datetime, timezone
-from dataclasses import dataclass, field, asdict
-from typing import Any
+from harbour.delegation import TransactionData, create_delegation_challenge, verify_challenge
 
+# Create OID4VP-aligned transaction data
+tx = TransactionData.create(
+    action="data.purchase",
+    txn={
+        "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+        "price": "100",
+        "currency": "ENVITED",
+        "marketplace": "did:web:dataspace.envited.io",
+    },
+    credential_ids=["simpulse_id"],
+)
 
-@dataclass
-class TransactionData:
-    """Full transaction data object."""
-    action: str
-    timestamp: str
-    nonce: str
-    transaction: dict[str, Any]
-    type: str = "HarbourDelegatedTransaction"
-    version: str = "1.0"
-    metadata: dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> dict:
-        return asdict(self)
-    
-    def compute_hash(self) -> str:
-        """Compute SHA-256 hash of canonical JSON representation."""
-        canonical = json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
-
-
-def create_delegation_challenge(
-    transaction_data: TransactionData,
-) -> str:
-    """Create a Harbour delegation challenge string.
-    
-    Format: <nonce> HARBOUR_DELEGATE <sha256-hash>
-    """
-    tx_hash = transaction_data.compute_hash()
-    return f"{transaction_data.nonce} HARBOUR_DELEGATE {tx_hash}"
-
-
-def parse_delegation_challenge(challenge: str) -> tuple[str, str, str]:
-    """Parse a Harbour delegation challenge string.
-    
-    Returns:
-        Tuple of (nonce, action_type, hash)
-    """
-    parts = challenge.split(' ')
-    if len(parts) != 3:
-        raise ValueError(f"Invalid challenge format: expected 3 parts, got {len(parts)}")
-    
-    nonce, action_type, tx_hash = parts
-    
-    if action_type != "HARBOUR_DELEGATE":
-        raise ValueError(f"Invalid action type: {action_type}")
-    
-    if len(tx_hash) != 64:
-        raise ValueError(f"Invalid hash length: expected 64, got {len(tx_hash)}")
-    
-    return nonce, action_type, tx_hash
-
-
-def verify_challenge(
-    challenge: str,
-    transaction_data: TransactionData,
-) -> bool:
-    """Verify that a challenge matches transaction data.
-    
-    Returns:
-        True if the hash in the challenge matches the transaction data
-    """
-    nonce, _, challenge_hash = parse_delegation_challenge(challenge)
-    
-    if nonce != transaction_data.nonce:
-        return False
-    
-    computed_hash = transaction_data.compute_hash()
-    return challenge_hash == computed_hash
-
-
-# Example usage
-if __name__ == "__main__":
-    tx = TransactionData(
-        action="data.purchase",
-        timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        nonce=secrets.token_hex(4),  # 8 hex chars
-        transaction={
-            "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
-            "price": "100",
-            "currency": "ENVITED",
-        },
-        metadata={"description": "Purchase sensor data package"},
-    )
-    
-    challenge = create_delegation_challenge(tx)
-    print(f"Challenge: {challenge}")
-    print(f"Valid: {verify_challenge(challenge, tx)}")
+# Create challenge: "<nonce> HARBOUR_DELEGATE <sha256-hash>"
+challenge = create_delegation_challenge(tx)
+print(f"Challenge: {challenge}")
+print(f"Valid: {verify_challenge(challenge, tx)}")
 ```
 
 ### 8.2 TypeScript
 
+The implementation is in `src/typescript/harbour/delegation.ts`:
+
 ```typescript
-import { createHash, randomBytes } from 'crypto';
+import {
+  createTransactionData,
+  createDelegationChallenge,
+  verifyChallenge,
+} from '@reachhaven/harbour-credentials';
 
-interface TransactionData {
-  type: 'HarbourDelegatedTransaction';
-  version: '1.0';
-  action: string;
-  timestamp: string;
-  nonce: string;
-  transaction: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-function computeTransactionHash(data: TransactionData): string {
-  const canonical = JSON.stringify(data, Object.keys(data).sort());
-  return createHash('sha256').update(canonical).digest('hex');
-}
-
-function createDelegationChallenge(data: TransactionData): string {
-  const hash = computeTransactionHash(data);
-  return `${data.nonce} HARBOUR_DELEGATE ${hash}`;
-}
-
-function parseDelegationChallenge(challenge: string): {
-  nonce: string;
-  actionType: string;
-  hash: string;
-} {
-  const parts = challenge.split(' ');
-  if (parts.length !== 3) {
-    throw new Error(`Invalid challenge format: expected 3 parts, got ${parts.length}`);
-  }
-  
-  const [nonce, actionType, hash] = parts;
-  
-  if (actionType !== 'HARBOUR_DELEGATE') {
-    throw new Error(`Invalid action type: ${actionType}`);
-  }
-  
-  if (hash.length !== 64) {
-    throw new Error(`Invalid hash length: expected 64, got ${hash.length}`);
-  }
-  
-  return { nonce, actionType, hash };
-}
-
-function verifyChallenge(challenge: string, data: TransactionData): boolean {
-  const { nonce, hash: challengeHash } = parseDelegationChallenge(challenge);
-  
-  if (nonce !== data.nonce) {
-    return false;
-  }
-  
-  const computedHash = computeTransactionHash(data);
-  return challengeHash === computedHash;
-}
-
-// Example usage
-const tx: TransactionData = {
-  type: 'HarbourDelegatedTransaction',
-  version: '1.0',
+// Create OID4VP-aligned transaction data
+const tx = createTransactionData({
   action: 'data.purchase',
-  timestamp: new Date().toISOString(),
-  nonce: randomBytes(4).toString('hex'),
-  transaction: {
+  txn: {
     assetId: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
     price: '100',
     currency: 'ENVITED',
+    marketplace: 'did:web:dataspace.envited.io',
   },
-  metadata: { description: 'Purchase sensor data package' },
-};
+  credentialIds: ['simpulse_id'],
+});
 
-console.log('Challenge:', createDelegationChallenge(tx));
-console.log('Valid:', verifyChallenge(createDelegationChallenge(tx), tx));
+// Create challenge: "<nonce> HARBOUR_DELEGATE <sha256-hash>"
+const challenge = await createDelegationChallenge(tx);
+console.log('Challenge:', challenge);
+console.log('Valid:', await verifyChallenge(challenge, tx));
 ```
 
 ---
@@ -581,113 +459,25 @@ Wallet/application implementations SHOULD:
 ### 9.4 Python Display Renderer
 
 ```python
-ACTION_LABELS = {
-    "blockchain.transfer": "Transfer tokens",
-    "blockchain.approve": "Approve token spending",
-    "blockchain.execute": "Execute smart contract",
-    "contract.sign": "Sign contract",
-    "contract.accept": "Accept agreement",
-    "data.purchase": "Purchase data asset",
-    "data.share": "Share data",
-    "credential.issue": "Issue credential",
-    "credential.present": "Present credential",
-}
+from harbour.delegation import TransactionData, render_transaction_display
 
-def render_transaction_display(
-    transaction_data: TransactionData, 
-    service_name: str = "Harbour Signing Service"
-) -> str:
-    """Render transaction data for human-readable display.
-    
-    Args:
-        transaction_data: The full transaction data object
-        service_name: Human-friendly name for the signing service
-    
-    Returns:
-        Multi-line string suitable for display to user
-    """
-    action = transaction_data.action
-    action_label = ACTION_LABELS.get(action, action.replace(".", " ").title())
-    
-    lines = [
-        f"{service_name} requests your authorization",
-        "─" * 50,
-        "",
-        f"  Action:      {action_label}",
-    ]
-    
-    # Add transaction-specific fields
-    for key, value in transaction_data.transaction.items():
-        display_key = key.replace("_", " ").title()
-        display_value = str(value)
-        if len(display_value) > 40:
-            display_value = display_value[:37] + "..."
-        lines.append(f"  {display_key}:  {display_value}")
-    
-    lines.extend([
-        "",
-        "─" * 50,
-        f"  Nonce:       {transaction_data.nonce}",
-        f"  Time:        {transaction_data.timestamp}",
-    ])
-    
-    if transaction_data.metadata.get("expiresAt"):
-        lines.append(f"  Expires:     {transaction_data.metadata['expiresAt']}")
-    
-    return "\n".join(lines)
+tx = TransactionData.create(
+    action="data.purchase",
+    txn={"assetId": "urn:uuid:550e8400...", "price": "100", "currency": "ENVITED"},
+)
+print(render_transaction_display(tx))
 ```
 
 ### 9.5 TypeScript Display Renderer
 
 ```typescript
-const ACTION_LABELS: Record<string, string> = {
-  'blockchain.transfer': 'Transfer tokens',
-  'blockchain.approve': 'Approve token spending',
-  'blockchain.execute': 'Execute smart contract',
-  'contract.sign': 'Sign contract',
-  'contract.accept': 'Accept agreement',
-  'data.purchase': 'Purchase data asset',
-  'data.share': 'Share data',
-  'credential.issue': 'Issue credential',
-  'credential.present': 'Present credential',
-};
+import { createTransactionData, renderTransactionDisplay } from '@reachhaven/harbour-credentials';
 
-function renderTransactionDisplay(
-  data: TransactionData,
-  serviceName = 'Harbour Signing Service'
-): string {
-  const actionLabel = ACTION_LABELS[data.action] ?? 
-    data.action.replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
-  
-  const lines: string[] = [
-    `${serviceName} requests your authorization`,
-    '─'.repeat(50),
-    '',
-    `  Action:      ${actionLabel}`,
-  ];
-  
-  for (const [key, value] of Object.entries(data.transaction)) {
-    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    let displayValue = String(value);
-    if (displayValue.length > 40) {
-      displayValue = displayValue.slice(0, 37) + '...';
-    }
-    lines.push(`  ${displayKey}:  ${displayValue}`);
-  }
-  
-  lines.push(
-    '',
-    '─'.repeat(50),
-    `  Nonce:       ${data.nonce}`,
-    `  Time:        ${data.timestamp}`,
-  );
-  
-  if (data.metadata?.expiresAt) {
-    lines.push(`  Expires:     ${data.metadata.expiresAt}`);
-  }
-  
-  return lines.join('\n');
-}
+const tx = createTransactionData({
+  action: 'data.purchase',
+  txn: { assetId: 'urn:uuid:550e8400...', price: '100', currency: 'ENVITED' },
+});
+console.log(renderTransactionDisplay(tx));
 ```
 
 ---
@@ -696,15 +486,17 @@ function renderTransactionDisplay(
 
 ### 10.1 Data Purchase Transaction
 
+These examples use the shared test vectors from `tests/fixtures/canonicalization-vectors.json`.
+
 **Transaction Data:**
 ```json
 {
-  "type": "HarbourDelegatedTransaction",
-  "version": "1.0",
-  "action": "data.purchase",
-  "timestamp": "2026-02-24T12:00:00Z",
+  "type": "harbour_delegate:data.purchase",
+  "credential_ids": ["simpulse_id"],
+  "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
-  "transaction": {
+  "iat": 1771934400,
+  "txn": {
     "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
@@ -715,7 +507,7 @@ function renderTransactionDisplay(
 
 **Challenge:**
 ```
-da9b1009 HARBOUR_DELEGATE d0450062b3c4c9168ac8266f0806d62f5d95ed96894d5a9a0aaddf4298317eaa
+da9b1009 HARBOUR_DELEGATE 86a3e927a80d9e858a71b37f574aa65cab184c5fc65e8c7824771f84ad6ed97e
 ```
 
 ### 10.2 Blockchain Transfer Transaction
@@ -723,24 +515,23 @@ da9b1009 HARBOUR_DELEGATE d0450062b3c4c9168ac8266f0806d62f5d95ed96894d5a9a0aaddf
 **Transaction Data:**
 ```json
 {
-  "type": "HarbourDelegatedTransaction",
-  "version": "1.0",
-  "action": "blockchain.transfer",
-  "timestamp": "2026-02-24T12:30:00Z",
-  "nonce": "ab12cd34",
-  "transaction": {
+  "type": "harbour_delegate:blockchain.transfer",
+  "credential_ids": ["default"],
+  "transaction_data_hashes_alg": ["sha-256"],
+  "nonce": "ef567890",
+  "iat": 1771934400,
+  "txn": {
     "chain": "eip155:42793",
-    "contract": "0x1234567890abcdef1234567890abcdef12345678",
-    "recipient": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
     "amount": "1000000000000000000",
-    "token": "ENVITED"
+    "recipient": "0xabcdef1234567890",
+    "contract": "0x1234567890abcdef"
   }
 }
 ```
 
 **Challenge:**
 ```
-ab12cd34 HARBOUR_DELEGATE 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b
+ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c422252b845d4c1
 ```
 
 ### 10.3 Contract Signature Transaction
@@ -748,20 +539,23 @@ ab12cd34 HARBOUR_DELEGATE 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c
 **Transaction Data:**
 ```json
 {
-  "type": "HarbourDelegatedTransaction",
-  "version": "1.0",
-  "action": "contract.sign",
-  "timestamp": "2026-02-24T13:00:00Z",
-  "nonce": "ef567890",
-  "transaction": {
-    "documentHash": "sha256:abc123def456...",
-    "documentUri": "https://contracts.example.com/abc123",
+  "type": "harbour_delegate:contract.sign",
+  "credential_ids": ["org_credential"],
+  "transaction_data_hashes_alg": ["sha-256"],
+  "nonce": "ab12cd34",
+  "iat": 1771934400,
+  "exp": 1771935300,
+  "description": "Sign partnership agreement",
+  "txn": {
+    "documentHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "parties": ["did:web:alice.example", "did:web:bob.example"]
-  },
-  "metadata": {
-    "expiresAt": "2026-02-24T13:15:00Z"
   }
 }
+```
+
+**Challenge:**
+```
+ab12cd34 HARBOUR_DELEGATE daccac20a99de56e2a5d108fcfa53d0d03faa7d4cd29552ae1dbdc486120d3ec
 ```
 
 ---
@@ -792,7 +586,8 @@ This specification aligns with [OID4VP Transaction Data (§8.4)](https://openid.
 | OID4VP Concept | Harbour Delegation Equivalent |
 |----------------|-------------------------------|
 | `transaction_data` request param | Transaction Data Object (§3) |
-| `transaction_data.type` | `"harbour_delegated_signing"` |
+| `transaction_data.type` | `"harbour_delegate:<action>"` |
+| `transaction_data.txn` | Action-specific transaction details |
 | `transaction_data_hashes` in KB-JWT | Same hash as in `proof.challenge` |
 | `transaction_data_hashes_alg` | `"sha-256"` |
 
@@ -802,17 +597,19 @@ OID4VP authorization request:
 ```json
 {
   "response_type": "vp_token",
-  "client_id": "did:web:harbour.signing-service.example.com",
-  "nonce": "n-0S6_WzA2Mj",
+  "client_id": "did:web:signing-service.envited.io",
+  "nonce": "da9b1009",
   "transaction_data": [{
-    "type": "harbour_delegated_signing",
+    "type": "harbour_delegate:data.purchase",
     "credential_ids": ["simpulse_id"],
     "transaction_data_hashes_alg": ["sha-256"],
-    "transaction": {
-      "action": "data.purchase",
+    "nonce": "da9b1009",
+    "iat": 1771934400,
+    "txn": {
       "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
       "price": "100",
-      "currency": "ENVITED"
+      "currency": "ENVITED",
+      "marketplace": "did:web:dataspace.envited.io"
     }
   }]
 }
@@ -830,12 +627,12 @@ This specification draws design inspiration from [Sign-In with Ethereum (SIWE)](
 |--------------|-------------------------------|
 | `domain` | `proof.domain` (signing service DID) |
 | `address` | Holder DID (in VP) |
-| `statement` | `metadata.description` (human-readable) |
-| `uri` | Transaction reference (in transaction object) |
+| `statement` | `description` field (human-readable) |
+| `uri` | Transaction reference (in `txn` object) |
 | `nonce` | `nonce` field |
-| `issued-at` | `timestamp` field |
-| `expiration-time` | `metadata.expiresAt` |
-| `chain-id` | Implicit in transaction fields (e.g., `chain: "eip155:42793"`) |
+| `issued-at` | `iat` field (Unix timestamp) |
+| `expiration-time` | `exp` field (Unix timestamp) |
+| `chain-id` | Implicit in `txn` fields (e.g., `chain: "eip155:42793"`) |
 
 **Key differences**:
 

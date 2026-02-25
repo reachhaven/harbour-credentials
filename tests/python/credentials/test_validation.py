@@ -36,9 +36,13 @@ def _load_json(path: Path) -> dict:
 
 
 def _all_credential_files() -> list[Path]:
-    """Collect all credential JSON files from examples/."""
+    """Collect all credential JSON files from examples/ (VCs only, not VPs)."""
     if EXAMPLES_DIR.is_dir():
-        return sorted(EXAMPLES_DIR.glob("*.json"))
+        return sorted(
+            p
+            for p in EXAMPLES_DIR.glob("*.json")
+            if any(t in p.stem for t in ("credential", "receipt", "offering"))
+        )
     return []
 
 
@@ -144,8 +148,8 @@ class TestHarbourContextConsistency:
         base_classes = [
             "HarbourCredential",
             "CRSetEntry",
-            "EmailVerification",
-            "IssuanceEvidence",
+            "CredentialEvidence",
+            "DelegatedSignatureEvidence",
         ]
         for cls in base_classes:
             assert cls in ctx, f"Missing {cls} in harbour base context"
@@ -154,8 +158,8 @@ class TestHarbourContextConsistency:
         ctx = _load_json(HARBOUR_CONTEXT_PATH).get("@context", {})
         base_classes = [
             "CRSetEntry",
-            "EmailVerification",
-            "IssuanceEvidence",
+            "CredentialEvidence",
+            "DelegatedSignatureEvidence",
         ]
         has_vocab = "@vocab" in ctx
         for cls in base_classes:
@@ -240,8 +244,8 @@ class TestHarbourShaclShapes:
         expected_shapes = [
             "harbour:HarbourCredential",
             "harbour:CRSetEntry",
-            "harbour:EmailVerification",
-            "harbour:IssuanceEvidence",
+            "harbour:CredentialEvidence",
+            "harbour:DelegatedSignatureEvidence",
         ]
         for shape in expected_shapes:
             assert (
@@ -265,7 +269,7 @@ class TestHarbourShaclShapes:
     def test_evidence_shapes_require_verifiable_presentation(self):
         """Evidence shapes must require verifiablePresentation."""
         content = HARBOUR_SHACL_PATH.read_text()
-        for ev_type in ["EmailVerification", "IssuanceEvidence"]:
+        for ev_type in ["CredentialEvidence", "DelegatedSignatureEvidence"]:
             marker = f"harbour:{ev_type} a sh:NodeShape"
             shape_start = content.index(marker)
             next_shape = content.find("\n\n", shape_start + 1)

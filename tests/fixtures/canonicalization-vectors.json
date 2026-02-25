@@ -1,0 +1,62 @@
+{
+  "description": "Shared test vectors for cross-runtime canonicalization. Python json.dumps(sort_keys=True, separators=(',',':')) sorts ALL keys recursively. TypeScript must match this exactly.",
+  "vectors": [
+    {
+      "name": "data.purchase — minimal required fields",
+      "input": {
+        "type": "harbour_delegate:data.purchase",
+        "credential_ids": ["simpulse_id"],
+        "transaction_data_hashes_alg": ["sha-256"],
+        "nonce": "da9b1009",
+        "iat": 1771934400,
+        "txn": {
+          "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+          "price": "100",
+          "currency": "ENVITED",
+          "marketplace": "did:web:dataspace.envited.io"
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"simpulse_id\"],\"iat\":1771934400,\"nonce\":\"da9b1009\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"assetId\":\"urn:uuid:550e8400-e29b-41d4-a716-446655440000\",\"currency\":\"ENVITED\",\"marketplace\":\"did:web:dataspace.envited.io\",\"price\":\"100\"},\"type\":\"harbour_delegate:data.purchase\"}",
+      "sha256_hash": "86a3e927a80d9e858a71b37f574aa65cab184c5fc65e8c7824771f84ad6ed97e",
+      "challenge": "da9b1009 HARBOUR_DELEGATE 86a3e927a80d9e858a71b37f574aa65cab184c5fc65e8c7824771f84ad6ed97e"
+    },
+    {
+      "name": "contract.sign — with optional exp and description",
+      "input": {
+        "type": "harbour_delegate:contract.sign",
+        "credential_ids": ["org_credential"],
+        "transaction_data_hashes_alg": ["sha-256"],
+        "nonce": "ab12cd34",
+        "iat": 1771934400,
+        "exp": 1771935300,
+        "description": "Sign partnership agreement",
+        "txn": {
+          "documentHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "parties": ["did:web:alice.example", "did:web:bob.example"]
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"org_credential\"],\"description\":\"Sign partnership agreement\",\"exp\":1771935300,\"iat\":1771934400,\"nonce\":\"ab12cd34\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"documentHash\":\"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"parties\":[\"did:web:alice.example\",\"did:web:bob.example\"]},\"type\":\"harbour_delegate:contract.sign\"}",
+      "sha256_hash": "daccac20a99de56e2a5d108fcfa53d0d03faa7d4cd29552ae1dbdc486120d3ec",
+      "challenge": "ab12cd34 HARBOUR_DELEGATE daccac20a99de56e2a5d108fcfa53d0d03faa7d4cd29552ae1dbdc486120d3ec"
+    },
+    {
+      "name": "blockchain.transfer — nested txn verifies recursive sort",
+      "input": {
+        "type": "harbour_delegate:blockchain.transfer",
+        "credential_ids": ["default"],
+        "nonce": "ef567890",
+        "iat": 1771934400,
+        "transaction_data_hashes_alg": ["sha-256"],
+        "txn": {
+          "chain": "eip155:42793",
+          "amount": "1000000000000000000",
+          "recipient": "0xabcdef1234567890",
+          "contract": "0x1234567890abcdef"
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"default\"],\"iat\":1771934400,\"nonce\":\"ef567890\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"amount\":\"1000000000000000000\",\"chain\":\"eip155:42793\",\"contract\":\"0x1234567890abcdef\",\"recipient\":\"0xabcdef1234567890\"},\"type\":\"harbour_delegate:blockchain.transfer\"}",
+      "sha256_hash": "0736db89c15be412294f96717a3e435f89d095e7e953b1808c422252b845d4c1",
+      "challenge": "ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c422252b845d4c1"
+    }
+  ]
+}

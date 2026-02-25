@@ -24,31 +24,33 @@ The key innovation is **cryptographic proof of consent** — the user's VP serve
 
 ```
 User                    Signing Service              Blockchain
-  │                           │                          │
-  │  1. Request transaction   │                          │
-  │  ─────────────────────►   │                          │
-  │                           │                          │
-  │  2. Consent request       │                          │
-  │  ◄─────────────────────   │                          │
-  │  (transaction details,    │                          │
-  │   nonce)                  │                          │
-  │                           │                          │
-  │  3. Create SD-JWT VP      │                          │
-  │  (consent proof with      │                          │
-  │   redacted PII)           │                          │
-  │  ─────────────────────►   │                          │
-  │                           │                          │
-  │                           │  4. Verify VP            │
-  │                           │  ✓ Signature valid       │
-  │                           │  ✓ Credential valid      │
-  │                           │  ✓ Intent matches        │
-  │                           │                          │
-  │                           │  5. Execute transaction  │
-  │                           │  ─────────────────────►  │
-  │                           │                          │
-  │                           │  6. Store VP as evidence │
-  │                           │  (for audit)             │
-  │                           │                          │
+  |                           |                          |
+  |  1. Request transaction   |                          |
+  |  ─────────────────────►   |                          |
+  |                           |                          |
+  |  2. Consent request       |                          |
+  |  ◄─────────────────────   |                          |
+  |  (OID4VP transaction_data,|                          |
+  |   nonce, audience)        |                          |
+  |                           |                          |
+  |  3. Create SD-JWT VP      |                          |
+  |  (consent proof with      |                          |
+  |   KB-JWT binding to       |                          |
+  |   transaction_data_hash)  |                          |
+  |  ─────────────────────►   |                          |
+  |                           |                          |
+  |                           |  4. Verify VP            |
+  |                           |  ✓ Signature valid       |
+  |                           |  ✓ Credential valid      |
+  |                           |  ✓ Transaction matches   |
+  |                           |                          |
+  |                           |  5. Execute transaction  |
+  |                           |  ─────────────────────►  |
+  |                           |                          |
+  |                           |  6. Issue receipt VC     |
+  |                           |  (DelegatedSignature-    |
+  |                           |   Evidence + CRSet)      |
+  |                           |                          |
 ```
 
 ## User Setup
@@ -94,13 +96,34 @@ The user's DID document (`did:web:carlo.simpulse.io`) must contain a verificatio
 }
 ```
 
+## OID4VP Transaction Data
+
+The signing service creates an OID4VP-aligned transaction data object (see [Delegation Challenge Encoding](../specs/delegation-challenge-encoding.md)):
+
+```json
+{
+  "type": "harbour_delegate:data.purchase",
+  "credential_ids": ["simpulse_id"],
+  "transaction_data_hashes_alg": ["sha-256"],
+  "nonce": "da9b1009",
+  "iat": 1771934400,
+  "txn": {
+    "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "price": "100",
+    "currency": "ENVITED",
+    "marketplace": "did:web:dataspace.envited.io"
+  }
+}
+```
+
 ## Creating the Consent VP
 
 When the signing service requests consent, the user creates an **SD-JWT VP** with:
 
 1. **Selective disclosure**: Only non-PII claims disclosed
-2. **Evidence**: Transaction intent proving what was consented to
-3. **Signature**: Signed with the user's P-256 key
+2. **Evidence**: Transaction data proving what was consented to
+3. **KB-JWT**: Bound to the transaction data hash
+4. **Signature**: Signed with the user's P-256 key
 
 ### Python Example
 
@@ -110,18 +133,21 @@ from harbour.sd_jwt_vp import issue_sd_jwt_vp
 # User's SD-JWT-VC (with all disclosures)
 sd_jwt_vc = "eyJ...~disclosure1~disclosure2~..."
 
-# Transaction intent (what the user is consenting to)
+# Transaction evidence (OID4VP-aligned)
 evidence = [{
-    "type": "harbour:DelegatedSignatureEvidence",
-    "transactionIntent": {
-        "type": "harbour:TransactionIntent",
-        "actionType": "purchase",
-        "actionReference": "urn:uuid:tx-12345",
-        "description": "Purchase 'Weather Data 2024' for €500",
-        "consentTimestamp": "2024-01-15T10:30:00Z",
-        "nonce": "abc123xyz"
+    "type": "DelegatedSignatureEvidence",
+    "transactionData": {
+        "type": "harbour_delegate:data.purchase",
+        "credential_ids": ["simpulse_id"],
+        "nonce": "da9b1009",
+        "iat": 1771934400,
+        "txn": {
+            "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+            "price": "100",
+            "currency": "ENVITED"
+        }
     },
-    "delegatedTo": "did:web:signing-service.harbour.io"
+    "delegatedTo": "did:web:signing-service.envited.io"
 }]
 
 # Create VP with selective disclosure (redact PII)
@@ -130,8 +156,8 @@ sd_jwt_vp = issue_sd_jwt_vp(
     holder_private_key,
     disclosures=["memberOf"],  # Only disclose non-PII claims
     evidence=evidence,
-    nonce="abc123xyz",
-    audience="did:web:signing-service.harbour.io"
+    nonce="da9b1009",
+    audience="did:web:signing-service.envited.io"
 )
 ```
 
@@ -143,19 +169,22 @@ import { issueSdJwtVp } from '@reachhaven/harbour-credentials';
 const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
   disclosures: ['memberOf'],
   evidence: [{
-    type: 'harbour:DelegatedSignatureEvidence',
-    transactionIntent: {
-      type: 'harbour:TransactionIntent',
-      actionType: 'purchase',
-      actionReference: 'urn:uuid:tx-12345',
-      description: "Purchase 'Weather Data 2024' for €500",
-      consentTimestamp: '2024-01-15T10:30:00Z',
-      nonce: 'abc123xyz'
+    type: 'DelegatedSignatureEvidence',
+    transactionData: {
+      type: 'harbour_delegate:data.purchase',
+      credential_ids: ['simpulse_id'],
+      nonce: 'da9b1009',
+      iat: 1771934400,
+      txn: {
+        assetId: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
+        price: '100',
+        currency: 'ENVITED'
+      }
     },
-    delegatedTo: 'did:web:signing-service.harbour.io'
+    delegatedTo: 'did:web:signing-service.envited.io'
   }],
-  nonce: 'abc123xyz',
-  audience: 'did:web:signing-service.harbour.io'
+  nonce: 'da9b1009',
+  audience: 'did:web:signing-service.envited.io'
 });
 ```
 
@@ -170,46 +199,66 @@ result = verify_sd_jwt_vp(
     sd_jwt_vp,
     issuer_public_key,      # From credential issuer's DID
     holder_public_key,      # From user's DID document
-    expected_nonce="abc123xyz",
-    expected_audience="did:web:signing-service.harbour.io"
+    expected_nonce="da9b1009",
+    expected_audience="did:web:signing-service.envited.io"
 )
 
-# Check transaction intent matches original request
-assert result["evidence"][0]["transactionIntent"]["actionReference"] == "urn:uuid:tx-12345"
+# Check transaction data matches original request
+tx = result["evidence"][0]["transactionData"]
+assert tx["type"] == "harbour_delegate:data.purchase"
+assert tx["txn"]["assetId"] == "urn:uuid:550e8400-e29b-41d4-a716-446655440000"
 
 # Check credential is still valid (CRSet)
 # ... revocation check ...
 
-# All checks pass → execute transaction
+# All checks pass -> execute transaction
 ```
+
+## Receipt Credential
+
+After executing the transaction, the signing service issues a **receipt credential** (SD-JWT-VC) with `DelegatedSignatureEvidence`:
+
+```json
+{
+  "type": ["VerifiableCredential", "harbour:DelegatedSigningReceipt"],
+  "issuer": "did:web:signing-service.envited.io",
+  "evidence": [{
+    "type": "harbour:DelegatedSignatureEvidence",
+    "verifiablePresentation": "<consent VP with PII redacted>",
+    "delegatedTo": "did:web:signing-service.envited.io",
+    "transactionData": { "..." }
+  }],
+  "credentialStatus": [{
+    "type": "harbour:CRSetEntry",
+    "statusPurpose": "revocation"
+  }]
+}
+```
+
+The receipt credential enables three-layer privacy via selective disclosure (see [Evidence](evidence.md#three-layer-privacy-model)).
 
 ## Privacy Model
 
-The SD-JWT VP enables **privacy-preserving audit**:
+The SD-JWT VP enables **three-layer privacy-preserving audit**:
 
-| Data | Public Audit | Private Audit |
-|------|--------------|---------------|
-| Transaction intent | ✅ Visible | ✅ Visible |
-| User DID | ✅ Visible | ✅ Visible |
-| VP signature | ✅ Verifiable | ✅ Verifiable |
-| Credential validity | ✅ Via CRSet | ✅ Via CRSet |
-| User name | ❌ Redacted | ✅ Available |
-| User email | ❌ Redacted | ✅ Available |
-
-**Public audit** proves:
-> "The holder of `did:web:carlo.simpulse.io` consented to transaction `tx-12345` at `2024-01-15T10:30:00Z`"
-
-**Private audit** (with additional disclosures) proves:
-> "Carlo Rossi (carlo@bmw.de), member of BMW, consented to..."
+| Data | Layer 1 (Public) | Layer 2 (Authorized) | Layer 3 (Full Audit) |
+|------|:-:|:-:|:-:|
+| CRSet entry (credential exists) | Yes | Yes | Yes |
+| Transaction data hash on-chain | Yes | Yes | Yes |
+| KB-JWT signature valid | Yes | Yes | Yes |
+| Transaction details (asset, price) | No | Yes | Yes |
+| Consent VP hash verification | No | Yes | Yes |
+| User name | No | No | Yes |
+| User email | No | No | Yes |
 
 ## Security Considerations
 
 ### Replay Protection
 
-The `nonce` in `TransactionIntent` prevents replay attacks:
+The `nonce` in transaction data prevents replay attacks:
 
 - Signing service generates unique nonce per request
-- VP must contain matching nonce
+- VP must contain matching nonce in KB-JWT
 - Nonce is single-use
 
 ### Audience Binding
@@ -220,7 +269,7 @@ The `audience` field ensures the VP was created for a specific verifier:
 verify_sd_jwt_vp(
     vp,
     ...,
-    expected_audience="did:web:signing-service.harbour.io"
+    expected_audience="did:web:signing-service.envited.io"
 )
 ```
 
@@ -258,33 +307,34 @@ verify_sd_jwt_vp(vp, issuer_key, public_key_from_did_doc, ...)
 User purchases dataset through blockchain:
 
 1. User browses marketplace, selects dataset
-2. App requests consent: "Purchase 'Weather Data 2024' for €500?"
+2. App creates OID4VP transaction data: "Purchase 'Weather Data 2024' for 100 ENVITED"
 3. User creates consent VP with wallet
 4. Harbour executes blockchain transaction
-5. VP stored as purchase receipt/evidence
+5. Receipt credential issued with `DelegatedSignatureEvidence`
 
 ### Contract Signing
 
 User signs legal contract:
 
 1. Contract platform prepares document
-2. Requests signature: "Sign employment contract with BMW?"
+2. Creates transaction data: `harbour_delegate:contract.sign`
 3. User creates consent VP
 4. Harbour records signature on blockchain
-5. VP serves as proof of signing intent
+5. Receipt VP serves as proof of signing intent
 
 ### Access Delegation
 
 User grants access to resource:
 
-1. Service requests access: "Grant read access to Project X?"
+1. Service creates transaction data: `harbour_delegate:data.access`
 2. User creates consent VP
 3. Harbour updates access control on blockchain
-4. VP serves as access grant evidence
+4. Receipt VP serves as access grant evidence
 
 ## Related Documentation
 
 - [Evidence Types](evidence.md) — All Harbour evidence types
+- [Delegation Challenge Encoding](../specs/delegation-challenge-encoding.md) — OID4VP transaction data spec
 - [SD-JWT-VC](../api/python/index.md) — SD-JWT credential issuance
 - [ADR-001: VC Securing Mechanism](../decisions/001-vc-securing-mechanism.md) — Why SD-JWT
 - [ADR-004: Key Management](../decisions/004-key-management.md) — P-256 keys

@@ -244,7 +244,13 @@ Examples:
     for path_str in args.examples:
         path = Path(path_str)
         if path.is_dir():
-            example_files.extend(sorted(path.glob("*.json")))
+            # Only process credential/receipt files, skip VPs and other artifacts
+            example_files.extend(
+                p
+                for p in sorted(path.glob("*.json"))
+                if p.parent.name != "signed"
+                and any(t in p.stem for t in ("credential", "receipt", "offering"))
+            )
         elif path.is_file():
             example_files.append(path)
         else:

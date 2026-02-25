@@ -13,15 +13,15 @@ Evidence creates an **audit trail** — allowing third parties to verify not jus
 
 ## Harbour Evidence Types
 
-### EmailVerification
+### CredentialEvidence
 
-Proves that an email address was verified before credential issuance.
+Proves that the issuer verified claims using a prior credential or verifiable presentation. The embedded VP contains the credentials the issuer relied upon (e.g., email verification, notary attestation).
 
-**Use case**: A `NaturalPersonCredential` includes evidence that the user's email was verified via an email verification service (e.g., Altme EmailPass).
+**Use case (email verification)**: A `NaturalPersonCredential` includes evidence that the user's email was verified via an email verification service (e.g., Altme EmailPass).
 
 ```json
 {
-  "type": "harbour:EmailVerification",
+  "type": "harbour:CredentialEvidence",
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation"],
@@ -40,17 +40,11 @@ Proves that an email address was verified before credential issuance.
 }
 ```
 
-**What it proves**: The issuer verified the email address via a trusted email verification provider before issuing the credential.
-
-### IssuanceEvidence
-
-References a previously issued credential that served as the basis for the new credential.
-
-**Use case**: A `LegalPersonCredential` includes evidence of a prior credential from a notary attesting to the organization's registration.
+**Use case (notary attestation)**: A `LegalPersonCredential` includes evidence of a prior credential from a notary attesting to the organization's registration.
 
 ```json
 {
-  "type": "harbour:IssuanceEvidence",
+  "type": "harbour:CredentialEvidence",
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation"],
@@ -70,41 +64,55 @@ References a previously issued credential that served as the basis for the new c
 }
 ```
 
-**What it proves**: The issuer based the credential on a prior attestation from another trusted party (the notary).
+**What it proves**: The issuer based the credential on a prior attestation from another trusted party.
 
 ### DelegatedSignatureEvidence
 
-Proves user consent for a delegated signature operation. Used when a signing service executes transactions on behalf of users.
+Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed a transaction with the user's explicit consent. The consent VP uses SD-JWT with PII redacted. Transaction data is a disclosable claim enabling three-layer privacy (public / authorized / full audit).
 
-**Use case**: A blockchain transaction record includes evidence that the user consented to the purchase.
+**Use case**: A signing service issues a receipt credential after executing a blockchain purchase on behalf of a user.
 
 ```json
 {
   "type": "harbour:DelegatedSignatureEvidence",
-  "transactionIntent": {
-    "type": "harbour:TransactionIntent",
-    "actionType": "purchase",
-    "actionReference": "urn:uuid:tx-12345",
-    "description": "Purchase 'Weather Data 2024' for €500",
-    "consentTimestamp": "2024-01-15T10:30:00Z",
-    "nonce": "abc123xyz"
-  },
-  "delegatedTo": "did:web:signing-service.harbour.io",
-  "verifiablePresentation": "<SD-JWT VP with redacted PII>"
+  "verifiablePresentation": "<SD-JWT VP with redacted PII>",
+  "delegatedTo": "did:web:signing-service.envited.io",
+  "transactionData": {
+    "type": "harbour_delegate:data.purchase",
+    "credential_ids": ["simpulse_id"],
+    "transaction_data_hashes_alg": ["sha-256"],
+    "nonce": "da9b1009",
+    "iat": 1771934400,
+    "txn": {
+      "assetId": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+      "price": "100",
+      "currency": "ENVITED",
+      "marketplace": "did:web:dataspace.envited.io"
+    }
+  }
 }
 ```
 
-**What it proves**: The user (identified by their DID) explicitly consented to the specific transaction at the specified time.
+**What it proves**: The user explicitly consented to the specific transaction, and the signing service executed it on their behalf.
 
 See [Delegated Signing](delegated-signing.md) for the complete flow.
+
+## Three-Layer Privacy Model
+
+The receipt credential is an **SD-JWT-VC**. Transaction data and identity details are **selectively disclosable**:
+
+| Layer | Audience | What's Visible |
+|-------|----------|----------------|
+| **Layer 1 — Public** | Everyone | CRSet entry (credential exists), transaction_data_hash on-chain, DID identifier, KB-JWT signature valid |
+| **Layer 2 — Authorized** | Auditor | Transaction details (asset, price, marketplace), consent VP hash verification |
+| **Layer 3 — Full Audit** | Compliance | User identity (name, email, organization), full credential chain |
 
 ## When to Use Each Type
 
 | Evidence Type | Use When | Example Scenario |
 |--------------|----------|------------------|
-| `EmailVerification` | Issuing credential that includes email claim | Onboarding a new user, verifying contact info |
-| `IssuanceEvidence` | Basing credential on prior attestation | Trust anchor issuing based on notary credential |
-| `DelegatedSignatureEvidence` | User consenting to delegated action | Blockchain purchase, contract signing |
+| `CredentialEvidence` | Issuing credential based on prior attestation | Email verification, notary credential, identity proofing |
+| `DelegatedSignatureEvidence` | Issuing receipt after delegated action | Blockchain purchase, contract signing, access delegation |
 
 ## Evidence Structure
 
@@ -113,7 +121,7 @@ All evidence types inherit from the abstract `Evidence` class and share:
 ```yaml
 Evidence:
   abstract: true
-  class_uri: cred:evidence
+  class_uri: cred:Evidence
   slots:
     - type  # Required: identifies the evidence type
 ```
@@ -126,9 +134,10 @@ Evidence often contains sensitive information. For privacy-preserving audit:
 
 1. **Use SD-JWT VPs**: Selectively disclose only necessary claims
 2. **Redact PII**: Names, emails, etc. can be hidden while keeping DID visible
-3. **Public vs. Private audit**:
-   - Public: Transaction intent + DID + signature validity
-   - Private: Full credential details with all claims
+3. **Three-layer disclosure**:
+   - Public: CRSet + transaction hash + signature validity
+   - Authorized: Transaction details (asset, price)
+   - Full audit: Identity details (name, email, organization)
 
 ## Verification
 
@@ -165,7 +174,7 @@ credential = {
     "credentialSubject": {...},
     "evidence": [
         {
-            "type": "harbour:EmailVerification",
+            "type": "harbour:CredentialEvidence",
             "verifiablePresentation": email_verification_vp_jwt
         }
     ]
@@ -185,25 +194,29 @@ Evidence:
   slots:
     - type
 
-EmailVerification:
+CredentialEvidence:
   is_a: Evidence
-  class_uri: harbour:EmailVerification
+  class_uri: harbour:CredentialEvidence
   slots:
     - verifiablePresentation
-
-IssuanceEvidence:
-  is_a: Evidence
-  class_uri: harbour:IssuanceEvidence
-  slots:
-    - verifiablePresentation
+  slot_usage:
+    verifiablePresentation:
+      required: true
 
 DelegatedSignatureEvidence:
   is_a: Evidence
   class_uri: harbour:DelegatedSignatureEvidence
   slots:
     - verifiablePresentation
-    - transactionIntent
     - delegatedTo
+    - transactionData
+  slot_usage:
+    verifiablePresentation:
+      required: true
+    delegatedTo:
+      required: true
+    transactionData:
+      required: true
 ```
 
 ## Related Documentation
