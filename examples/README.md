@@ -26,6 +26,23 @@ flowchart LR
     end
 ```
 
+## Skeleton Credentials vs Domain Extensions
+
+The examples in this directory are **harbour skeletons** — they define the
+minimum base structure required for each credential type, without any
+domain-specific compliance data. The `delegated-signing-receipt.json` is the
+canonical reference for the skeleton pattern.
+
+Domain extensions live in subdirectories and add compliance data on top of the
+skeleton. Currently:
+
+- **`gaiax/`** — [Gaia-X domain extensions](gaiax/README.md): adds
+  `gxParticipant` inner nodes with Gaia-X properties (registration number,
+  addresses) and the `https://w3id.org/gaia-x/development#` context.
+
+The `gxParticipant` composition slot is defined as `required: false` in the
+harbour schema — it is only populated when a domain extension needs it.
+
 ## Credential Issuance Model
 
 The Harbour Signing Service is the **sole issuer** of all credentials, acting
@@ -352,14 +369,21 @@ import { verifySdJwtVp, signJwt } from '@reachhaven/harbour-credentials';
 
 ## File Index
 
-### Credential examples (unsigned, expanded JSON-LD)
+### Harbour skeletons (unsigned, expanded JSON-LD)
 
 | File | Step | Description |
 |------|------|-------------|
 | [`trust-anchor-credential.json`](trust-anchor-credential.json) | — | Trust Anchor self-signed credential (root of trust) |
-| [`legal-person-credential.json`](legal-person-credential.json) | 1 | Organization credential with Gaia-X compliance data |
-| [`natural-person-credential.json`](natural-person-credential.json) | 2 | Employee credential with `memberOf` link |
+| [`legal-person-credential.json`](legal-person-credential.json) | 1 | Organization credential (harbour skeleton) |
+| [`natural-person-credential.json`](natural-person-credential.json) | 2 | Employee credential with `memberOf` link (harbour skeleton) |
 | [`delegated-signing-receipt.json`](delegated-signing-receipt.json) | 3+4 | Transaction receipt with embedded consent VP as evidence |
+
+### Gaia-X domain extensions (`gaiax/`)
+
+| File | Derives from | What's added |
+|------|-------------|--------------|
+| [`gaiax/legal-person-credential.json`](gaiax/legal-person-credential.json) | `legal-person-credential.json` | `gxParticipant` with registration number, addresses |
+| [`gaiax/natural-person-credential.json`](gaiax/natural-person-credential.json) | `natural-person-credential.json` | `gxParticipant` with `gx:Participant` |
 
 
 ### Signed artifacts (`signed/`)
@@ -389,7 +413,8 @@ source .venv/bin/activate
 PYTHONPATH=src/python:$PYTHONPATH python -m credentials.example_signer examples/
 ```
 
-This signs all `examples/*.json` files and writes artifacts to `examples/signed/`.
+This signs all `examples/*.json` and `examples/gaiax/*.json` files, writing
+artifacts to `examples/signed/` and `examples/gaiax/signed/` respectively.
 
 > **Wire format vs JSON-LD**: The `.json` files in this directory show credentials
 > as expanded JSON-LD for readability. On the wire, every credential and VP is

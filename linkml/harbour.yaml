@@ -390,7 +390,7 @@ classes:
       - statusPurpose
 
   # ==========================================
-  # 5. HELPERS
+  # 6. HELPERS
   # ==========================================
   # Spec: DID-Core §5.3.1 — verificationMethod MUST have id, type, controller,
   #   and key material (publicKeyJwk or publicKeyMultibase). Harbour models a

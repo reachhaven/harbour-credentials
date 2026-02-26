@@ -28,21 +28,17 @@ HARBOUR_NS = "https://w3id.org/reachhaven/harbour/credentials/v1/"
 # Gaia-X namespace
 GAIAX_NS = "https://w3id.org/gaia-x/development#"
 
+# ---------------------------------------------------------------------------
+# Base harbour mappings (skeleton credentials — no Gaia-X)
+# ---------------------------------------------------------------------------
+
 HARBOUR_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}LegalPersonCredential",
     "claims": {
         "credentialSubject.name": "name",
-        "credentialSubject.gxParticipant.schema:name": "legalName",
-        "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
-        "credentialSubject.gxParticipant.gx:headquartersAddress": "headquartersAddress",
-        "credentialSubject.gxParticipant.gx:legalAddress": "legalAddress",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "name", "legalName"],
-    "selectively_disclosed": [
-        "registrationNumber",
-        "headquartersAddress",
-        "legalAddress",
-    ],
+    "always_disclosed": ["iss", "vct", "iat", "exp", "name"],
+    "selectively_disclosed": [],
 }
 
 HARBOUR_NATURAL_PERSON_MAPPING = {
@@ -57,24 +53,59 @@ HARBOUR_NATURAL_PERSON_MAPPING = {
     "selectively_disclosed": ["givenName", "familyName", "email", "memberOf"],
 }
 
-HARBOUR_SERVICE_OFFERING_MAPPING = {
-    "vct": f"{HARBOUR_NS}ServiceOfferingCredential",
+# ---------------------------------------------------------------------------
+# Gaia-X domain mappings (extends base with gxParticipant)
+# ---------------------------------------------------------------------------
+
+GAIAX_LEGAL_PERSON_MAPPING = {
+    "vct": f"{HARBOUR_NS}LegalPersonCredential",
     "claims": {
-        "credentialSubject.name": "name",
-        "credentialSubject.description": "description",
-        "credentialSubject.gxServiceOffering.gx:providedBy": "providedBy",
-        "credentialSubject.gxServiceOffering.gx:serviceOfferingTermsAndConditions": "termsAndConditions",
+        "credentialSubject.gxParticipant.schema:name": "legalName",
+        "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
+        "credentialSubject.gxParticipant.gx:headquartersAddress": "headquartersAddress",
+        "credentialSubject.gxParticipant.gx:legalAddress": "legalAddress",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "providedBy", "name"],
-    "selectively_disclosed": ["description", "termsAndConditions"],
+    "always_disclosed": ["iss", "vct", "iat", "exp", "legalName"],
+    "selectively_disclosed": [
+        "registrationNumber",
+        "headquartersAddress",
+        "legalAddress",
+    ],
 }
 
-# Registry: VC type string → mapping dict
-# Additional mappings can be registered at runtime
+GAIAX_NATURAL_PERSON_MAPPING = {
+    "vct": f"{HARBOUR_NS}NaturalPersonCredential",
+    "claims": {
+        "credentialSubject.gxParticipant.schema:name": "gxName",
+        "credentialSubject.schema:givenName": "givenName",
+        "credentialSubject.schema:familyName": "familyName",
+        "credentialSubject.schema:email": "email",
+        "credentialSubject.memberOf": "memberOf",
+    },
+    "always_disclosed": ["iss", "vct", "iat", "exp"],
+    "selectively_disclosed": [
+        "gxName",
+        "givenName",
+        "familyName",
+        "email",
+        "memberOf",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Registries
+# ---------------------------------------------------------------------------
+
+# Base harbour mappings (skeleton credentials)
 MAPPINGS: dict[str, dict] = {
     "harbour:LegalPersonCredential": HARBOUR_LEGAL_PERSON_MAPPING,
     "harbour:NaturalPersonCredential": HARBOUR_NATURAL_PERSON_MAPPING,
-    "harbour:ServiceOfferingCredential": HARBOUR_SERVICE_OFFERING_MAPPING,
+}
+
+# Gaia-X domain mappings (extended with gxParticipant)
+GAIAX_MAPPINGS: dict[str, dict] = {
+    "harbour:LegalPersonCredential": GAIAX_LEGAL_PERSON_MAPPING,
+    "harbour:NaturalPersonCredential": GAIAX_NATURAL_PERSON_MAPPING,
 }
 
 
@@ -179,8 +210,19 @@ def sd_jwt_claims_to_vc(claims: dict, mapping: dict, vc_type: str) -> dict:
     return vc
 
 
+def _has_gaiax_context(vc: dict) -> bool:
+    """Check whether a VC's @context includes the Gaia-X namespace."""
+    ctx = vc.get("@context", [])
+    if isinstance(ctx, str):
+        ctx = [ctx]
+    return GAIAX_NS in ctx
+
+
 def get_mapping_for_vc(vc: dict) -> dict | None:
-    """Find the matching mapping for a VC based on its type.
+    """Find the matching mapping for a VC based on its type and context.
+
+    Context-aware: if the VC's @context includes the Gaia-X namespace,
+    returns the Gaia-X mapping; otherwise returns the base harbour mapping.
 
     Supports both:
     - W3C VCDM: "type" array (e.g., ["VerifiableCredential", "PersonCredential"])
@@ -205,7 +247,10 @@ def get_mapping_for_vc(vc: dict) -> dict | None:
         elif isinstance(at_type, list):
             vc_types = vc_types + at_type
 
-    for vc_type, mapping in MAPPINGS.items():
+    # Choose registry based on context
+    registry = GAIAX_MAPPINGS if _has_gaiax_context(vc) else MAPPINGS
+
+    for vc_type, mapping in registry.items():
         if vc_type in vc_types:
             return mapping
     return None
@@ -362,7 +407,12 @@ Examples:
 
     elif args.command == "list-types":
         print("Supported credential types:")
+        print("\nBase harbour mappings:")
         for type_key, mapping in MAPPINGS.items():
+            print(f"  {type_key}")
+            print(f"    vct: {mapping['vct']}")
+        print("\nGaia-X domain mappings:")
+        for type_key, mapping in GAIAX_MAPPINGS.items():
             print(f"  {type_key}")
             print(f"    vct: {mapping['vct']}")
 

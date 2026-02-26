@@ -100,13 +100,13 @@ const payload = await verifyVcJose(jwt, publicKey);
 
 ## Harbour Credential Types
 
-Harbour provides a base credential framework (`harbour.yaml`) and a Gaia-X domain layer (`gaiax-domain.yaml`) that adds participant and service offering types using a **composition pattern**:
+Harbour provides a base credential framework (`harbour.yaml`) with **skeleton credentials** that define the minimum required structure. A Gaia-X domain layer (`gaiax-domain.yaml`) extends the skeletons with participant types using a **composition pattern**:
 
 | Credential Type                     | Subject Type              | Composition Slot      | Gaia-X Inner Type     |
 | ----------------------------------- | ------------------------- | --------------------- | --------------------- |
 | `harbour:LegalPersonCredential`     | `harbour:LegalPerson`     | `gxParticipant`       | `gx:LegalPerson`     |
 | `harbour:NaturalPersonCredential`   | `harbour:NaturalPerson`   | `gxParticipant`       | `gx:Participant`     |
-| `harbour:ServiceOfferingCredential` | `harbour:ServiceOffering` | `gxServiceOffering`   | `gx:ServiceOffering` |
+
 
 All harbour credentials require:
 
@@ -114,7 +114,7 @@ All harbour credentials require:
 - `validFrom` - Mandatory datetime
 - `credentialStatus` - At least one `harbour:CRSetEntry` for revocation support
 
-The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
+Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain extensions with `gxParticipant` live in `examples/gaiax/`. The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
 
 ```json
 {
@@ -233,9 +233,9 @@ submodules/
 └── w3id.org/                  # W3ID context resolution
 
 examples/
-├── legal-person-credential.json       # Harbour credential examples
+├── legal-person-credential.json       # Harbour skeleton credentials
 ├── natural-person-credential.json     # (canonical unsigned JSON-LD)
-├── service-offering-credential.json
+├── gaiax/                             # Gaia-X domain extensions
 └── did-webs/                          # Example did:webs DID documents used by examples
 
 tests/

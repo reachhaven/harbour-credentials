@@ -196,7 +196,7 @@ validate-shacl:
 		tmp_output=$$(mktemp) && \
 		$(PYTHON) -m src.tools.validators.validation_suite \
 			--run check-data-conformance \
-			--data-paths ../../examples/ ../../tests/validation-probe/ontology-loading-probe.json \
+			--data-paths ../../examples/ ../../examples/gaiax/ ../../tests/validation-probe/ontology-loading-probe.json \
 			--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
 		status=$$? ; \
 		cat $$tmp_output ; \

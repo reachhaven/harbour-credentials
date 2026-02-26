@@ -24,6 +24,7 @@ while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.pare
     _REPO_ROOT = _REPO_ROOT.parent
 
 EXAMPLES_DIR = _REPO_ROOT / "examples"
+GAIAX_EXAMPLES_DIR = EXAMPLES_DIR / "gaiax"
 
 
 @pytest.fixture(scope="module")
@@ -205,6 +206,73 @@ class TestProcessExample:
             pytest.skip("examples/ not populated")
 
         output_dir = tmp_path / "signed"
+        for path in example_files:
+            jwt_path = process_example(path, private_key, kid, output_dir)
+            vc_jwt = jwt_path.read_text().strip()
+            vc_payload = verify_vc_jose(vc_jwt, public_key)
+            assert "VerifiableCredential" in vc_payload["type"]
+
+
+class TestProcessGaiaxExample:
+    """Test processing Gaia-X domain extension examples."""
+
+    def test_process_gaiax_legal_person(self, signing_key, tmp_path):
+        """Process the Gaia-X legal person credential through the pipeline."""
+        private_key, public_key, kid = signing_key
+
+        example_path = GAIAX_EXAMPLES_DIR / "legal-person-credential.json"
+        if not example_path.exists():
+            pytest.skip("examples/gaiax/ not populated")
+
+        output_dir = tmp_path / "gaiax" / "signed"
+        jwt_path = process_example(example_path, private_key, kid, output_dir)
+
+        assert jwt_path.exists()
+        assert (output_dir / "legal-person-credential.decoded.json").exists()
+        assert (output_dir / "legal-person-credential.evidence-vp.jwt").exists()
+
+        # Verify outer VC JWT
+        vc_jwt = jwt_path.read_text().strip()
+        vc_payload = verify_vc_jose(vc_jwt, public_key)
+        assert "harbour:LegalPersonCredential" in vc_payload["type"]
+
+        # Gaia-X credential should have gxParticipant in subject
+        subject = vc_payload["credentialSubject"]
+        assert "gxParticipant" in subject
+        assert subject["gxParticipant"]["type"] == "gx:LegalPerson"
+
+    def test_process_gaiax_natural_person(self, signing_key, tmp_path):
+        """Process the Gaia-X natural person credential through the pipeline."""
+        private_key, public_key, kid = signing_key
+
+        example_path = GAIAX_EXAMPLES_DIR / "natural-person-credential.json"
+        if not example_path.exists():
+            pytest.skip("examples/gaiax/ not populated")
+
+        output_dir = tmp_path / "gaiax" / "signed"
+        jwt_path = process_example(example_path, private_key, kid, output_dir)
+
+        assert jwt_path.exists()
+        vc_jwt = jwt_path.read_text().strip()
+        vc_payload = verify_vc_jose(vc_jwt, public_key)
+        assert "harbour:NaturalPersonCredential" in vc_payload["type"]
+
+        # Gaia-X credential should have gxParticipant in subject
+        subject = vc_payload["credentialSubject"]
+        assert "gxParticipant" in subject
+
+    def test_process_all_gaiax_examples(self, signing_key, tmp_path):
+        """Process all Gaia-X examples and verify each produces a valid JWT."""
+        private_key, public_key, kid = signing_key
+
+        if not GAIAX_EXAMPLES_DIR.is_dir():
+            pytest.skip("examples/gaiax/ not populated")
+
+        example_files = sorted(GAIAX_EXAMPLES_DIR.glob("*-credential.json"))
+        if not example_files:
+            pytest.skip("No Gaia-X credential examples found")
+
+        output_dir = tmp_path / "gaiax" / "signed"
         for path in example_files:
             jwt_path = process_example(path, private_key, kid, output_dir)
             vc_jwt = jwt_path.read_text().strip()

@@ -2,6 +2,8 @@
 
 Reads expanded (human-readable) examples from examples/*.json and produces
 wire-format signed JWTs plus decoded companion files in examples/signed/.
+When given a directory, also processes gaiax/ subdirectory if present,
+outputting signed artifacts to each subdirectory's own signed/ folder.
 
 Output per credential:
   - <name>.jwt                      — VC-JOSE-COSE compact JWS (wire format)
@@ -251,6 +253,15 @@ Examples:
                 if p.parent.name != "signed"
                 and any(t in p.stem for t in ("credential", "receipt", "offering"))
             )
+            # Also process gaiax/ subdirectory if it exists
+            gaiax_dir = path / "gaiax"
+            if gaiax_dir.is_dir():
+                example_files.extend(
+                    p
+                    for p in sorted(gaiax_dir.glob("*.json"))
+                    if p.parent.name != "signed"
+                    and any(t in p.stem for t in ("credential", "receipt", "offering"))
+                )
         elif path.is_file():
             example_files.append(path)
         else:
@@ -260,24 +271,26 @@ Examples:
         print("No example credentials found", file=sys.stderr)
         sys.exit(1)
 
-    # Determine output directory
-    if args.output_dir:
-        output_dir = Path(args.output_dir)
-    else:
-        # Use first input's parent/signed/
-        output_dir = example_files[0].parent / "signed"
-
     print(f"Signing {len(example_files)} example credentials...")
     print(f"  kid: {kid_vm}")
-    print(f"  output: {output_dir}")
 
+    output_dirs_used: set[Path] = set()
     for path in example_files:
+        # Per-file output: each file's signed artifacts go to file.parent / "signed"
+        if args.output_dir:
+            output_dir = Path(args.output_dir)
+        else:
+            output_dir = path.parent / "signed"
         jwt_path = process_example(path, private_key, kid_vm, output_dir)
-        print(f"  {path.name} -> {jwt_path.name}")
+        output_dirs_used.add(output_dir)
+        rel = path.parent.name
+        prefix = f"{rel}/" if rel != "examples" else ""
+        print(f"  {prefix}{path.name} -> {output_dir.name}/{jwt_path.name}")
 
     # List all generated files
-    signed_files = sorted(output_dir.iterdir())
-    print(f"\nGenerated {len(signed_files)} files in {output_dir}/")
+    for out_dir in sorted(output_dirs_used):
+        signed_files = sorted(out_dir.iterdir())
+        print(f"\nGenerated {len(signed_files)} files in {out_dir}/")
 
     print("Done.")
 
