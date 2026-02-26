@@ -5,6 +5,7 @@ __pycache__/
 htmlcov/
 artifacts/*/
 examples/signed/
+examples/gaiax/signed/
 dist/
 .venv/
 

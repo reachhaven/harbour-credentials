@@ -13,7 +13,7 @@ const SD_JWT_SEPARATOR = "~";
 export interface KbJwtOptions {
   nonce: string;
   audience: string;
-  transactionData?: string[];
+  transaction_data?: string[];
 }
 
 export interface KbJwtPayload {
@@ -32,7 +32,7 @@ export interface KbJwtPayload {
  *
  * @param sdJwt - The SD-JWT compact string (ending with ~).
  * @param holderPrivateKey - Holder's private key.
- * @param options - KB-JWT options (nonce, audience, transactionData).
+ * @param options - KB-JWT options (nonce, audience, transaction_data).
  * @returns Complete SD-JWT-VC + KB-JWT string.
  */
 export async function createKbJwt(
@@ -40,12 +40,15 @@ export async function createKbJwt(
   holderPrivateKey: CryptoKey,
   options: KbJwtOptions
 ): Promise<string> {
-  const { nonce, audience, transactionData } = options;
+  const { nonce, audience, transaction_data } = options;
 
-  // Compute sd_hash (SHA-256 of the issuer-jwt part)
-  const issuerJwt = sdJwt.split(SD_JWT_SEPARATOR)[0];
-  const issuerJwtBytes = new TextEncoder().encode(issuerJwt);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", issuerJwtBytes);
+  // Compute sd_hash per RFC 9901 §4.3.1 — hash over the entire SD-JWT
+  // string before the KB-JWT: <issuer-jwt>~<disc1>~...~<discN>~
+  const sdJwtForHash = sdJwt.endsWith(SD_JWT_SEPARATOR)
+    ? sdJwt
+    : sdJwt + SD_JWT_SEPARATOR;
+  const sdJwtBytes = new TextEncoder().encode(sdJwtForHash);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", sdJwtBytes);
   const sdHash = base64urlEncode(new Uint8Array(hashBuffer));
 
   // Build KB-JWT payload
@@ -56,9 +59,9 @@ export async function createKbJwt(
     sd_hash: sdHash,
   };
 
-  if (transactionData && transactionData.length > 0) {
+  if (transaction_data && transaction_data.length > 0) {
     const tdHashes: string[] = [];
-    for (const td of transactionData) {
+    for (const td of transaction_data) {
       const tdBytes = new TextEncoder().encode(td);
       const tdHash = await crypto.subtle.digest("SHA-256", tdBytes);
       tdHashes.push(base64urlEncode(new Uint8Array(tdHash)));
@@ -90,7 +93,7 @@ export class KbJwtVerificationError extends Error {
 export interface KbJwtVerifyOptions {
   expectedNonce: string;
   expectedAudience: string;
-  expectedTransactionData?: string[];
+  expected_transaction_data?: string[];
 }
 
 /**
@@ -107,7 +110,7 @@ export async function verifyKbJwt(
   holderPublicKey: CryptoKey,
   options: KbJwtVerifyOptions
 ): Promise<KbJwtPayload> {
-  const { expectedNonce, expectedAudience, expectedTransactionData } = options;
+  const { expectedNonce, expectedAudience, expected_transaction_data } = options;
 
   // Split: the KB-JWT is the last segment
   const parts = sdJwtWithKb.split(SD_JWT_SEPARATOR);
@@ -155,10 +158,15 @@ export async function verifyKbJwt(
     );
   }
 
-  // Verify sd_hash
-  const issuerJwt = parts[0];
-  const issuerJwtBytes = new TextEncoder().encode(issuerJwt);
-  const expectedHashBuffer = await crypto.subtle.digest("SHA-256", issuerJwtBytes);
+  // Verify sd_hash per RFC 9901 §4.3.1 — hash over everything before KB-JWT:
+  // <issuer-jwt>~<disc1>~...~<discN>~
+  const sdJwtPart =
+    parts.slice(0, -1).join(SD_JWT_SEPARATOR) + SD_JWT_SEPARATOR;
+  const sdJwtPartBytes = new TextEncoder().encode(sdJwtPart);
+  const expectedHashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    sdJwtPartBytes
+  );
   const expectedSdHash = base64urlEncode(new Uint8Array(expectedHashBuffer));
 
   if (payload.sd_hash !== expectedSdHash) {
@@ -166,9 +174,9 @@ export async function verifyKbJwt(
   }
 
   // Verify transaction_data_hashes if expected
-  if (expectedTransactionData && expectedTransactionData.length > 0) {
+  if (expected_transaction_data && expected_transaction_data.length > 0) {
     const expectedHashes: string[] = [];
-    for (const td of expectedTransactionData) {
+    for (const td of expected_transaction_data) {
       const tdBytes = new TextEncoder().encode(td);
       const tdHash = await crypto.subtle.digest("SHA-256", tdBytes);
       expectedHashes.push(base64urlEncode(new Uint8Array(tdHash)));

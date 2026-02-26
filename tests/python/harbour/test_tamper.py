@@ -15,7 +15,7 @@ def test_tamper_payload(sample_vc, p256_private_key, p256_public_key):
 
     # Decode payload, tamper, re-encode
     payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=="))
-    payload["credentialSubject"]["id"] = "did:web:did.ascs.digital:participants:evil"
+    payload["credentialSubject"]["id"] = "did:web:evil.example.com"
     tampered_payload = (
         base64.urlsafe_b64encode(
             json.dumps(payload, ensure_ascii=False).encode("utf-8")

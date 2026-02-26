@@ -34,7 +34,7 @@ harbour-credentials/
 |--------|--------|
 | Proof format | SD-JWT-VC + VC-JOSE-COSE |
 | Algorithm | ES256 (P-256) primary, EdDSA (Ed25519) supported |
-| Key resolution | X.509 (x5c) + did:web + did:key |
+| Key resolution | X.509 (x5c) + did:webs + did:key |
 | Selective disclosure | Native (SD-JWT-VC) |
 | Canonicalization | None needed (JWT/SD-JWT) |
 | Runtimes | Python + TypeScript |

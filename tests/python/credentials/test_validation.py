@@ -36,10 +36,22 @@ def _load_json(path: Path) -> dict:
 
 
 def _all_credential_files() -> list[Path]:
-    """Collect all credential JSON files from examples/."""
+    """Collect all credential JSON files from examples/ and examples/gaiax/."""
+    files: list[Path] = []
     if EXAMPLES_DIR.is_dir():
-        return sorted(EXAMPLES_DIR.glob("*.json"))
-    return []
+        files.extend(
+            p
+            for p in EXAMPLES_DIR.glob("*.json")
+            if any(t in p.stem for t in ("credential", "receipt", "offering"))
+        )
+        gaiax_dir = EXAMPLES_DIR / "gaiax"
+        if gaiax_dir.is_dir():
+            files.extend(
+                p
+                for p in gaiax_dir.glob("*.json")
+                if any(t in p.stem for t in ("credential", "receipt", "offering"))
+            )
+    return sorted(files)
 
 
 # ---------------------------------------------------------------------------
@@ -144,8 +156,8 @@ class TestHarbourContextConsistency:
         base_classes = [
             "HarbourCredential",
             "CRSetEntry",
-            "EmailVerification",
-            "IssuanceEvidence",
+            "CredentialEvidence",
+            "DelegatedSignatureEvidence",
         ]
         for cls in base_classes:
             assert cls in ctx, f"Missing {cls} in harbour base context"
@@ -154,8 +166,8 @@ class TestHarbourContextConsistency:
         ctx = _load_json(HARBOUR_CONTEXT_PATH).get("@context", {})
         base_classes = [
             "CRSetEntry",
-            "EmailVerification",
-            "IssuanceEvidence",
+            "CredentialEvidence",
+            "DelegatedSignatureEvidence",
         ]
         has_vocab = "@vocab" in ctx
         for cls in base_classes:
@@ -186,10 +198,8 @@ class TestDomainContextConsistency:
         domain_classes = [
             "LegalPersonCredential",
             "NaturalPersonCredential",
-            "ServiceOfferingCredential",
             "LegalPerson",
             "NaturalPerson",
-            "ServiceOffering",
         ]
         for cls in domain_classes:
             assert cls in ctx, f"Missing {cls} in gaiax-domain context"
@@ -197,17 +207,14 @@ class TestDomainContextConsistency:
     def test_context_has_composition_slots(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
         assert "gxParticipant" in ctx, "Missing gxParticipant in domain context"
-        assert "gxServiceOffering" in ctx, "Missing gxServiceOffering in domain context"
 
     def test_domain_class_iris_are_prefixed(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
         domain_classes = [
             "LegalPerson",
             "NaturalPerson",
-            "ServiceOffering",
             "LegalPersonCredential",
             "NaturalPersonCredential",
-            "ServiceOfferingCredential",
         ]
         has_vocab = "@vocab" in ctx
         for cls in domain_classes:
@@ -240,8 +247,8 @@ class TestHarbourShaclShapes:
         expected_shapes = [
             "harbour:HarbourCredential",
             "harbour:CRSetEntry",
-            "harbour:EmailVerification",
-            "harbour:IssuanceEvidence",
+            "harbour:CredentialEvidence",
+            "harbour:DelegatedSignatureEvidence",
         ]
         for shape in expected_shapes:
             assert (
@@ -265,7 +272,7 @@ class TestHarbourShaclShapes:
     def test_evidence_shapes_require_verifiable_presentation(self):
         """Evidence shapes must require verifiablePresentation."""
         content = HARBOUR_SHACL_PATH.read_text()
-        for ev_type in ["EmailVerification", "IssuanceEvidence"]:
+        for ev_type in ["CredentialEvidence", "DelegatedSignatureEvidence"]:
             marker = f"harbour:{ev_type} a sh:NodeShape"
             shape_start = content.index(marker)
             next_shape = content.find("\n\n", shape_start + 1)
@@ -301,10 +308,8 @@ class TestDomainShaclShapes:
         expected_shapes = [
             "harbour:LegalPersonCredential",
             "harbour:NaturalPersonCredential",
-            "harbour:ServiceOfferingCredential",
             "harbour:LegalPerson",
             "harbour:NaturalPerson",
-            "harbour:ServiceOffering",
         ]
         for shape in expected_shapes:
             assert (
@@ -317,7 +322,6 @@ class TestDomainShaclShapes:
         for cred_type in [
             "LegalPersonCredential",
             "NaturalPersonCredential",
-            "ServiceOfferingCredential",
         ]:
             marker = f"harbour:{cred_type} a sh:NodeShape"
             assert marker in content, f"Missing shape for {cred_type}"

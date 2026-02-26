@@ -12,15 +12,15 @@ import {
 
 const FIXTURES_DIR = resolve(__dirname, "../../fixtures");
 const VCT =
-  "https://w3id.org/ascs-ev/simpulse-id/credentials/v1/ParticipantCredential";
+  "https://w3id.org/reachhaven/harbour/credentials/v1/LegalPersonCredential";
 
 const SAMPLE_CLAIMS = {
-  iss: "did:web:did.ascs.digital:participants:ascs",
+  iss: "did:web:issuer.example.com",
   iat: 1723972522,
-  legalName: "Bayerische Motoren Werke AG",
-  legalForm: "AG",
+  legalName: "Example Corporation GmbH",
+  legalForm: "GmbH",
   countryCode: "DE",
-  email: "imprint@bmw.com",
+  email: "info@example.com",
 };
 
 let privateKey: CryptoKey;
@@ -59,7 +59,7 @@ describe("SD-JWT-VC verification", () => {
     const sdJwt = await issueSdJwtVc(SAMPLE_CLAIMS, privateKey, { vct: VCT });
     const result = await verifySdJwtVc(sdJwt, publicKey);
     expect(result.vct).toBe(VCT);
-    expect(result.legalName).toBe("Bayerische Motoren Werke AG");
+    expect(result.legalName).toBe("Example Corporation GmbH");
   });
 
   it("returns disclosed claims with selective disclosure", async () => {
@@ -68,9 +68,9 @@ describe("SD-JWT-VC verification", () => {
       disclosable: ["email", "countryCode"],
     });
     const result = await verifySdJwtVc(sdJwt, publicKey);
-    expect(result.email).toBe("imprint@bmw.com");
+    expect(result.email).toBe("info@example.com");
     expect(result.countryCode).toBe("DE");
-    expect(result.legalName).toBe("Bayerische Motoren Werke AG");
+    expect(result.legalName).toBe("Example Corporation GmbH");
   });
 
   it("throws on wrong key", async () => {

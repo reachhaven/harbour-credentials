@@ -1,0 +1,42 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/jwk/v1"
+  ],
+  "id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "controller": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "verificationMethod": [
+    {
+      "id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ#key-1",
+      "type": "JsonWebKey2020",
+      "controller": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "W3OIQrEY5e5WOLMSqo82WIiKnNS3YZmCwazJ5jCReGk",
+        "y": "D562mZty35hWJ2V6rKQ5N5IJOKpZkVL52ucujzNcMI8"
+      }
+    },
+    {
+      "id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ#key-2",
+      "type": "JsonWebKey2020",
+      "controller": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "aBzuAd1MlQAeJxCitiz-AqlMgsw1K1L_tuJ8u8hptxY",
+        "y": "ZRY5BsEos8y7QP4hKstg7uzFjduqq_zZlyFIES6Kagk"
+      }
+    }
+  ],
+  "authentication": [
+    "#key-1",
+    "#key-2"
+  ],
+  "assertionMethod": [
+    "#key-1"
+  ],
+  "capabilityDelegation": [
+    "#key-2"
+  ]
+}

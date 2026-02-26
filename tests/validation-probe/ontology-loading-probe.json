@@ -1,0 +1,12 @@
+{
+  "@context": {
+    "@vocab": "https://w3id.org/reachhaven/harbour/credentials/v1/",
+    "gx": "https://w3id.org/gaia-x/development#"
+  },
+  "@id": "urn:uuid:ontology-loading-probe",
+  "@type": [
+    "https://w3id.org/reachhaven/harbour/credentials/v1/LoadProbe",
+    "https://w3id.org/reachhaven/harbour/core/v1/LoadProbe",
+    "https://w3id.org/gaia-x/development#LoadProbe"
+  ]
+}

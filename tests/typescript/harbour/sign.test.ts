@@ -47,7 +47,7 @@ describe("signVcJose", () => {
     const token = await signVcJose(sampleVc, privateKey);
     const header = decodeHeader(token);
     expect(header.alg).toBe("ES256");
-    expect(header.typ).toBe("vc+ld+jwt");
+    expect(header.typ).toBe("vc+jwt");
   });
 
   it("includes kid in header when provided", async () => {
@@ -80,7 +80,7 @@ describe("signVpJose", () => {
   it("has correct header typ", async () => {
     const token = await signVpJose(sampleVp, privateKey);
     const header = decodeHeader(token);
-    expect(header.typ).toBe("vp+ld+jwt");
+    expect(header.typ).toBe("vp+jwt");
   });
 
   it("includes nonce and audience in payload", async () => {

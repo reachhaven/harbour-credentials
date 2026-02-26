@@ -8,7 +8,7 @@ Read these before making changes; they are authoritative for repo workflows.
 | ------------------ | ------------------------------------------------------------------ |
 | Agent instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
 | Documentation      | [README.md](README.md)                                             |
-| Docs               | [docs/README.md](docs/README.md)                                   |
+| Architecture       | [docs/architecture.md](docs/architecture.md)                       |
 
 ## Project Structure
 

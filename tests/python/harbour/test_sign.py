@@ -21,7 +21,7 @@ def test_sign_vc_jose_header_typ(sample_vc, p256_private_key):
     token = sign_vc_jose(sample_vc, p256_private_key)
     header = _decode_header(token)
     assert header["alg"] == "ES256"
-    assert header["typ"] == "vc+ld+jwt"
+    assert header["typ"] == "vc+jwt"
 
 
 def test_sign_vc_jose_header_kid(sample_vc, p256_private_key, p256_did_key_vm):
@@ -60,7 +60,7 @@ def test_sign_vc_jose_eddsa(sample_vc, ed25519_private_key):
     token = sign_vc_jose(sample_vc, ed25519_private_key)
     header = _decode_header(token)
     assert header["alg"] == "EdDSA"
-    assert header["typ"] == "vc+ld+jwt"
+    assert header["typ"] == "vc+jwt"
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ def test_sign_vp_jose_returns_compact_jws(sample_vp, p256_private_key):
 def test_sign_vp_jose_header_typ(sample_vp, p256_private_key):
     token = sign_vp_jose(sample_vp, p256_private_key)
     header = _decode_header(token)
-    assert header["typ"] == "vp+ld+jwt"
+    assert header["typ"] == "vp+jwt"
 
 
 def test_sign_vp_jose_nonce_and_audience(sample_vp, p256_private_key):

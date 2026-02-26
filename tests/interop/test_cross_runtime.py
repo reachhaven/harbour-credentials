@@ -5,6 +5,12 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from harbour.delegation import (
+    TransactionData,
+    compute_transaction_data_param_hash,
+    create_delegation_challenge,
+    encode_transaction_data_param,
+)
 from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.signer import sign_vc_jose, sign_vp_jose
 from harbour.verifier import verify_vc_jose, verify_vp_jose
@@ -112,7 +118,7 @@ const jwk = {json.dumps(fixture)};
 const key = await importJWK(jwk, "ES256");
 const payload = new TextEncoder().encode(JSON.stringify({json.dumps(sample_vc)}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vc+ld+jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "vc+jwt" }});
 const token = await signer.sign(key);
 console.log(token);
 """
@@ -137,7 +143,7 @@ const jwk = {json.dumps(fixture)};
 const key = await importJWK(jwk, "ES256");
 const payload = new TextEncoder().encode(JSON.stringify({json.dumps(vp)}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vp+ld+jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "vp+jwt" }});
 const token = await signer.sign(key);
 console.log(token);
 """
@@ -212,3 +218,178 @@ console.log(token + "~");
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
         assert result["iss"] == "did:web:node-issuer"
         assert result["vct"] == "https://example.com/vc"
+
+
+class TestCanonicalizationInterop:
+    """Verify Python and TypeScript produce identical canonical JSON and hashes."""
+
+    @pytest.fixture()
+    def vectors(self):
+        vectors_path = FIXTURES_DIR / "canonicalization-vectors.json"
+        return json.loads(vectors_path.read_text())["vectors"]
+
+    def test_canonical_json_matches(self, vectors):
+        """Both runtimes produce the same canonical JSON for all vectors."""
+        for v in vectors:
+            td = TransactionData.from_dict(v["input"])
+            py_canonical = td.to_json(canonical=True)
+            assert (
+                py_canonical == v["canonical_json"]
+            ), f"Python mismatch for {v['name']}"
+
+        # Run all vectors through TypeScript in a single Node invocation
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["canonical_json"] for v in vectors])
+
+        script = f"""
+import {{ toCanonicalJson }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+const results = inputs.map(input => toCanonicalJson(input));
+for (let i = 0; i < results.length; i++) {{
+  if (results[i] !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + results[i]);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+"""
+        assert _run_node(script) == "OK"
+
+    def test_sha256_hash_matches(self, vectors):
+        """Both runtimes produce the same SHA-256 hash for all vectors."""
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["sha256_hash"] for v in vectors])
+
+        script = f"""
+import {{ computeTransactionHash }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+for (let i = 0; i < inputs.length; i++) {{
+  const hash = await computeTransactionHash(inputs[i]);
+  if (hash !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + hash);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+"""
+        assert _run_node(script) == "OK"
+
+    def test_challenge_string_matches(self, vectors):
+        """Both runtimes produce the same delegation challenge string."""
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["challenge"] for v in vectors])
+
+        script = f"""
+import {{ createDelegationChallenge }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+for (let i = 0; i < inputs.length; i++) {{
+  const challenge = await createDelegationChallenge(inputs[i]);
+  if (challenge !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + challenge);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+        """
+        assert _run_node(script) == "OK"
+
+    def test_transaction_data_param_matches(self, vectors):
+        """Both runtimes produce the same base64url transaction_data request strings."""
+        for v in vectors:
+            td = TransactionData.from_dict(v["input"])
+            assert (
+                encode_transaction_data_param(td) == v["transaction_data_param"]
+            ), f"Python mismatch for {v['name']}"
+
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["transaction_data_param"] for v in vectors])
+
+        script = f"""
+import {{ encodeTransactionDataParam }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+for (let i = 0; i < inputs.length; i++) {{
+  const encoded = encodeTransactionDataParam(inputs[i]);
+  if (encoded !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + encoded);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+"""
+        assert _run_node(script) == "OK"
+
+    def test_transaction_data_param_hash_matches(self, vectors):
+        """Both runtimes produce the same OID4VP transaction_data_hashes values."""
+        for v in vectors:
+            td = TransactionData.from_dict(v["input"])
+            assert (
+                compute_transaction_data_param_hash(td)
+                == v["transaction_data_param_hash"]
+            ), f"Python mismatch for {v['name']}"
+
+        inputs_json = json.dumps([v["input"] for v in vectors])
+        expected_json = json.dumps([v["transaction_data_param_hash"] for v in vectors])
+
+        script = f"""
+import {{ computeTransactionDataParamHash }} from "./dist/delegation.js";
+const inputs = {inputs_json};
+const expected = {expected_json};
+for (let i = 0; i < inputs.length; i++) {{
+  const hash = await computeTransactionDataParamHash(inputs[i]);
+  if (hash !== expected[i]) {{
+    console.error("MISMATCH at index " + i);
+    console.error("Got:      " + hash);
+    console.error("Expected: " + expected[i]);
+    process.exit(1);
+  }}
+}}
+console.log("OK");
+"""
+        assert _run_node(script) == "OK"
+
+    def test_python_challenge_verified_by_typescript(self, vectors):
+        """Python-generated challenge is verified by TypeScript."""
+        for v in vectors:
+            td = TransactionData.from_dict(v["input"])
+            py_challenge = create_delegation_challenge(td)
+            input_json = json.dumps(v["input"])
+
+            script = f"""
+import {{ verifyChallenge }} from "./dist/delegation.js";
+const td = {input_json};
+const ok = await verifyChallenge("{py_challenge}", td);
+if (!ok) {{
+  console.error("Challenge verification failed");
+  process.exit(1);
+}}
+console.log("OK");
+"""
+            assert _run_node(script) == "OK", f"Failed for {v['name']}"
+
+    def test_typescript_challenge_verified_by_python(self, vectors):
+        """TypeScript-generated challenge is verified by Python."""
+        for v in vectors:
+            input_json = json.dumps(v["input"])
+
+            script = f"""
+import {{ createDelegationChallenge }} from "./dist/delegation.js";
+const td = {input_json};
+const challenge = await createDelegationChallenge(td);
+console.log(challenge);
+"""
+            ts_challenge = _run_node(script)
+            td = TransactionData.from_dict(v["input"])
+            py_challenge = create_delegation_challenge(td)
+            assert ts_challenge == py_challenge, f"Mismatch for {v['name']}"

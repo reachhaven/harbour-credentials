@@ -2,15 +2,14 @@ id: https://w3id.org/reachhaven/harbour/gaiax-domain/v1
 name: gaiax-domain
 description: >
   Gaia-X domain layer for Harbour credentials.
-  Defines participant and service offering types that wrap Gaia-X
-  compliance data via composition. Harbour outer nodes carry
-  harbour-specific properties; nested gx blank nodes carry only gx
-  properties, keeping gx closed SHACL shapes intact.
+  Defines participant types that wrap Gaia-X compliance data via
+  composition. Harbour outer nodes carry harbour-specific properties;
+  nested gx blank nodes carry only gx properties, keeping gx closed
+  SHACL shapes intact.
 
 prefixes:
   linkml: https://w3id.org/linkml/
   harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
-  core: https://w3id.org/reachhaven/harbour/core/v1/
   xsd: http://www.w3.org/2001/XMLSchema#
   cred: https://www.w3.org/2018/credentials#
   schema: http://schema.org/
@@ -26,6 +25,12 @@ imports:
 # Composition Slots
 # ==========================================
 # These slots link harbour outer nodes to Gaia-X inner blank nodes.
+# Design: Gaia-X Trust Framework defines closed SHACL shapes on gx: types.
+#   Harbour cannot add properties to gx nodes without violating sh:closed.
+#   Solution: composition — harbour outer node owns harbour properties;
+#   nested gx blank node carries only gx properties.
+# Spec: Gaia-X Trust Framework 22.10 — gx:LegalPerson, gx:Participant,
+#   Gaia-X shapes requiring specific properties.
 
 slots:
   gxParticipant:
@@ -36,83 +41,26 @@ slots:
     range: Any
     required: false
 
-  gxServiceOffering:
-    description: >
-      Nested Gaia-X service offering compliance data
-      (gx:ServiceOffering blank node).
-    slot_uri: harbour:gxServiceOffering
-    range: Any
-    required: false
 
 classes:
   # ==========================================
-  # 1. PARTICIPANT TYPES
+  # 1. CREDENTIAL TYPES
   # ==========================================
-  # Harbour wraps Gaia-X participant types via composition.
-  # Gaia-X data lives in nested blank nodes (gxParticipant /
-  # gxServiceOffering) to keep gx closed shapes intact.
-
-  LegalPerson:
-    description: >
-      A legal person (organization) participating in the harbour ecosystem.
-      Gaia-X compliance data is nested in the gxParticipant slot as a
-      gx:LegalPerson blank node, keeping the gx closed shape intact.
-    class_uri: harbour:LegalPerson
-    slots:
-      - name
-      - gxParticipant
-    slot_usage:
-      name:
-        required: true
-
-  NaturalPerson:
-    description: >
-      A natural person (individual) participating in the harbour ecosystem.
-      Gaia-X participant data is nested in the gxParticipant slot.
-    class_uri: harbour:NaturalPerson
-    slots:
-      - name
-      - gxParticipant
-    slot_usage:
-      name:
-        required: true
-    attributes:
-      givenName:
-        slot_uri: schema:givenName
-        range: string
-      familyName:
-        slot_uri: schema:familyName
-        range: string
-      email:
-        slot_uri: schema:email
-        range: string
-      memberOf:
-        description: Organization (LegalPerson) the natural person belongs to.
-        slot_uri: schema:memberOf
-        range: uri
-
-  ServiceOffering:
-    description: >
-      A service offering available in the harbour ecosystem.
-      Gaia-X compliance data is nested in the gxServiceOffering slot.
-    class_uri: harbour:ServiceOffering
-    slots:
-      - name
-      - description
-      - gxServiceOffering
-    slot_usage:
-      name:
-        required: true
-
-  # ==========================================
-  # 2. CREDENTIAL TYPES
-  # ==========================================
+  # Concrete credential types for harbour use case stories.
+  # Defined in the domain layer because the credentialSubject types
+  # (LegalPerson, NaturalPerson) carry domain-specific composition
+  # slots (gxParticipant) that must be present in the SHACL closed shapes.
+  # Spec: VCDM2 §4 — each credential MUST have @context, type, issuer,
+  #   credentialSubject. Harbour profile additionally requires validFrom
+  #   and credentialStatus (inherited from HarbourCredential).
 
   LegalPersonCredential:
     is_a: HarbourCredential
     description: >
       Credential attesting to a harbour:LegalPerson (organization) identity.
-      The credentialSubject wraps a gx:LegalPerson via the gxParticipant slot.
+      In skeleton form the credentialSubject carries only harbour properties
+      (name). When Gaia-X compliance is needed, gxParticipant carries the
+      gx:LegalPerson blank node with compliance data.
     class_uri: harbour:LegalPersonCredential
     slot_usage:
       validFrom:
@@ -124,7 +72,9 @@ classes:
     is_a: HarbourCredential
     description: >
       Credential attesting to a harbour:NaturalPerson (individual) identity.
-      The credentialSubject wraps gx:Participant via the gxParticipant slot.
+      In skeleton form the credentialSubject carries only harbour properties
+      (name, givenName, familyName, email, memberOf). When Gaia-X compliance
+      is needed, gxParticipant carries the gx:Participant blank node.
     class_uri: harbour:NaturalPersonCredential
     slot_usage:
       validFrom:
@@ -132,13 +82,57 @@ classes:
       evidence:
         required: true
 
-  ServiceOfferingCredential:
-    is_a: HarbourCredential
+  # ==========================================
+  # 2. PARTICIPANT TYPES
+  # ==========================================
+  # Harbour wraps Gaia-X participant types via composition.
+  # Gaia-X data lives in nested blank nodes (gxParticipant /
+  # gxParticipant) to keep gx closed shapes intact.
+  # Spec: Gaia-X TF — gx:LegalPerson requires gx:registrationNumber (object),
+  #   gx:headquartersAddress, gx:legalAddress. gx:Participant is the base type.
+
+  LegalPerson:
     description: >
-      Credential attesting to a harbour:ServiceOffering.
-      The credentialSubject wraps a gx:ServiceOffering via the
-      gxServiceOffering slot.
-    class_uri: harbour:ServiceOfferingCredential
+      A legal person (organization) participating in the harbour ecosystem.
+      In skeleton form only the harbour name property is present. When Gaia-X
+      compliance is needed, name is omitted from the outer node and schema:name
+      lives in the gxParticipant inner node (gx:LegalPerson blank node),
+      keeping the gx closed shape intact.
+    class_uri: harbour:LegalPerson
+    slots:
+      - name
+      - gxParticipant
     slot_usage:
-      validFrom:
-        required: true
+      name:
+        required: false
+
+  NaturalPerson:
+    description: >
+      A natural person (individual) participating in the harbour ecosystem.
+      In skeleton form only harbour properties are present. When Gaia-X
+      compliance is needed, name is omitted and schema:name lives in the
+      gxParticipant inner node (gx:Participant blank node).
+    class_uri: harbour:NaturalPerson
+    slots:
+      - name
+      - gxParticipant
+    slot_usage:
+      name:
+        required: false
+    attributes:
+      # Spec: schema.org Person vocabulary — givenName, familyName, email.
+      givenName:
+        slot_uri: schema:givenName
+        range: string
+      familyName:
+        slot_uri: schema:familyName
+        range: string
+      email:
+        slot_uri: schema:email
+        range: string
+      # Spec: schema.org — memberOf relates Person to Organization.
+      memberOf:
+        description: Organization (LegalPerson) the natural person belongs to.
+        slot_uri: schema:memberOf
+        range: uri
+

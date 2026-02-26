@@ -32,7 +32,7 @@ describe("tamper detection", () => {
       Buffer.from(parts[1], "base64url").toString(),
     ) as Record<string, any>;
     (payload.credentialSubject as any).id =
-      "did:web:did.ascs.digital:participants:evil";
+      "did:web:evil.example.com";
     const tampered = Buffer.from(JSON.stringify(payload)).toString("base64url");
 
     const tamperedToken = `${parts[0]}.${tampered}.${parts[2]}`;

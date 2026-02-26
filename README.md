@@ -9,7 +9,7 @@ JOSE signing and verification library for W3C Verifiable Credentials, supporting
 - **ES256 (P-256)**: EUDI HAIP compliant algorithm
 - **EdDSA (Ed25519)**: Supported (deprecated per RFC 9864, use ES256 for production)
 - **X.509 Support**: Certificate chains via `x5c` header
-- **DID Support**: `did:key` and `did:web` resolution
+- **DID Support**: `did:key` key identifiers plus `did:web` / `did:webs` subject identifiers (resolution handled by integrators)
 - **Selective Disclosure**: Native SD-JWT-VC with disclosable claims
 - **Key Binding**: KB-JWT for holder binding in presentations
 - **Harbour Credential Types**: Base credential framework with composition slots for Gaia-X compliance
@@ -100,13 +100,13 @@ const payload = await verifyVcJose(jwt, publicKey);
 
 ## Harbour Credential Types
 
-Harbour provides a base credential framework (`harbour.yaml`) and a Gaia-X domain layer (`gaiax-domain.yaml`) that adds participant and service offering types using a **composition pattern**:
+Harbour provides a base credential framework (`harbour.yaml`) with **skeleton credentials** that define the minimum required structure. A Gaia-X domain layer (`gaiax-domain.yaml`) extends the skeletons with participant types using a **composition pattern**:
 
 | Credential Type                     | Subject Type              | Composition Slot      | Gaia-X Inner Type     |
 | ----------------------------------- | ------------------------- | --------------------- | --------------------- |
 | `harbour:LegalPersonCredential`     | `harbour:LegalPerson`     | `gxParticipant`       | `gx:LegalPerson`     |
 | `harbour:NaturalPersonCredential`   | `harbour:NaturalPerson`   | `gxParticipant`       | `gx:Participant`     |
-| `harbour:ServiceOfferingCredential` | `harbour:ServiceOffering` | `gxServiceOffering`   | `gx:ServiceOffering` |
+
 
 All harbour credentials require:
 
@@ -114,7 +114,7 @@ All harbour credentials require:
 - `validFrom` - Mandatory datetime
 - `credentialStatus` - At least one `harbour:CRSetEntry` for revocation support
 
-The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
+Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain extensions with `gxParticipant` live in `examples/gaiax/`. The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
 
 ```json
 {
@@ -124,10 +124,10 @@ The composition pattern keeps harbour properties on the harbour-typed outer node
     "https://w3id.org/reachhaven/harbour/credentials/v1/"
   ],
   "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
-  "issuer": "did:web:trust-anchor.example.com",
+  "issuer": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSubject": {
-    "id": "did:web:participant.example.com",
+    "id": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH",
     "gxParticipant": {
@@ -146,7 +146,7 @@ The composition pattern keeps harbour properties on the harbour-typed outer node
   },
   "credentialStatus": [
     {
-      "id": "did:web:issuer.example.com:revocation#abc123",
+      "id": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo:services:revocation-registry#abc123",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }
@@ -169,13 +169,6 @@ make validate-shacl
 
 # Run structural validation tests
 make validate
-```
-
-### Run Tests
-
-```bash
-# Run all fixture validations via pytest
-make test
 ```
 
 ## CLI Usage
@@ -230,9 +223,10 @@ submodules/
 └── w3id.org/                  # W3ID context resolution
 
 examples/
-├── legal-person-credential.json       # Harbour credential examples
+├── legal-person-credential.json       # Harbour skeleton credentials
 ├── natural-person-credential.json     # (canonical unsigned JSON-LD)
-└── service-offering-credential.json
+├── gaiax/                             # Gaia-X domain extensions
+└── did-webs/                          # Example did:webs DID documents used by examples
 
 tests/
 ├── fixtures/                      # Shared test fixtures
@@ -246,14 +240,12 @@ tests/
 └── typescript/harbour/            # TypeScript tests
 
 linkml/
-├── core.yaml              # Core types (id, type)
 ├── harbour.yaml           # Harbour base credential framework
 └── gaiax-domain.yaml      # Gaia-X domain layer (participant/service types)
 
 artifacts/                 # Generated per domain (make generate)
 ├── harbour/               # Base OWL/SHACL/context
-├── gaiax-domain/          # Domain OWL/SHACL/context
-└── core/
+└── gaiax-domain/          # Domain OWL/SHACL/context
 ```
 
 ## Testing
@@ -262,13 +254,17 @@ artifacts/                 # Generated per domain (make generate)
 # Python tests
 make test
 
-# TypeScript tests
-cd src/typescript/harbour && yarn test
+# TypeScript tests (requires make build-ts first)
+make build-ts
+make test-ts
 
-# Cross-runtime interop tests
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
+# Cross-runtime interop tests (requires make build-ts first)
+make test-interop
 
-# All tests with coverage
+# Full pipeline: Python + SHACL conformance + TypeScript (builds TS automatically)
+make test-all
+
+# Python tests with coverage
 make test-cov
 
 # Lint

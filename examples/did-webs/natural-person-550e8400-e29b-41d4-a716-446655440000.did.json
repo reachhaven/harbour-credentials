@@ -1,0 +1,27 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/jwk/v1"
+  ],
+  "id": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
+  "controller": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
+  "verificationMethod": [
+    {
+      "id": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP#key-1",
+      "type": "JsonWebKey2020",
+      "controller": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "6dkU6ZMFK79WwicwJ5rbxE13zSukBY2OoEiVUEjqMEc",
+        "y": "RnHznyVlrPSMT7irDs15D9wxgMojiSDAQpfFhqTkLRY"
+      }
+    }
+  ],
+  "authentication": [
+    "#key-1"
+  ],
+  "assertionMethod": [
+    "#key-1"
+  ]
+}

@@ -73,6 +73,4 @@ interface KbJwtOptions {
 
 ## Generated Documentation
 
-Full TypeScript API documentation is generated with TypeDoc and available at:
-
-- [TypeDoc API Reference](./typedoc/index.html)
+Full TypeScript API documentation can be generated with TypeDoc by running `yarn docs` in the TypeScript package directory.

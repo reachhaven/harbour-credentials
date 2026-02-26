@@ -11,7 +11,6 @@ description: >
 prefixes:
   linkml: https://w3id.org/linkml/
   harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
-  core: https://w3id.org/reachhaven/harbour/core/v1/
   xsd: http://www.w3.org/2001/XMLSchema#
   cs: https://www.w3.org/ns/credentials/status#
   cred: https://www.w3.org/2018/credentials#
@@ -22,20 +21,43 @@ default_range: string
 
 imports:
   - linkml:types
-  - ./core
 
 slots:
+  # --- Identity Slots ---
+  # Spec: VCDM2 §4.4 — "id" is OPTIONAL on VC/VP/credentialSubject.
+  #   If present, MUST be a URL (incl. DIDs, urn:uuid:).
+  #   Maps to JSON-LD @id.
+  # Spec: DID-Core §3.1 — DID is a URI scheme.
+  id:
+    description: The stable identifier for the entity (becomes @id in JSON-LD).
+    identifier: true
+    range: uri
+
+  # NOTE: "type" is intentionally NOT modeled as a slot.
+  # Spec: VCDM2 §4.5 — "type" MUST be present, maps to @type. Values MUST be
+  #   terms or absolute URL strings resolvable via @context.
+  # W3C VC v2 context defines "type": "@type", which correctly maps JSON "type"
+  # to rdf:type IRIs. Declaring a LinkML slot with slot_uri: rdf:type would
+  # generate a JSON-LD context entry that overrides the W3C alias, turning type
+  # values into xsd:anyURI literals instead of IRIs.
+
   # --- DID Slots ---
+  # Spec: DID-Core §4.2 — controller is a URI or set of URIs.
+  #   In practice always a DID (did:web:..., did:key:..., etc.).
   controller:
     slot_uri: https://www.w3.org/ns/did#controller
-    range: string
+    range: uri
 
+  # Spec: DID-Core §5.4 — serviceEndpoint can be URI, map, or set.
   serviceEndpoint:
     slot_uri: https://www.w3.org/ns/did#serviceEndpoint
     range: Any
     required: true
 
   # --- Revocation Registry (CRSet) Slots ---
+  # Spec: VCDM2 §4.10 — credentialStatus MUST have id and type; statusPurpose
+  #   defined by BitstringStatusList. SD-JWT-VC uses "status" claim (MUST NOT
+  #   be selectively disclosable, draft-14 §3.2).
   statusPurpose:
     slot_uri: cs:statusPurpose
     range: string
@@ -93,22 +115,58 @@ slots:
     range: string
 
   # --- Credential / Evidence Slots ---
+  # Spec: VCDM2 §5.6 — evidence is OPTIONAL (0..*), each object MUST have type.
+  #   SD-JWT-VC does NOT define evidence; custom claims allowed (draft-14 §11).
   evidence:
     slot_uri: cred:evidence
     range: Evidence
     multivalued: true
     required: false
 
+  # Spec: VC-JOSE-COSE §6.1 — media types: application/vp+jwt, application/vp+sd-jwt.
+  #   Payload is the full VC JSON-LD as JWT claims set (§3.1).
+  #   SD-JWT VP: RFC 9901 §4.3 — KB-JWT appended after disclosures.
   verifiablePresentation:
     description: >
       A Verifiable Presentation embedded as evidence. In examples this is
       shown as expanded JSON-LD for readability; on the wire it is encoded
-      as a VC-JOSE-COSE compact JWS string (typ: vp+ld+jwt).
+      as a VC-JOSE-COSE compact JWS string (typ: vp+jwt) or SD-JWT VP.
     slot_uri: harbour:verifiablePresentation
     range: Any
     required: false
 
+  # --- Delegated Signature Evidence Slots ---
+  # Spec: OID4VP §5.1 — transaction_data is request param (array of base64url JSON).
+  #   OID4VP §B.3.3 — KB-JWT carries transaction_data_hashes + _alg.
+  #   OID4VP §8.4 — Wallet MUST process each transaction_data object.
+  #   CSC-DM v1.0.0 — signatureRequest triggers OID4VP flow with transaction_data.
+  #   Harbour Delegation Spec §3 — transaction data object with type, credential_ids,
+  #     nonce, iat, txn. Hash computed over canonical JSON (sorted keys, no whitespace).
+  #   NOTE: OID4VP hashes base64url transport string; Harbour hashes decoded canonical
+  #     JSON. Both serve different layers (transport binding vs content integrity).
+  transaction_data:
+    description: >
+      OID4VP-aligned transaction data object (§8.4). Contains action type,
+      credential IDs, timestamps, and action-specific details in the txn field.
+      On the receipt SD-JWT-VC this is a selectively disclosable claim enabling
+      three-layer privacy (public / authorized / full audit).
+    slot_uri: harbour:transaction_data
+    range: Any
+    required: false
+
+  # Spec: Conceptually maps to OID4VP client_id → KB-JWT aud (RFC 9901 §4.3)
+  #   or Data Integrity proof.domain (VC-DI §2.1).
+  delegatedTo:
+    description: DID of the signing service executing on behalf of the user.
+    slot_uri: harbour:delegatedTo
+    range: uri
+    required: false
+
   # --- Credential Envelope Slots ---
+  # Spec: VCDM2 §4.7 — issuer MUST exist; MUST be URL or object with id.
+  #   VC-JOSE §3.1.3 — iss SHOULD NOT conflict with issuer.
+  #   SD-JWT-VC draft-14 — iss OPTIONAL (can use x5c); draft-08 REQUIRED.
+  #   Harbour profile: REQUIRED (stricter than SD-JWT-VC draft-14).
   issuer:
     slot_uri: cred:issuer
     range: string
@@ -116,11 +174,16 @@ slots:
     description: DID of the credential issuer.
 
   # --- W3C VC v2 Envelope Slots (harbour constrains these) ---
+  # Spec: VCDM2 §4.9 — validFrom is OPTIONAL, xsd:dateTime with mandatory TZ.
+  #   SD-JWT-VC maps to iat (OPTIONAL, selectively disclosable) or nbf (OPTIONAL).
+  #   Harbour profile: REQUIRED (stricter than base spec).
   validFrom:
     slot_uri: cred:validFrom
     range: datetime
     required: true
 
+  # Spec: VCDM2 §4.9 — validUntil is OPTIONAL, xsd:dateTime.
+  #   SD-JWT-VC maps to exp (OPTIONAL, MUST NOT be selectively disclosable).
   validUntil:
     slot_uri: cred:validUntil
     range: datetime
@@ -134,17 +197,24 @@ classes:
   # ==========================================
   # 1. ROOT DOCUMENT
   # ==========================================
+  # Spec: DID-Core §4 — DID Document is a set of data describing the DID subject.
+  #   Properties: id (REQUIRED), controller, verificationMethod, service, etc.
   DIDDocument:
     class_uri: https://www.w3.org/ns/did#DIDDocument
     slots:
       - id
       - controller
     attributes:
+      # Spec: DID-Core §5.4 — service is OPTIONAL, each entry MUST have id, type,
+      #   and serviceEndpoint. service values MUST be unique.
       service:
         slot_uri: https://www.w3.org/ns/did#service
         multivalued: true
         inlined: true
         range: ServiceUnion
+      # Spec: DID-Core §5.3.1 — verificationMethod entries MUST have id, type,
+      #   controller, and key material (publicKeyJwk or publicKeyMultibase).
+      #   Harbour models a subset (id, controller, blockchainAccountId).
       verificationMethod:
         slot_uri: https://www.w3.org/ns/did#verificationMethod
         multivalued: true
@@ -153,22 +223,41 @@ classes:
   # ==========================================
   # 2. SERVICES
   # ==========================================
+  # Spec: DID-Core §5.4 — services express ways of communicating with the DID
+  #   subject. Each service MUST have id, type, serviceEndpoint.
   ServiceUnion:
     union_of:
       - TrustAnchorService
       - CRSetRevocationRegistryService
+      - LinkedCredentialService
 
+  # Harbour-specific: trust anchor endpoint exposing organization metadata.
   TrustAnchorService:
     class_uri: harbour:TrustAnchorService
     slots:
       - id
-      - type
       - serviceEndpoint
     slot_usage:
       serviceEndpoint:
         range: OrganizationEndpoint
         inlined: true
 
+  # Harbour-specific: linked credential endpoint for self-signed root credentials.
+  # Analogous to a root CA certificate — the Trust Anchor's self-signed
+  # LegalPersonCredential is publicly resolvable via this service endpoint.
+  LinkedCredentialService:
+    class_uri: harbour:LinkedCredentialService
+    slots:
+      - id
+      - serviceEndpoint
+    slot_usage:
+      serviceEndpoint:
+        range: uri
+        description: >
+          HTTPS URL where the self-signed credential (VC-JOSE-COSE JWT) can
+          be fetched. Typically a .well-known path on the Trust Anchor's domain.
+
+  # Uses schema.org Organization vocabulary for interoperability.
   OrganizationEndpoint:
     class_uri: schema:Organization
     slots:
@@ -187,11 +276,13 @@ classes:
       - contactType
       - email
 
+  # Harbour-specific: CRSet revocation registry service endpoint.
+  # Spec: VCDM2 §4.10 — credentialStatus mechanisms are extensible. CRSet is a
+  #   Harbour-defined mechanism (not BitstringStatusList or StatusList2021).
   CRSetRevocationRegistryService:
     class_uri: harbour:CRSetRevocationRegistryService
     slots:
       - id
-      - type
       - serviceEndpoint
     slot_usage:
       serviceEndpoint:
@@ -210,8 +301,14 @@ classes:
   # ==========================================
   # 3. CREDENTIAL TYPES
   # ==========================================
+  # Spec: VCDM2 §4 — VerifiableCredential MUST have @context, type,
+  #   credentialSubject, issuer. MAY have id, validFrom, validUntil,
+  #   credentialStatus, evidence, credentialSchema, relatedResource, etc.
   # Harbour credential types add mandatory credentialStatus (CRSetEntry)
   # and optional evidence to W3C VerifiableCredential.
+  # Spec: VC-JOSE §3.1.1 — full VC JSON-LD becomes JWT payload (no vc wrapper).
+  # Spec: SD-JWT-VC draft-14 §11 — SD-JWT-VC does NOT use W3C VCDM; flat claims.
+  #   Harbour claim_mapping.py bridges W3C ↔ SD-JWT-VC formats.
 
   HarbourCredential:
     abstract: true
@@ -221,12 +318,16 @@ classes:
     class_uri: harbour:HarbourCredential
     slots:
       - id
-      - type
       - issuer
       - validFrom
       - validUntil
       - evidence
     attributes:
+      # Spec: VCDM2 §4.10 — credentialStatus is OPTIONAL, each MUST have type.
+      #   Harbour profile: REQUIRED (stricter than base spec).
+      #   SD-JWT-VC uses "status" claim (MUST NOT be selectively disclosable,
+      #   draft-14 §3.2). CRSet is a Harbour-defined status type; VCDM2 allows
+      #   custom types provided they have id and type.
       credentialStatus:
         slot_uri: cred:credentialStatus
         range: CRSetEntry
@@ -237,47 +338,85 @@ classes:
   # ==========================================
   # 4. EVIDENCE TYPES
   # ==========================================
+  # Spec: VCDM2 §5.6 — evidence is OPTIONAL (0..*), each object MUST have type.
+  #   No specific evidence subtypes are defined by the base spec.
   Evidence:
     abstract: true
     class_uri: cred:Evidence
-    slots:
-      - type
 
-  EmailVerification:
+  # Harbour-specific evidence type for authorization proof during issuance.
+  # Spec: VCDM2 §5.6 — evidence can contain any claims (extensible).
+  # Spec: VC-JOSE §6.1 — embedded VP is application/vp+jwt or application/vp+sd-jwt.
+  CredentialEvidence:
     is_a: Evidence
-    description: Evidence that an email address was verified (e.g. via Altme EmailPass).
-    class_uri: harbour:EmailVerification
+    description: >
+      Evidence that an authorizing party approved the credential issuance
+      via OID4VP. The embedded VP carries the authorization proof:
+      (1) For LegalPersonCredential: the Trust Anchor presents a VP
+          containing its self-signed LegalPersonCredential, authorizing
+          the Signing Service to issue a credential for the organization.
+      (2) For NaturalPersonCredential: the organization presents a VP
+          containing its own LegalPersonCredential (SD-JWT with sensitive
+          fields redacted), authorizing the Signing Service to issue a
+          credential for the employee.
+      The Signing Service is the sole issuer of all credentials;
+      evidence VPs establish the chain of authorization.
+    class_uri: harbour:CredentialEvidence
     slots:
       - verifiablePresentation
     slot_usage:
       verifiablePresentation:
         required: true
 
-  IssuanceEvidence:
+  # Harbour-specific evidence type for delegated signing flows.
+  # Spec: OID4VP §5.1, §8.4 — transaction_data in authorization request.
+  # Spec: OID4VP §B.3.3 — KB-JWT carries transaction_data_hashes + _alg.
+  # Spec: CSC-DM v1.0.0 — signatureRequest triggers OID4VP flow.
+  # Spec: Harbour Delegation Spec §3 — challenge = "<nonce> HARBOUR_DELEGATE <hash>".
+  #   transaction_data contains type, credential_ids, nonce, iat, txn.
+  # Spec: OID4VP §B.1.3.2.5 — Data Integrity proof.challenge = OID4VP nonce;
+  #   proof.domain = OID4VP client_id. KB-JWT equivalent: nonce = nonce, aud = client_id.
+  DelegatedSignatureEvidence:
     is_a: Evidence
-    description: Evidence referencing a previously issued credential.
-    class_uri: harbour:IssuanceEvidence
+    description: >
+      Evidence on a receipt credential (SD-JWT-VC) that a signing service
+      executed a transaction with the user's explicit consent. The consent VP
+      uses SD-JWT with PII redacted. Transaction data is a disclosable claim
+      enabling three-layer privacy (public / authorized / full audit).
+    class_uri: harbour:DelegatedSignatureEvidence
     slots:
       - verifiablePresentation
+      - delegatedTo
+      - transaction_data
     slot_usage:
       verifiablePresentation:
         required: true
+      delegatedTo:
+        required: true
+      transaction_data:
+        required: true
 
+  # Spec: VCDM2 §4.10 — credentialStatus entries MUST have id and type.
+  #   CRSet is a Harbour-defined status type (not BitstringStatusListEntry).
+  #   SD-JWT-VC uses "status" with status_list sub-object (idx + uri).
   CRSetEntry:
     class_uri: harbour:CRSetEntry
     slots:
       - id
-      - type
       - statusPurpose
 
   # ==========================================
-  # 5. HELPERS
+  # 6. HELPERS
   # ==========================================
+  # Spec: DID-Core §5.3.1 — verificationMethod MUST have id, type, controller,
+  #   and key material (publicKeyJwk or publicKeyMultibase). Harbour models a
+  #   subset; blockchainAccountId is a Harbour extension for on-chain binding.
+  # Spec: VC-JOSE §4.2 — verification method type MUST be JsonWebKey; key
+  #   material MUST be in publicKeyJwk property.
   VerificationMethod:
     class_uri: https://www.w3.org/ns/did#VerificationMethod
     slots:
       - id
-      - type
       - controller
     attributes:
       blockchainAccountId:

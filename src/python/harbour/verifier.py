@@ -35,7 +35,7 @@ def verify_vc_jose(token: str, public_key: PublicKeyType) -> dict:
     Raises:
         VerificationError: If the signature is invalid or the token is malformed.
     """
-    return _verify_jose(token, public_key, expected_typ="vc+ld+jwt")
+    return _verify_jose(token, public_key, expected_typ="vc+jwt")
 
 
 def verify_vp_jose(
@@ -59,7 +59,7 @@ def verify_vp_jose(
     Raises:
         VerificationError: If the signature, nonce, or audience is invalid.
     """
-    payload = _verify_jose(token, public_key, expected_typ="vp+ld+jwt")
+    payload = _verify_jose(token, public_key, expected_typ="vp+jwt")
 
     if expected_nonce is not None:
         actual_nonce = payload.get("nonce")

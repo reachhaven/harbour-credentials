@@ -52,10 +52,15 @@ def create_kb_jwt(
     """
     alg = _resolve_alg(holder_private_key, None)
 
-    # Compute sd_hash (SHA-256 of the issuer-jwt part)
-    issuer_jwt = sd_jwt.split(SD_JWT_SEPARATOR)[0]
+    # Compute sd_hash per RFC 9901 §4.3.1 — hash over the entire SD-JWT
+    # string before the KB-JWT: <issuer-jwt>~<disc1>~...~<discN>~
+    sd_jwt_for_hash = (
+        sd_jwt if sd_jwt.endswith(SD_JWT_SEPARATOR) else sd_jwt + SD_JWT_SEPARATOR
+    )
     sd_hash = (
-        base64.urlsafe_b64encode(hashlib.sha256(issuer_jwt.encode("ascii")).digest())
+        base64.urlsafe_b64encode(
+            hashlib.sha256(sd_jwt_for_hash.encode("ascii")).digest()
+        )
         .rstrip(b"=")
         .decode()
     )
@@ -154,10 +159,11 @@ def verify_kb_jwt(
             f"got {payload.get('aud')!r}"
         )
 
-    # Verify sd_hash
-    issuer_jwt = parts[0]
+    # Verify sd_hash per RFC 9901 §4.3.1 — hash over everything before KB-JWT:
+    # <issuer-jwt>~<disc1>~...~<discN>~
+    sd_jwt_part = SD_JWT_SEPARATOR.join(parts[:-1]) + SD_JWT_SEPARATOR
     expected_sd_hash = (
-        base64.urlsafe_b64encode(hashlib.sha256(issuer_jwt.encode("ascii")).digest())
+        base64.urlsafe_b64encode(hashlib.sha256(sd_jwt_part.encode("ascii")).digest())
         .rstrip(b"=")
         .decode()
     )

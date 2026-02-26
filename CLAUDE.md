@@ -65,6 +65,8 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `verifier` / `verify` | `verifier.py` | `verify.ts` | JWT verification |
 | `sd_jwt` / `sd-jwt` | `sd_jwt.py` | `sd-jwt.ts` | SD-JWT-VC selective disclosure |
 | `kb_jwt` / `kb-jwt` | `kb_jwt.py` | `kb-jwt.ts` | Key Binding JWT |
+| `delegation` | `delegation.py` | `delegation.ts` | Delegated signing evidence (OID4VP) |
+| `sd_jwt_vp` / `sd-jwt-vp` | `sd_jwt_vp.py` | `sd-jwt-vp.ts` | SD-JWT VP issue/verify with evidence |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates |
 | `credentials/` | Python only | — | Credential processing pipeline |
 
@@ -107,6 +109,8 @@ from harbour.signer import sign_vc_jose
 from harbour.verifier import verify_vc_jose, VerificationError
 from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.kb_jwt import create_kb_jwt, verify_kb_jwt
+from harbour.delegation import TransactionData, create_delegation_challenge, verify_challenge
+from harbour.sd_jwt_vp import issue_sd_jwt_vp, verify_sd_jwt_vp
 from harbour.x509 import generate_self_signed_cert, validate_x5c_chain
 ```
 
@@ -118,6 +122,8 @@ import {
   signJwt, verifyJwt,
   issueSdJwt, verifySdJwt,
   createKbJwt, verifyKbJwt,
+  createDelegationChallenge, verifyChallenge, createTransactionData,
+  issueSdJwtVp, verifySdJwtVp,
 } from '@reachhaven/harbour-credentials';
 ```
 
@@ -166,7 +172,7 @@ When instructed to prepare a commit or PR, **do not commit directly**. Create th
 |-------|------|
 | Agent instructions | [AGENTS.md](AGENTS.md) |
 | Copilot instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
-| Documentation | [docs/README.md](docs/README.md) |
+| Architecture | [docs/architecture.md](docs/architecture.md) |
 | ADRs | [docs/decisions/](docs/decisions/) |
 
 ## Common Mistakes to Avoid
