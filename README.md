@@ -171,16 +171,6 @@ make validate-shacl
 make validate
 ```
 
-### Run Tests
-
-```bash
-# Run Python tests only
-make test
-
-# Run full pipeline (Python + SHACL conformance via validation_suite.py + TypeScript)
-make test-all
-```
-
 ## CLI Usage
 
 All Python modules have CLI entry points:
@@ -264,13 +254,17 @@ artifacts/                 # Generated per domain (make generate)
 # Python tests
 make test
 
-# TypeScript tests
-cd src/typescript/harbour && yarn test
+# TypeScript tests (requires make build-ts first)
+make build-ts
+make test-ts
 
-# Cross-runtime interop tests
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
+# Cross-runtime interop tests (requires make build-ts first)
+make test-interop
 
-# All tests with coverage
+# Full pipeline: Python + SHACL conformance + TypeScript (builds TS automatically)
+make test-all
+
+# Python tests with coverage
 make test-cov
 
 # Lint
