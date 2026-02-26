@@ -124,10 +124,10 @@ The composition pattern keeps harbour properties on the harbour-typed outer node
     "https://w3id.org/reachhaven/harbour/credentials/v1/"
   ],
   "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
-  "issuer": "did:web:trust-anchor.example.com",
+  "issuer": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSubject": {
-    "id": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
+    "id": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH",
     "gxParticipant": {
@@ -146,7 +146,7 @@ The composition pattern keeps harbour properties on the harbour-typed outer node
   },
   "credentialStatus": [
     {
-      "id": "did:web:issuer.example.com:revocation#abc123",
+      "id": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo:services:revocation-registry#abc123",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }

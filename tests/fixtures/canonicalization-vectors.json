@@ -6,7 +6,7 @@
       "input": {
         "type": "harbour_delegate:data.purchase",
         "credential_ids": [
-          "simpulse_id"
+          "harbour_natural_person"
         ],
         "transaction_data_hashes_alg": [
           "sha-256"
@@ -20,11 +20,11 @@
           "marketplace": "did:web:dataspace.envited.io"
         }
       },
-      "canonical_json": "{\"credential_ids\":[\"simpulse_id\"],\"iat\":1771934400,\"nonce\":\"da9b1009\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"asset_id\":\"urn:uuid:550e8400-e29b-41d4-a716-446655440000\",\"currency\":\"ENVITED\",\"marketplace\":\"did:web:dataspace.envited.io\",\"price\":\"100\"},\"type\":\"harbour_delegate:data.purchase\"}",
-      "sha256_hash": "c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f",
-      "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f",
-      "transaction_data_param": "eyJjcmVkZW50aWFsX2lkcyI6WyJzaW1wdWxzZV9pZCJdLCJpYXQiOjE3NzE5MzQ0MDAsIm5vbmNlIjoiZGE5YjEwMDkiLCJ0cmFuc2FjdGlvbl9kYXRhX2hhc2hlc19hbGciOlsic2hhLTI1NiJdLCJ0eG4iOnsiYXNzZXRfaWQiOiJ1cm46dXVpZDo1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJjdXJyZW5jeSI6IkVOVklURUQiLCJtYXJrZXRwbGFjZSI6ImRpZDp3ZWI6ZGF0YXNwYWNlLmVudml0ZWQuaW8iLCJwcmljZSI6IjEwMCJ9LCJ0eXBlIjoiaGFyYm91cl9kZWxlZ2F0ZTpkYXRhLnB1cmNoYXNlIn0",
-      "transaction_data_param_hash": "7W0LFUTpMvb6nJK7ngamNNY0zNvxqJ-2jNXTmLzhWQE"
+      "canonical_json": "{\"credential_ids\":[\"harbour_natural_person\"],\"iat\":1771934400,\"nonce\":\"da9b1009\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"asset_id\":\"urn:uuid:550e8400-e29b-41d4-a716-446655440000\",\"currency\":\"ENVITED\",\"marketplace\":\"did:web:dataspace.envited.io\",\"price\":\"100\"},\"type\":\"harbour_delegate:data.purchase\"}",
+      "sha256_hash": "cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
+      "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
+      "transaction_data_param": "eyJjcmVkZW50aWFsX2lkcyI6WyJoYXJib3VyX25hdHVyYWxfcGVyc29uIl0sImlhdCI6MTc3MTkzNDQwMCwibm9uY2UiOiJkYTliMTAwOSIsInRyYW5zYWN0aW9uX2RhdGFfaGFzaGVzX2FsZyI6WyJzaGEtMjU2Il0sInR4biI6eyJhc3NldF9pZCI6InVybjp1dWlkOjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCIsImN1cnJlbmN5IjoiRU5WSVRFRCIsIm1hcmtldHBsYWNlIjoiZGlkOndlYjpkYXRhc3BhY2UuZW52aXRlZC5pbyIsInByaWNlIjoiMTAwIn0sInR5cGUiOiJoYXJib3VyX2RlbGVnYXRlOmRhdGEucHVyY2hhc2UifQ",
+      "transaction_data_param_hash": "b3zwXdmQYj3kdUJLWeHIh_hXDrSucGSTXr4wvob5hqo"
     },
     {
       "name": "contract.sign \u2014 with optional exp and description",

@@ -127,7 +127,7 @@ describe("issueSdJwtVp", () => {
         type: "DelegatedSignatureEvidence",
         transaction_data: {
           type: "harbour_delegate:data.purchase",
-          credential_ids: ["simpulse_id"],
+          credential_ids: ["harbour_natural_person"],
           nonce: txNonce,
           iat: 1771934400,
           txn: { asset_id: "tx:abc123", price: "100" },

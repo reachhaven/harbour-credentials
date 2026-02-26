@@ -11,12 +11,12 @@ from harbour.sd_jwt import issue_sd_jwt_vc
 from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
-    "iss": "did:web:did.ascs.digital:participants:ascs",
-    "legalName": "Bayerische Motoren Werke AG",
-    "email": "imprint@bmw.com",
+    "iss": "did:web:issuer.example.com",
+    "legalName": "Example Corporation GmbH",
+    "email": "info@example.com",
 }
 
-VCT = "https://w3id.org/ascs-ev/simpulse-id/credentials/v1/ParticipantCredential"
+VCT = "https://w3id.org/reachhaven/harbour/credentials/v1/LegalPersonCredential"
 
 
 @pytest.fixture()

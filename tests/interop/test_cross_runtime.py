@@ -118,7 +118,7 @@ const jwk = {json.dumps(fixture)};
 const key = await importJWK(jwk, "ES256");
 const payload = new TextEncoder().encode(JSON.stringify({json.dumps(sample_vc)}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vc+ld+jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "vc+jwt" }});
 const token = await signer.sign(key);
 console.log(token);
 """
@@ -143,7 +143,7 @@ const jwk = {json.dumps(fixture)};
 const key = await importJWK(jwk, "ES256");
 const payload = new TextEncoder().encode(JSON.stringify({json.dumps(vp)}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vp+ld+jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "vp+jwt" }});
 const token = await signer.sign(key);
 console.log(token);
 """

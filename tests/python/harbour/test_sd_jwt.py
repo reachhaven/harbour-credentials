@@ -10,16 +10,16 @@ from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
-    "iss": "did:web:did.ascs.digital:participants:ascs",
+    "iss": "did:web:issuer.example.com",
     "iat": 1723972522,
     "exp": 1913990400,
-    "legalName": "Bayerische Motoren Werke AG",
-    "legalForm": "AG",
+    "legalName": "Example Corporation GmbH",
+    "legalForm": "GmbH",
     "countryCode": "DE",
-    "email": "imprint@bmw.com",
+    "email": "info@example.com",
 }
 
-VCT = "https://w3id.org/ascs-ev/simpulse-id/credentials/v1/ParticipantCredential"
+VCT = "https://w3id.org/reachhaven/harbour/credentials/v1/LegalPersonCredential"
 
 
 class TestSDJWTVCIssuance:
@@ -67,8 +67,8 @@ class TestSDJWTVCVerification:
     def test_verify_all_disclosed(self, p256_private_key, p256_public_key):
         sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
-        assert result["legalName"] == "Bayerische Motoren Werke AG"
-        assert result["iss"] == "did:web:did.ascs.digital:participants:ascs"
+        assert result["legalName"] == "Example Corporation GmbH"
+        assert result["iss"] == "did:web:issuer.example.com"
 
     def test_verify_with_selective_disclosure(self, p256_private_key, p256_public_key):
         sd_jwt = issue_sd_jwt_vc(
@@ -79,10 +79,10 @@ class TestSDJWTVCVerification:
         )
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
         # Both disclosable claims should be disclosed (all disclosures present)
-        assert result["email"] == "imprint@bmw.com"
+        assert result["email"] == "info@example.com"
         assert result["countryCode"] == "DE"
         # Non-disclosable claims are always present
-        assert result["legalName"] == "Bayerische Motoren Werke AG"
+        assert result["legalName"] == "Example Corporation GmbH"
 
     def test_verify_partial_disclosure(self, p256_private_key, p256_public_key):
         """Remove one disclosure to simulate holder hiding a claim."""
@@ -135,7 +135,7 @@ class TestSDJWTVCEd25519:
         sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, ed25519_private_key, vct=VCT)
         result = verify_sd_jwt_vc(sd_jwt, ed25519_public_key)
         assert result["vct"] == VCT
-        assert result["legalName"] == "Bayerische Motoren Werke AG"
+        assert result["legalName"] == "Example Corporation GmbH"
 
     def test_selective_disclosure_ed25519(
         self, ed25519_private_key, ed25519_public_key
@@ -147,7 +147,7 @@ class TestSDJWTVCEd25519:
             disclosable=["email", "countryCode"],
         )
         result = verify_sd_jwt_vc(sd_jwt, ed25519_public_key)
-        assert result["email"] == "imprint@bmw.com"
+        assert result["email"] == "info@example.com"
         assert result["countryCode"] == "DE"
 
     def test_wrong_key_type_fails(self, ed25519_private_key, p256_public_key):

@@ -48,13 +48,10 @@ Where:
 ### 2.2 Example
 
 ```
-da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f
+da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
 ```
 
-This format is inspired by [simpulse-id-credentials](https://github.com/ASCS-eV/simpulse-id-credentials) which uses:
-```
-<nonce> ISSUE_PAYLOAD <hash>
-```
+This format uses a compact, single-line structure designed for QR code presentation while maintaining full auditability via the hash binding.
 
 ### 2.3 ABNF Grammar (RFC 5234)
 
@@ -148,12 +145,12 @@ Important: `txn` keys are part of canonicalization and hashing. Renaming a key (
 ```json
 {
   "type": "harbour_delegate:data.purchase",
-  "credential_ids": ["simpulse_id"],
+  "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
   "iat": 1771934400,
   "exp": 1771935300,
-  "description": "Purchase sensor data package from BMW",
+  "description": "Purchase sensor data package",
   "txn": {
     "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
@@ -180,14 +177,14 @@ def compute_transaction_hash(transaction_data: dict) -> str:
 
 The resulting challenge:
 ```
-da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f
+da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
 ```
 
 ---
 
 ## 4. VP Evidence Structure (W3C VC 2.0 Compliant)
 
-The delegated consent is captured as `evidence` in a Verifiable Credential or directly as the VP. This follows the pattern from [simpulse-id-credentials](https://github.com/ASCS-eV/simpulse-id-credentials/pull/24).
+The delegated consent is captured as `evidence` in a Verifiable Credential or directly as the VP.
 
 ### 4.1 Evidence with Embedded VP
 
@@ -195,17 +192,17 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
 {
   "@context": ["https://www.w3.org/ns/credentials/v2"],
   "type": ["VerifiableCredential"],
-  "issuer": "did:web:harbour.signing-service.example.com",
+  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "validFrom": "2026-02-24T12:00:00Z",
   "credentialSubject": {
-    "id": "did:web:user.example.com"
+    "id": "did:webs:users.example.com:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP"
   },
   "evidence": [{
     "type": ["CredentialEvidence"],
     "verifiablePresentation": {
       "@context": ["https://www.w3.org/ns/credentials/v2"],
       "type": ["VerifiablePresentation"],
-      "holder": "did:web:user.example.com",
+      "holder": "did:webs:users.example.com:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
       "verifiableCredential": [
         "<SD-JWT-VC with PII redacted>"
       ],
@@ -213,9 +210,9 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
         "type": "DataIntegrityProof",
         "cryptosuite": "ecdsa-rdfc-2019",
         "proofPurpose": "authentication",
-        "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f",
-        "domain": "did:web:harbour.signing-service.example.com",
-        "verificationMethod": "did:web:user.example.com#key-1",
+        "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
+        "domain": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+        "verificationMethod": "did:webs:users.example.com:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP#key-1",
         "created": "2026-02-24T12:00:05Z",
         "proofValue": "z5vgFc..."
       }
@@ -282,7 +279,7 @@ This specification is designed for seamless integration with [OpenID for Verifia
 ```json
 {
   "type": "harbour_delegate:data.purchase",
-  "credential_ids": ["simpulse_id"],
+  "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
   "iat": 1771934400,
@@ -302,7 +299,7 @@ Per OID4VP Appendix B.3.3, the KB-JWT includes:
 ```json
 {
   "nonce": "n-0S6_WzA2Mj",
-  "aud": "did:web:harbour.signing-service.example.com",
+  "aud": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "iat": 1709838604,
   "sd_hash": "Dy-RYwZfaaoC3inJbLslgPvMp09bH-clYP_3qbRqtW4",
   "transaction_data_hashes": ["7W0LFUTpMvb6nJK7ngamNNY0zNvxqJ-2jNXTmLzhWQE"],
@@ -381,7 +378,7 @@ tx = TransactionData.create(
         "currency": "ENVITED",
         "marketplace": "did:web:dataspace.envited.io",
     },
-    credential_ids=["simpulse_id"],
+    credential_ids=["harbour_natural_person"],
 )
 
 # Create challenge: "<nonce> HARBOUR_DELEGATE <sha256-hash>"
@@ -410,7 +407,7 @@ const tx = createTransactionData({
     currency: 'ENVITED',
     marketplace: 'did:web:dataspace.envited.io',
   },
-  credentialIds: ['simpulse_id'],
+  credentialIds: ['harbour_natural_person'],
 });
 
 // Create challenge: "<nonce> HARBOUR_DELEGATE <sha256-hash>"
@@ -428,19 +425,19 @@ Following the design philosophy of [SIWE (EIP-4361)](https://eips.ethereum.org/E
 ### 9.1 Display Format
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║  Harbour Signing Service requests your authorization         ║
-╠══════════════════════════════════════════════════════════════╣
-║                                                              ║
-║  Action:      Purchase data asset                            ║
-║  Asset:       urn:uuid:550e8400-e29b-41d4-a716-44665544...  ║
-║  Amount:      100 ENVITED                                    ║
-║                                                              ║
-╠══════════════════════════════════════════════════════════════╣
-║  Service:     did:web:harbour.signing-service.example.com    ║
-║  Nonce:       da9b1009                                       ║
-║  Time:        2026-02-24 12:00:00 UTC                        ║
-╚══════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════╗
+║  Harbour Signing Service requests your authorization                  ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║                                                                       ║
+║  Action:      Purchase data asset                                     ║
+║  Asset:       urn:uuid:550e8400-e29b-41d4-a716-44665544...           ║
+║  Amount:      100 ENVITED                                             ║
+║                                                                       ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║  Service:     did:webs:harbour.reachhaven.com:Er9_mnFst...            ║
+║  Nonce:       da9b1009                                                ║
+║  Time:        2026-02-24 12:00:00 UTC                                 ║
+╚═══════════════════════════════════════════════════════════════════════╝
 ```
 
 ### 9.2 Display Requirements
@@ -504,7 +501,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
 ```json
 {
   "type": "harbour_delegate:data.purchase",
-  "credential_ids": ["simpulse_id"],
+  "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
   "iat": 1771934400,
@@ -519,7 +516,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
 
 **Challenge:**
 ```
-da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f
+da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
 ```
 
 ### 10.2 Blockchain Transfer Transaction
@@ -560,7 +557,7 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
   "description": "Sign partnership agreement",
   "txn": {
     "document_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "parties": ["did:web:alice.example", "did:web:bob.example"]
+    "parties": ["did:webs:alice.example:EAbc123", "did:webs:bob.example:EDef456"]
   }
 }
 ```
@@ -609,11 +606,11 @@ OID4VP authorization request:
 ```json
 {
   "response_type": "vp_token",
-  "client_id": "did:web:signing-service.envited.io",
+  "client_id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "nonce": "da9b1009",
   "transaction_data": [{
     "type": "harbour_delegate:data.purchase",
-    "credential_ids": ["simpulse_id"],
+    "credential_ids": ["harbour_natural_person"],
     "transaction_data_hashes_alg": ["sha-256"],
     "nonce": "da9b1009",
     "iat": 1771934400,

@@ -296,16 +296,17 @@ def issue_sd_jwt_vp(
     vp_jwt = jws.serialize_compact(vp_header, vp_payload_bytes, key, algorithms=[alg])
 
     # Create KB-JWT for holder binding
+    # RFC 9901 §4.3.1 — sd_hash over <issuer-jwt>~<disc1>~...~<discN>~
+    sd_material = (
+        issuer_jwt
+        + SD_JWT_SEPARATOR
+        + SD_JWT_SEPARATOR.join(selected_disclosures)
+        + SD_JWT_SEPARATOR
+    )
     kb_payload = {
         "iat": int(time.time()),
         "sd_hash": base64.urlsafe_b64encode(
-            hashlib.sha256(
-                (
-                    issuer_jwt
-                    + SD_JWT_SEPARATOR
-                    + SD_JWT_SEPARATOR.join(selected_disclosures)
-                ).encode("ascii")
-            ).digest()
+            hashlib.sha256(sd_material.encode("ascii")).digest()
         )
         .rstrip(b"=")
         .decode(),
@@ -429,7 +430,13 @@ def verify_sd_jwt_vp(
         raise VerificationError("VC hash mismatch: VP does not bind to presented VC")
 
     # 5. Verify SD hash in KB-JWT
-    sd_material = issuer_jwt + SD_JWT_SEPARATOR + SD_JWT_SEPARATOR.join(disclosures)
+    # RFC 9901 §4.3.1 — sd_hash over <issuer-jwt>~<disc1>~...~<discN>~
+    sd_material = (
+        issuer_jwt
+        + SD_JWT_SEPARATOR
+        + SD_JWT_SEPARATOR.join(disclosures)
+        + SD_JWT_SEPARATOR
+    )
     expected_sd_hash = (
         base64.urlsafe_b64encode(hashlib.sha256(sd_material.encode("ascii")).digest())
         .rstrip(b"=")

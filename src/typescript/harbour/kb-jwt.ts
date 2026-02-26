@@ -42,10 +42,13 @@ export async function createKbJwt(
 ): Promise<string> {
   const { nonce, audience, transaction_data } = options;
 
-  // Compute sd_hash (SHA-256 of the issuer-jwt part)
-  const issuerJwt = sdJwt.split(SD_JWT_SEPARATOR)[0];
-  const issuerJwtBytes = new TextEncoder().encode(issuerJwt);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", issuerJwtBytes);
+  // Compute sd_hash per RFC 9901 §4.3.1 — hash over the entire SD-JWT
+  // string before the KB-JWT: <issuer-jwt>~<disc1>~...~<discN>~
+  const sdJwtForHash = sdJwt.endsWith(SD_JWT_SEPARATOR)
+    ? sdJwt
+    : sdJwt + SD_JWT_SEPARATOR;
+  const sdJwtBytes = new TextEncoder().encode(sdJwtForHash);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", sdJwtBytes);
   const sdHash = base64urlEncode(new Uint8Array(hashBuffer));
 
   // Build KB-JWT payload
@@ -155,10 +158,15 @@ export async function verifyKbJwt(
     );
   }
 
-  // Verify sd_hash
-  const issuerJwt = parts[0];
-  const issuerJwtBytes = new TextEncoder().encode(issuerJwt);
-  const expectedHashBuffer = await crypto.subtle.digest("SHA-256", issuerJwtBytes);
+  // Verify sd_hash per RFC 9901 §4.3.1 — hash over everything before KB-JWT:
+  // <issuer-jwt>~<disc1>~...~<discN>~
+  const sdJwtPart =
+    parts.slice(0, -1).join(SD_JWT_SEPARATOR) + SD_JWT_SEPARATOR;
+  const sdJwtPartBytes = new TextEncoder().encode(sdJwtPart);
+  const expectedHashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    sdJwtPartBytes
+  );
   const expectedSdHash = base64urlEncode(new Uint8Array(expectedHashBuffer));
 
   if (payload.sd_hash !== expectedSdHash) {

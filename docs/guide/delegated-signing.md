@@ -62,29 +62,30 @@ The user needs a Harbour credential (e.g., `NaturalPersonCredential`) issued as 
 ```json
 {
   "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-  "issuer": "did:web:issuer.example.com",
+  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "credentialSubject": {
-    "id": "did:web:carlo.simpulse.io",
+    "id": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
     "type": "harbour:NaturalPerson",
-    "name": "Carlo Rossi",          // ← Disclosable (PII)
-    "email": "carlo@bmw.de",        // ← Disclosable (PII)
-    "memberOf": "did:web:bmw.gaiax.de"
+    "name": "Alice Smith",                // ← Disclosable (PII)
+    "email": "alice.smith@example.com",   // ← Disclosable (PII)
+    "memberOf": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-...:ENro7uf0eP..."
   }
 }
 ```
 
 ### 2. DID Document
 
-The user's DID document (`did:web:carlo.simpulse.io`) must contain a verification method with their P-256 public key:
+The user's `did:webs` DID document must contain a verification method with their P-256 public key (the same key as in their `did:jwk` wallet):
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/did/v1"],
-  "id": "did:web:carlo.simpulse.io",
+  "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/jwk/v1"],
+  "id": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
+  "controller": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
   "verificationMethod": [{
-    "id": "did:web:carlo.simpulse.io#key-1",
+    "id": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...#key-1",
     "type": "JsonWebKey2020",
-    "controller": "did:web:carlo.simpulse.io",
+    "controller": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
     "publicKeyJwk": {
       "kty": "EC",
       "crv": "P-256",
@@ -92,9 +93,12 @@ The user's DID document (`did:web:carlo.simpulse.io`) must contain a verificatio
       "y": "..."
     }
   }],
-  "authentication": ["did:web:carlo.simpulse.io#key-1"]
+  "authentication": ["#key-1"],
+  "assertionMethod": ["#key-1"]
 }
 ```
+
+See [`examples/did-webs/`](../../examples/did-webs/) for complete DID documents.
 
 ### Repository Boundary (did:web / did:webs)
 
@@ -104,8 +108,7 @@ This repository verifies signatures and hash bindings, but it does **not** host 
 - Integrators must run DID resolution and pass the resolved holder key into `verify_sd_jwt_vp(...)`.
 - Repository examples now use `did:webs` identifiers for person subjects. See `examples/did-webs/` for static example DID documents used by `examples/*.json`.
 - Naming policy in examples:
-  - Natural persons use UUID-based path segments (no real names in DID path).
-  - Legal persons may use organization suffixes (for example `bmw_ag`).
+  - All identifiers use UUID-based path segments (no real names or organization names in DID paths).
 
 Current integration hooks and TODOs:
 
@@ -120,7 +123,7 @@ The signing service creates an OID4VP-aligned transaction data object (see [Dele
 ```json
 {
   "type": "harbour_delegate:data.purchase",
-  "credential_ids": ["simpulse_id"],
+  "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
   "iat": 1771934400,
@@ -159,7 +162,7 @@ evidence = [{
     "type": "DelegatedSignatureEvidence",
     "transaction_data": {
         "type": "harbour_delegate:data.purchase",
-        "credential_ids": ["simpulse_id"],
+        "credential_ids": ["harbour_natural_person"],
         "nonce": "da9b1009",
         "iat": 1771934400,
         "txn": {
@@ -168,7 +171,7 @@ evidence = [{
             "currency": "ENVITED"
         }
     },
-    "delegatedTo": "did:web:signing-service.envited.io"
+    "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
 }]
 
 # Create VP with selective disclosure (redact PII)
@@ -178,7 +181,7 @@ sd_jwt_vp = issue_sd_jwt_vp(
     disclosures=["memberOf"],  # Only disclose non-PII claims
     evidence=evidence,
     nonce="da9b1009",
-    audience="did:web:signing-service.envited.io"
+    audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
 )
 ```
 
@@ -193,7 +196,7 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
     type: 'DelegatedSignatureEvidence',
     transaction_data: {
       type: 'harbour_delegate:data.purchase',
-      credential_ids: ['simpulse_id'],
+      credential_ids: ['harbour_natural_person'],
       nonce: 'da9b1009',
       iat: 1771934400,
       txn: {
@@ -202,10 +205,10 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
         currency: 'ENVITED'
       }
     },
-    delegatedTo: 'did:web:signing-service.envited.io'
+    delegatedTo: 'did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ'
   }],
   nonce: 'da9b1009',
-  audience: 'did:web:signing-service.envited.io'
+  audience: 'did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ'
 });
 ```
 
@@ -223,7 +226,7 @@ result = verify_sd_jwt_vp(
     issuer_public_key,      # From credential issuer's DID
     holder_public_key,      # From user's DID document
     expected_nonce="da9b1009",
-    expected_audience="did:web:signing-service.envited.io"
+    expected_audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
 )
 
 # Check transaction data matches original request
@@ -244,11 +247,11 @@ After executing the transaction, the signing service issues a **receipt credenti
 ```json
 {
   "type": ["VerifiableCredential", "harbour:DelegatedSigningReceipt"],
-  "issuer": "did:web:signing-service.envited.io",
+  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "evidence": [{
     "type": "harbour:DelegatedSignatureEvidence",
     "verifiablePresentation": "<consent VP with PII redacted>",
-    "delegatedTo": "did:web:signing-service.envited.io",
+    "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
     "transaction_data": { "..." }
   }],
   "credentialStatus": [{
@@ -292,7 +295,7 @@ The `audience` field ensures the VP was created for a specific verifier:
 verify_sd_jwt_vp(
     vp,
     ...,
-    expected_audience="did:web:signing-service.envited.io"
+    expected_audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
 )
 ```
 
@@ -313,8 +316,8 @@ if is_revoked:
 Verify the VP signature matches the public key in the user's DID document:
 
 ```python
-# Resolve DID document
-did_doc = resolve_did("did:web:carlo.simpulse.io")
+# Resolve DID document (integrator-provided resolver)
+did_doc = resolve_did("did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...")
 
 # Extract public key
 public_key = did_doc["verificationMethod"][0]["publicKeyJwk"]

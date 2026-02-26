@@ -15,33 +15,13 @@ Evidence creates an **audit trail** — allowing third parties to verify not jus
 
 ### CredentialEvidence
 
-Proves that the issuer verified claims using a prior credential or verifiable presentation. The embedded VP contains the credentials the issuer relied upon (e.g., email verification, notary attestation).
+Proves that an authorizing party approved the credential issuance via OID4VP. The embedded VP carries the authorization proof — a Verifiable Presentation containing the authorizer's credential.
 
-**Use case (email verification)**: A `NaturalPersonCredential` includes evidence that the user's email was verified via an email verification service (e.g., Altme EmailPass).
-The EmailPass proof is modeled as a VC issued by a `did:webs` issuer DID.
+The Harbour Signing Service is the **sole issuer** of all credentials. Evidence VPs establish the chain of authorization:
 
-```json
-{
-  "type": "harbour:CredentialEvidence",
-  "verifiablePresentation": {
-    "@context": ["https://www.w3.org/ns/credentials/v2"],
-    "type": ["VerifiablePresentation"],
-    "holder": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
-    "verifiableCredential": [
-      {
-        "type": ["VerifiableCredential"],
-        "issuer": "did:webs:issuers.altme.example:legal-persons:altme_sas:EMtR9m3wZ5xV2k8sP4jQ7nH1cD6bL0fYgAaUu2hCqK9M",
-        "credentialSubject": {
-          "type": "EmailPass",
-          "email": "alice@example.com"
-        }
-      }
-    ]
-  }
-}
-```
+**Use case 1 — Trust Anchor authorizes org (LegalPersonCredential)**: The Trust Anchor presents a VP containing its **self-signed LegalPersonCredential** (root of trust, analogous to a root CA certificate). The Signing Service verifies this VP and issues the org's credential with it as evidence.
 
-**Use case (notary attestation)**: A `LegalPersonCredential` includes evidence of a prior credential from a notary attesting to the organization's registration.
+**Use case 2 — Org authorizes employee (NaturalPersonCredential)**: The organization presents a VP containing its **LegalPersonCredential** (SD-JWT with sensitive fields redacted — registration number and addresses hidden, name/legalName disclosed). The Signing Service verifies this VP and issues the employee's credential with it as evidence.
 
 ```json
 {
@@ -49,15 +29,16 @@ The EmailPass proof is modeled as a VC issued by a `did:webs` issuer DID.
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation"],
-    "holder": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
+    "holder": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
     "verifiableCredential": [
       {
-        "type": ["VerifiableCredential"],
-        "issuer": "did:web:notary.example.com",
+        "@context": ["https://www.w3.org/ns/credentials/v2", "..."],
+        "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
+        "issuer": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
         "credentialSubject": {
-          "type": "gx:LegalPerson",
-          "gx:legalName": "Example Corporation GmbH",
-          "gx:registrationNumber": "DE123456789"
+          "id": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
+          "type": "harbour:LegalPerson",
+          "name": "ReachHaven GmbH"
         }
       }
     ]
@@ -65,7 +46,7 @@ The EmailPass proof is modeled as a VC issued by a `did:webs` issuer DID.
 }
 ```
 
-**What it proves**: The issuer based the credential on a prior attestation from another trusted party.
+**What it proves**: The authorizing party (Trust Anchor or org) approved the Signing Service to issue a credential for the target subject. The chain of trust flows: Trust Anchor → org → employee.
 
 ### DelegatedSignatureEvidence
 
@@ -77,10 +58,10 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
 {
   "type": "harbour:DelegatedSignatureEvidence",
   "verifiablePresentation": "<SD-JWT VP with redacted PII>",
-  "delegatedTo": "did:web:signing-service.envited.io",
+  "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "transaction_data": {
     "type": "harbour_delegate:data.purchase",
-    "credential_ids": ["simpulse_id"],
+    "credential_ids": ["harbour_natural_person"],
     "transaction_data_hashes_alg": ["sha-256"],
     "nonce": "da9b1009",
     "iat": 1771934400,
@@ -91,7 +72,7 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
       "marketplace": "did:web:dataspace.envited.io"
     }
   },
-  "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f"
+  "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52"
 }
 ```
 
@@ -113,7 +94,7 @@ The receipt credential is an **SD-JWT-VC**. Transaction data and identity detail
 
 | Evidence Type | Use When | Example Scenario |
 |--------------|----------|------------------|
-| `CredentialEvidence` | Issuing credential based on prior attestation | Email verification, notary credential, identity proofing |
+| `CredentialEvidence` | Issuing credential after authorization from a trusted party | Trust Anchor authorizes org issuance; org authorizes employee issuance |
 | `DelegatedSignatureEvidence` | Issuing receipt after delegated action | Blockchain purchase, contract signing, access delegation |
 
 ## Evidence Structure
@@ -172,12 +153,12 @@ When issuing a credential with evidence:
 credential = {
     "@context": [...],
     "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-    "issuer": "did:web:issuer.example.com",
+    "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
     "credentialSubject": {...},
     "evidence": [
         {
             "type": "harbour:CredentialEvidence",
-            "verifiablePresentation": email_verification_vp_jwt
+            "verifiablePresentation": authorization_vp_jwt
         }
     ]
 }

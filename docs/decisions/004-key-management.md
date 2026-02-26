@@ -38,7 +38,7 @@ The original choice of Ed25519 must be revised based on regulatory requirements:
 | Key size | 64 bytes public | 32 bytes public |
 | X.509 support | Universal | Limited |
 | did:key prefix | `zDn...` | `z6Mk...` |
-| Role in harbour | **Default** | Testing/legacy |
+| Role in harbour | **Default** | Testing |
 
 ### Key Format: JWK (RFC 7517)
 
@@ -52,7 +52,7 @@ The original choice of Ed25519 must be revised based on regulatory requirements:
 }
 ```
 
-**Ed25519 key (legacy):**
+**Ed25519 key:**
 ```json
 {
   "kty": "OKP",
@@ -61,14 +61,14 @@ The original choice of Ed25519 must be revised based on regulatory requirements:
 }
 ```
 
-### Key Resolution: X.509 (EUDI) + DID (Gaia-X)
+### Key Resolution: X.509 (EUDI) + DID (Gaia-X / Harbour)
 
 Three mechanisms, serving different ecosystems:
 
 | Method | Ecosystem | JOSE Header | Example |
 |--------|-----------|-------------|---------|
 | **X.509 chain** | EUDI | `x5c` | Certificate chain in JWT header |
-| **did:web** | Gaia-X | `kid` | `did:web:did.ascs.digital:participants:bmw#key-1` |
+| **did:webs** | Gaia-X | `kid` | `did:webs:participants.harbour.reachhaven.com:legal-persons:<uuid>:<AID>#key-1` |
 | **did:key** | Testing | `kid` | `did:key:zDn...#zDn...` |
 
 **X.509 (EUDI mandatory):**
@@ -77,10 +77,10 @@ Three mechanisms, serving different ecosystems:
 - Trust anchor certificate excluded from chain
 - No self-signed end-entity certificates
 
-**did:web (Gaia-X):**
-- Resolves to DID Document at well-known URL
+**did:webs (Gaia-X):**
+- Resolves to DID Document at well-known URL with KERI key history
 - DID Document contains JWK public key(s)
-- Used for organizational identities (ASCS, BMW, etc.)
+- Used for all Harbour identities (infrastructure, organizations, users)
 - Gaia-X GXDCH uses X.509 certificates as trust anchors for DIDs
 
 **did:key (testing):**

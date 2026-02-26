@@ -89,12 +89,12 @@ class TestTransactionData:
             txn={"asset_id": "test"},
             exp=1771935300,
             description="Test purchase",
-            credential_ids=["simpulse_id"],
+            credential_ids=["harbour_natural_person"],
         )
 
         assert tx.exp == 1771935300
         assert tx.description == "Test purchase"
-        assert tx.credential_ids == ["simpulse_id"]
+        assert tx.credential_ids == ["harbour_natural_person"]
 
     def test_action_property(self):
         """Test action extraction from type field."""
@@ -129,7 +129,7 @@ class TestTransactionData:
         """Test TransactionData.to_dict() includes optional fields when set."""
         tx = TransactionData(
             type="harbour_delegate:data.purchase",
-            credential_ids=["simpulse_id"],
+            credential_ids=["harbour_natural_person"],
             nonce="da9b1009",
             iat=1771934400,
             txn={"asset_id": "test"},
@@ -903,7 +903,7 @@ class TestIntegration:
                 "currency": "ENVITED",
             },
             description="Purchase sensor data",
-            credential_ids=["simpulse_id"],
+            credential_ids=["harbour_natural_person"],
         )
 
         # 2. Create challenge

@@ -34,7 +34,7 @@ W3C spec for embedding cryptographic proofs inside credential JSON.
 
 W3C spec for wrapping VC Data Model 2.0 credentials in JWT/JWS or COSE.
 
-- **Format:** Standard JWT with `typ: vc+ld+jwt`, payload is the full VC JSON-LD
+- **Format:** Standard JWT with `typ: vc+jwt`, payload is the full VC JSON-LD
 - **Data model:** W3C VC Data Model 2.0 (`@context`, `type` array, `credentialSubject`)
 - **Selective disclosure:** Supported via SD-JWT extension within VC-JOSE-COSE
 - **Libraries:** Any JOSE library (npm `jose`, Python `joserfc`)
@@ -101,7 +101,7 @@ HAIP requires:
 
 > "The public key used to validate the signature MUST be included in the x5c JOSE header parameter"
 
-Gaia-X uses DIDs (primarily `did:web`) plus X.509 via GXDCH. We need to support **both** `x5c` (for EUDI) and DID resolution (for Gaia-X).
+Gaia-X uses DIDs (primarily `did:web`/`did:webs`) plus X.509 via GXDCH. We need to support **both** `x5c` (for EUDI) and DID resolution (for Gaia-X). Harbour uses `did:webs` for all identities.
 
 ### 3. SD-JWT-VC ≠ W3C VC Data Model
 
@@ -137,7 +137,7 @@ Support **two complementary formats**, serving different purposes:
 |--------|--------|
 | Format | SD-JWT-VC (compact serialization) |
 | Algorithm | **ES256** (ECDSA P-256) — HAIP mandatory minimum |
-| Key resolution | X.509 via `x5c` header (EUDI) + `did:web` (Gaia-X) |
+| Key resolution | X.509 via `x5c` header (EUDI) + `did:webs` (Gaia-X) |
 | Selective disclosure | Native SD-JWT |
 | Holder binding | `cnf` claim with proof-of-possession |
 | Status | `status_list` (Token Status List) |
@@ -151,9 +151,9 @@ Support **two complementary formats**, serving different purposes:
 |--------|--------|
 | Format | Compact JWS (`header.payload.signature`) |
 | Algorithm | **ES256** (consistent with SD-JWT-VC) |
-| JWT header | `{"alg": "ES256", "typ": "vc+ld+jwt"}` |
+| JWT header | `{"alg": "ES256", "typ": "vc+jwt"}` |
 | Payload | Full W3C VCDM 2.0 JSON-LD |
-| Key resolution | `did:web` (Gaia-X) + `x5c` (EUDI alignment) |
+| Key resolution | `did:webs` (Gaia-X) + `x5c` (EUDI alignment) |
 | JS library | npm `jose` |
 | Python library | `joserfc` |
 
@@ -163,10 +163,10 @@ Support **two complementary formats**, serving different purposes:
 |--------|---------|--------|
 | Algorithm | Ed25519 (EdDSA) | **P-256 (ES256)** |
 | Key format | JWK OKP/Ed25519 | **JWK EC/P-256** |
-| DID method | `did:key:z6Mk...` | `did:key:zDn...` (P-256) + `did:web` |
+| DID method | `did:key:z6Mk...` | `did:key:zDn...` (P-256) + `did:webs` |
 | Certificates | None | X.509 chains via `x5c` |
 
-Ed25519 keys SHOULD still be supported for backwards compatibility and testing, but **ES256 MUST be the default** for EUDI compliance.
+Ed25519 is also supported for testing, but **ES256 MUST be the default** for EUDI compliance.
 
 ## Relationship Between Formats
 
@@ -200,7 +200,7 @@ A credential can exist in multiple formats simultaneously. The mapping from SHAC
 
 ### Positive
 - EUDI wallet compatible (SD-JWT-VC + ES256 + x5c)
-- Gaia-X compatible (VC-JWT + did:web)
+- Gaia-X compatible (VC-JWT + did:webs)
 - Selective disclosure for privacy-sensitive fields
 - Both Python and JS implementations exist for SD-JWT-VC
 - Future-proof (SD-JWT-VC is the regulatory direction)

@@ -5,10 +5,10 @@
   ],
   "type": ["VerifiableCredential"],
   "id": "urn:uuid:576fbefb-35e8-4b71-bb1a-53d1803c86de",
-  "issuer": "did:web:trust.harbour.example.com",
+  "issuer": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
   "validFrom": "2025-08-06T10:15:22Z",
   "credentialSubject": {
-    "id": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
+    "id": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH"
   }

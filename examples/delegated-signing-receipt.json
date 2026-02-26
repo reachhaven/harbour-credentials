@@ -8,17 +8,17 @@
     "harbour:DelegatedSigningReceipt"
   ],
   "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
-  "issuer": "did:web:signing-service.envited.io",
+  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
   "validFrom": "2025-06-25T10:00:00Z",
   "credentialSubject": {
     "id": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
     "type": "harbour:TransactionReceipt",
-    "transactionHash": "c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f",
+    "transactionHash": "cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
     "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   },
   "credentialStatus": [
     {
-      "id": "did:web:signing-service.envited.io:services:revocation-registry#f7e8d9c0b1a23456",
+      "id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ:services:revocation-registry#f7e8d9c0b1a23456",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }
@@ -33,7 +33,7 @@
         "type": [
           "VerifiablePresentation"
         ],
-        "holder": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
+        "holder": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6IjZka1U2Wk1GSzc5V3dpY3dKNXJieEUxM3pTdWtCWTJPb0VpVlVFanFNRWMiLCJ5IjoiUm5Iem55VmxyUFNNVDdpckRzMTVEOXd4Z01vamlTREFRcGZGaHFUa0xSWSJ9",
         "verifiableCredential": [
           {
             "@context": [
@@ -44,20 +44,20 @@
               "VerifiableCredential",
               "harbour:NaturalPersonCredential"
             ],
-            "issuer": "did:web:issuer.example.com",
+            "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
             "credentialSubject": {
               "id": "did:webs:users.altme.example:natural-persons:550e8400-e29b-41d4-a716-446655440000:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
               "type": "harbour:NaturalPerson",
-              "memberOf": "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
+              "memberOf": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
             }
           }
         ]
       },
-      "delegatedTo": "did:web:signing-service.envited.io",
+      "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
       "transaction_data": {
         "type": "harbour_delegate:data.purchase",
         "credential_ids": [
-          "simpulse_id"
+          "harbour_natural_person"
         ],
         "transaction_data_hashes_alg": [
           "sha-256"
@@ -71,7 +71,7 @@
           "marketplace": "did:web:dataspace.envited.io"
         }
       },
-      "challenge": "da9b1009 HARBOUR_DELEGATE c0a4f646410379520b80256ca8a9f738d7ce59c9511d24649a452d6e23ea590f"
+      "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52"
     }
   ]
 }

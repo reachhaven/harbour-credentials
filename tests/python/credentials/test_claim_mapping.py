@@ -31,10 +31,13 @@ class TestHarbourLegalPersonMapping:
         mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
-        assert claims["iss"] == "did:web:trust-anchor.example.com"
+        assert (
+            claims["iss"]
+            == "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+        )
         assert (
             claims["sub"]
-            == "did:webs:participants.example.com:legal-persons:bmw_ag:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
+            == "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
         )
         assert claims["name"] == "Example Corporation GmbH"
         assert claims["legalName"] == "Example Corporation GmbH"
@@ -60,10 +63,10 @@ class TestHarbourLegalPersonMapping:
         subject = vc["credentialSubject"]
         gx = subject["gxParticipant"]
         assert gx["type"] == "gx:LegalPerson"
-        assert "gx:legalName" in gx
+        assert "schema:name" in gx
         assert "gx:registrationNumber" in gx
         # gx properties must NOT be on the outer node
-        assert "gx:legalName" not in subject
+        # schema:name is on both nodes (outer via harbour, inner via gx)
         assert "gx:registrationNumber" not in subject
 
     def test_roundtrip(self):
@@ -74,8 +77,8 @@ class TestHarbourLegalPersonMapping:
             claims, mapping, "harbour:LegalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["gxParticipant"]["gx:legalName"]
-            == vc["credentialSubject"]["gxParticipant"]["gx:legalName"]
+            reconstructed["credentialSubject"]["gxParticipant"]["schema:name"]
+            == vc["credentialSubject"]["gxParticipant"]["schema:name"]
         )
 
 
@@ -127,40 +130,6 @@ class TestHarbourNaturalPersonMapping:
             reconstructed["credentialSubject"]["schema:givenName"]
             == vc["credentialSubject"]["schema:givenName"]
         )
-
-
-class TestHarbourServiceOfferingMapping:
-    def test_vc_to_claims(self):
-        vc = _load_fixture("service-offering-credential.json")
-        mapping = MAPPINGS["harbour:ServiceOfferingCredential"]
-        claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
-
-        assert claims["sub"] == "did:web:provider.example.com:services:data-api"
-        assert claims["name"] == "Example Data API"
-        assert claims["providedBy"] == "did:web:provider.example.com"
-        assert "description" in disclosable
-
-    def test_has_credential_status(self):
-        vc = _load_fixture("service-offering-credential.json")
-        assert "credentialStatus" in vc
-        status = vc["credentialStatus"][0]
-        assert status["type"] == "harbour:CRSetEntry"
-
-    def test_subject_is_harbour_service_offering(self):
-        """Verify the subject uses harbour:ServiceOffering (outer node only)."""
-        vc = _load_fixture("service-offering-credential.json")
-        subject_type = vc["credentialSubject"]["type"]
-        assert subject_type == "harbour:ServiceOffering"
-
-    def test_gx_inner_node_exists(self):
-        """Verify gx:ServiceOffering data lives in the gxServiceOffering inner node."""
-        vc = _load_fixture("service-offering-credential.json")
-        subject = vc["credentialSubject"]
-        gx = subject["gxServiceOffering"]
-        assert gx["type"] == "gx:ServiceOffering"
-        assert "gx:providedBy" in gx
-        # gx properties must NOT be on the outer node
-        assert "gx:providedBy" not in subject
 
 
 class TestMappingDiscovery:

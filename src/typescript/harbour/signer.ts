@@ -38,7 +38,7 @@ export async function signVcJose(
   const payload = new TextEncoder().encode(JSON.stringify(vc));
 
   const signer = new CompactSign(payload);
-  const header: Record<string, unknown> = { alg, typ: "vc+ld+jwt" };
+  const header: Record<string, unknown> = { alg, typ: "vc+jwt" };
   if (options.kid) header.kid = options.kid;
   if (options.x5c) header.x5c = options.x5c;
   signer.setProtectedHeader(header as jose.CompactJWSHeaderParameters);
@@ -69,7 +69,7 @@ export async function signVpJose(
   const payload = new TextEncoder().encode(JSON.stringify(vpPayload));
 
   const signer = new CompactSign(payload);
-  const header: Record<string, unknown> = { alg, typ: "vp+ld+jwt" };
+  const header: Record<string, unknown> = { alg, typ: "vp+jwt" };
   if (options.kid) header.kid = options.kid;
   signer.setProtectedHeader(header as jose.CompactJWSHeaderParameters);
 

@@ -32,7 +32,7 @@ HARBOUR_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}LegalPersonCredential",
     "claims": {
         "credentialSubject.name": "name",
-        "credentialSubject.gxParticipant.gx:legalName": "legalName",
+        "credentialSubject.gxParticipant.schema:name": "legalName",
         "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
         "credentialSubject.gxParticipant.gx:headquartersAddress": "headquartersAddress",
         "credentialSubject.gxParticipant.gx:legalAddress": "legalAddress",

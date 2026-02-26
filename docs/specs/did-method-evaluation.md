@@ -1,16 +1,16 @@
 # DID Method Evaluation: did:web vs did:webs
 
-**Version**: 1.0.0  
-**Date**: 2026-02-24  
+**Version**: 2.0.0
+**Date**: 2026-02-26
 **Status**: Decision Record
 
 ---
 
 ## 1. Executive Summary
 
-This document evaluates `did:web` and `did:webs` DID methods for use in Harbour Credentials and the SimpulseID ecosystem.
+This document evaluates `did:web` and `did:webs` DID methods for use in Harbour Credentials.
 
-**Decision**: Use `did:web` for v1 with documented key rotation practices. Consider `did:webs` migration for v2 when tooling matures.
+**Decision**: Use `did:webs` for all Harbour identities (infrastructure and participants). The wallet-transparent KERI architecture (§8) enables `did:webs` without requiring wallet-side KERI support.
 
 ---
 
@@ -121,50 +121,35 @@ Most VC wallets support did:web natively. did:webs support is limited to KERI-sp
 
 ---
 
-## 7. Current SimpulseID Implementation (did:web)
+## 7. Current Harbour Implementation (did:webs)
 
-Our current did:web implementation includes key rotation best practices:
+Harbour uses `did:webs` identifiers for all entities. The wallet-transparent
+KERI architecture (§8) provides cryptographic key history without requiring
+wallet-side KERI support.
 
-### 7.1 Key Rotation Model
+### 7.1 DID Structure
 
-From `examples/did-web/README.md`:
+From [`examples/did-webs/`](../../examples/did-webs/):
 
-1. **Stable fragment IDs**: Key fragments (`#wallet-key-1`) never change
-2. **Revocation timestamps**: Old keys marked with `"revoked": "<timestamp>"`
-3. **Active key tracking**: Only non-revoked keys in `assertionMethod`
-
-```json
-{
-  "verificationMethod": [
-    {
-      "id": "did:web:example.com:users:alice#wallet-key-1",
-      "type": "JsonWebKey",
-      "publicKeyJwk": { "kty": "EC", "crv": "P-256", ... },
-      "revoked": "2026-01-15T00:00:00Z"
-    },
-    {
-      "id": "did:web:example.com:users:alice#wallet-key-2",
-      "type": "JsonWebKey",
-      "publicKeyJwk": { "kty": "EC", "crv": "P-256", ... }
-    }
-  ],
-  "assertionMethod": [
-    "did:web:example.com:users:alice#wallet-key-2"
-  ]
-}
-```
+| Entity | DID | Keys |
+|--------|-----|------|
+| Trust Anchor | `did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo` | `#key-1` (assertionMethod) |
+| Signing Service | `did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ` | `#key-1` (assertionMethod), `#key-2` (capabilityDelegation) |
+| Participants | `did:webs:participants.harbour.reachhaven.com:legal-persons:<uuid>:<AID>` | `#key-1` (assertionMethod) |
+| Users | `did:webs:users.altme.example:natural-persons:<uuid>:<AID>` | `#key-1` (assertionMethod) |
 
 ### 7.2 Trust Model
 
-- All DIDs controlled by `did:web:did.ascs.digital:services:trust-anchor`
-- ASCS operates the web server (centralized trust anchor)
-- Signatures are attestations, not control grants
+- Trust Anchor (`did:webs:reachhaven.com:ENVSnGVU...`) is the root of trust
+- Signing Service is the sole credential issuer, authorized via evidence VPs
+- Trust Anchor has a `LinkedCredentialService` endpoint for its self-signed credential
+- Naming policy: all DID paths use UUID segments (never real names or org names)
 
-### 7.3 Limitations
+### 7.3 Credential Issuance Chain
 
-- Key history not cryptographically verifiable
-- Must trust ASCS to honestly report revocations
-- No protection against server compromise
+1. Trust Anchor authorizes org → VP with self-signed LegalPersonCredential
+2. Org authorizes employee → VP with org's LegalPersonCredential (SD-JWT, PII redacted)
+3. Signing Service issues all credentials with authorization VPs as evidence
 
 ---
 
@@ -242,65 +227,46 @@ This architecture provides KERI's cryptographic benefits while maintaining compa
 
 ---
 
-## 9. Migration Path to did:webs
+## 9. Migration Status
 
-If/when did:webs matures, migration could follow this path:
+Migration to `did:webs` is complete for identity modeling. All example
+identities, DID documents, and credential examples now use `did:webs`.
 
-### Phase 1: Dual Resolution
-- Maintain did:web documents as-is
-- Add KERI AID to DID documents
-- Resolve both methods, prefer did:webs when available
+### Completed
 
-### Phase 2: KERI Infrastructure
-- Deploy KERI witnesses (minimum 3 recommended)
-- Set up watchers for duplicity detection
-- Migrate high-value DIDs (trust anchor, services) first
+- [x] All Harbour infrastructure DIDs use `did:webs` (Trust Anchor, Signing Service)
+- [x] All participant/user DIDs use `did:webs` with UUID paths
+- [x] DID documents created for all actors (`examples/did-webs/`)
+- [x] Credential examples updated with `did:webs` issuers and subjects
+- [x] Wallet-transparent architecture designed (§8) — any ES256 wallet works
 
-### Phase 3: Full Migration
-- Convert all user DIDs to did:webs
-- Deprecate did:web-only resolution
-- Update wallet integrations
-
-### Prerequisites for Migration (Updated)
-
-Based on the wallet-transparent architecture (§8), migration prerequisites are significantly reduced:
+### Remaining Infrastructure Work
 
 - [ ] KERI witness infrastructure deployed (Harbour-operated, 3+ witnesses recommended)
 - [ ] Rotation signing protocol implemented in Harbour
-- [ ] did:webs resolver integrated (or use Universal Resolver)
-- [x] ~~3+ major wallets support did:webs~~ **NOT REQUIRED** — Any ES256 wallet works
-- [x] ~~did:webs spec reaches 1.0~~ **NOT BLOCKING** — Architecture is spec-compatible
+- [ ] did:webs resolver integrated for production verification (or use Universal Resolver)
 
 ---
 
 ## 10. Recommendation
 
-### For v1 (Current)
+### Current
 
-**Use did:web** with the following practices:
+**Use did:webs** with the wallet-transparent KERI architecture (§8):
 
 1. ✅ P-256 keys (ES256 algorithm)
-2. ✅ Stable fragment IDs for key references
-3. ✅ Revocation timestamps (never delete keys)
-4. ✅ Trust anchor pattern (centralized control with attestations)
-5. ✅ Document key rotation procedures
+2. ✅ Stable fragment IDs for key references (`#key-1`, `#key-2`)
+3. ✅ Trust Anchor with self-signed credential (root of trust)
+4. ✅ Signing Service as sole credential issuer
+5. ✅ UUID-only DID paths (privacy-preserving)
+6. ✅ Wallet-transparent KERI (any ES256 wallet works)
 
-### For v2 (Future)
+### Remaining Infrastructure Work
 
-**Implement wallet-transparent did:webs**:
-
-1. Deploy KERI infrastructure in Harbour (witnesses, watchers)
-2. Implement rotation signing protocol (wallet signs KERI events as regular ES256 payloads)
-3. Add did:webs resolution alongside did:web
-
-**Key insight**: We don't need to wait for wallet ecosystem support. Harbour can provide did:webs benefits to **any ES256-capable wallet** by operating the KERI infrastructure server-side. The wallet just signs—Harbour handles the KERI complexity.
-
-### Migration Prerequisites (Updated)
-
-- [ ] KERI witness infrastructure deployed (Harbour-operated)
+- [ ] KERI witness infrastructure deployed (Harbour-operated, 3+ witnesses)
 - [ ] Rotation signing protocol implemented
-- [ ] did:webs resolver integrated
-- [ ] ~~3+ wallets support did:webs~~ (NOT required with transparent architecture)
+- [ ] did:webs resolver integrated for production verification
+- [x] ~~3+ wallets support did:webs~~ **NOT REQUIRED** — wallet-transparent architecture
 
 ---
 
@@ -334,5 +300,6 @@ Reference specifications are stored in `docs/specs/references/` for offline acce
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.0.0 | 2026-02-26 | Migrated to did:webs; updated section 7 for current implementation |
 | 1.1.0 | 2026-02-24 | Updated recommendation based on wallet-transparent KERI insight |
 | 1.0.0 | 2026-02-24 | Initial evaluation and decision |

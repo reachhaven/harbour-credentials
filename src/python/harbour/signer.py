@@ -39,7 +39,7 @@ def sign_vc_jose(
         Compact JWS string (header.payload.signature).
     """
     alg = _resolve_alg(private_key, alg)
-    header = _build_header(alg, typ="vc+ld+jwt", kid=kid, x5c=x5c)
+    header = _build_header(alg, typ="vc+jwt", kid=kid, x5c=x5c)
     payload = json.dumps(vc, ensure_ascii=False).encode("utf-8")
     key = _import_private_key(private_key, alg)
     return jws.serialize_compact(header, payload, key, algorithms=[alg])
@@ -68,7 +68,7 @@ def sign_vp_jose(
         Compact JWS string (header.payload.signature).
     """
     alg = _resolve_alg(private_key, alg)
-    header = _build_header(alg, typ="vp+ld+jwt", kid=kid)
+    header = _build_header(alg, typ="vp+jwt", kid=kid)
 
     # Add nonce and audience to the VP payload (not header)
     vp_payload = dict(vp)

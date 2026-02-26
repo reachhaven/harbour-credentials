@@ -160,7 +160,7 @@ class TestIssueSDJWTVP:
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
                     "type": "harbour_delegate:data.purchase",
-                    "credential_ids": ["simpulse_id"],
+                    "credential_ids": ["harbour_natural_person"],
                     "nonce": tx_nonce,
                     "iat": 1771934400,
                     "txn": {"asset_id": "tx:abc123", "price": "100"},
@@ -538,12 +538,12 @@ class TestDelegatedSigningFlow:
         )
 
         # Step 2: Holder creates consent VP
-        signing_service_did = "did:web:harbour.signing-service.example.com"
+        signing_service_did = "did:webs:harbour.signing-service.example.com"
         consent_nonce = secrets.token_urlsafe(32)
 
         transaction_data = {
             "type": "harbour_delegate:data.purchase",
-            "credential_ids": ["simpulse_id"],
+            "credential_ids": ["harbour_natural_person"],
             "nonce": consent_nonce,
             "iat": 1771934400,
             "description": "Purchase data asset XYZ for 100 ENVITED tokens",

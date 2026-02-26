@@ -81,12 +81,12 @@ describe("TransactionData", () => {
       txn: { asset_id: "test" },
       exp: 1771935300,
       description: "Test purchase",
-      credentialIds: ["simpulse_id"],
+      credentialIds: ["harbour_natural_person"],
     });
 
     expect(tx.exp).toBe(1771935300);
     expect(tx.description).toBe("Test purchase");
-    expect(tx.credential_ids).toEqual(["simpulse_id"]);
+    expect(tx.credential_ids).toEqual(["harbour_natural_person"]);
   });
 
   it("extracts action from type", () => {

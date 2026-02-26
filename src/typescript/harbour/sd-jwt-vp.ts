@@ -171,10 +171,12 @@ export async function issueSdJwtVp(
   const vpJwt = await vpSigner.sign(holderPrivateKey);
 
   // Create KB-JWT
+  // RFC 9901 §4.3.1 — sd_hash over <issuer-jwt>~<disc1>~...~<discN>~
   const sdMaterial =
     issuerJwt +
     SD_JWT_SEPARATOR +
-    selectedDisclosures.join(SD_JWT_SEPARATOR);
+    selectedDisclosures.join(SD_JWT_SEPARATOR) +
+    SD_JWT_SEPARATOR;
   const sdHashBuffer = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(sdMaterial)
@@ -303,10 +305,12 @@ export async function verifySdJwtVp(
   }
 
   // 5. Verify SD hash in KB-JWT
+  // RFC 9901 §4.3.1 — sd_hash over <issuer-jwt>~<disc1>~...~<discN>~
   const sdMaterial =
     issuerJwt +
     SD_JWT_SEPARATOR +
-    disclosures.join(SD_JWT_SEPARATOR);
+    disclosures.join(SD_JWT_SEPARATOR) +
+    SD_JWT_SEPARATOR;
   const expectedSdHash = base64urlEncode(
     new Uint8Array(
       await crypto.subtle.digest(

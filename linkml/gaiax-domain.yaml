@@ -26,6 +26,12 @@ imports:
 # Composition Slots
 # ==========================================
 # These slots link harbour outer nodes to Gaia-X inner blank nodes.
+# Design: Gaia-X Trust Framework defines closed SHACL shapes on gx: types.
+#   Harbour cannot add properties to gx nodes without violating sh:closed.
+#   Solution: composition — harbour outer node owns harbour properties;
+#   nested gx blank node carries only gx properties.
+# Spec: Gaia-X Trust Framework 22.10 — gx:LegalPerson, gx:Participant,
+#   gx:ServiceOffering are closed SHACL shapes requiring specific properties.
 
 slots:
   gxParticipant:
@@ -51,6 +57,8 @@ classes:
   # Harbour wraps Gaia-X participant types via composition.
   # Gaia-X data lives in nested blank nodes (gxParticipant /
   # gxServiceOffering) to keep gx closed shapes intact.
+  # Spec: Gaia-X TF — gx:LegalPerson requires gx:registrationNumber (object),
+  #   gx:headquartersAddress, gx:legalAddress. gx:Participant is the base type.
 
   LegalPerson:
     description: >
@@ -59,6 +67,9 @@ classes:
       gx:LegalPerson blank node, keeping the gx closed shape intact.
     class_uri: harbour:LegalPerson
     slots:
+      # Spec: schema.org — schema:name for human-readable organization name.
+      #   NOTE: gx:legalName is NOT a valid gx:LegalPerson property in current
+      #   Gaia-X shapes. Use schema:name on the harbour outer node instead.
       - name
       - gxParticipant
     slot_usage:
@@ -77,6 +88,7 @@ classes:
       name:
         required: true
     attributes:
+      # Spec: schema.org Person vocabulary — givenName, familyName, email.
       givenName:
         slot_uri: schema:givenName
         range: string
@@ -86,6 +98,7 @@ classes:
       email:
         slot_uri: schema:email
         range: string
+      # Spec: schema.org — memberOf relates Person to Organization.
       memberOf:
         description: Organization (LegalPerson) the natural person belongs to.
         slot_uri: schema:memberOf
@@ -107,6 +120,11 @@ classes:
   # ==========================================
   # 2. CREDENTIAL TYPES
   # ==========================================
+  # Spec: VCDM2 §4 — each credential MUST have @context, type, issuer,
+  #   credentialSubject. Harbour profile additionally requires validFrom
+  #   and credentialStatus (inherited from HarbourCredential).
+  # Spec: SD-JWT-VC draft-14 — uses vct claim instead of type array.
+  #   Harbour claim_mapping.py bridges W3C ↔ SD-JWT-VC formats.
 
   LegalPersonCredential:
     is_a: HarbourCredential
@@ -117,6 +135,8 @@ classes:
     slot_usage:
       validFrom:
         required: true
+      # Evidence REQUIRED: Trust Anchor authorizes issuance via VP containing
+      # its self-signed LegalPersonCredential (root of trust).
       evidence:
         required: true
 
@@ -129,6 +149,8 @@ classes:
     slot_usage:
       validFrom:
         required: true
+      # Evidence REQUIRED: organization authorizes issuance via VP containing
+      # its LegalPersonCredential (SD-JWT, sensitive fields redacted).
       evidence:
         required: true
 
