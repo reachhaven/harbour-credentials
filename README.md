@@ -250,14 +250,12 @@ tests/
 └── typescript/harbour/            # TypeScript tests
 
 linkml/
-├── core.yaml              # Core types (id, type)
 ├── harbour.yaml           # Harbour base credential framework
 └── gaiax-domain.yaml      # Gaia-X domain layer (participant/service types)
 
 artifacts/                 # Generated per domain (make generate)
 ├── harbour/               # Base OWL/SHACL/context
-├── gaiax-domain/          # Domain OWL/SHACL/context
-└── core/
+└── gaiax-domain/          # Domain OWL/SHACL/context
 ```
 
 ## Testing

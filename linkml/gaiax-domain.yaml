@@ -10,7 +10,6 @@ description: >
 prefixes:
   linkml: https://w3id.org/linkml/
   harbour: https://w3id.org/reachhaven/harbour/credentials/v1/
-  core: https://w3id.org/reachhaven/harbour/core/v1/
   xsd: http://www.w3.org/2001/XMLSchema#
   cred: https://www.w3.org/2018/credentials#
   schema: http://schema.org/

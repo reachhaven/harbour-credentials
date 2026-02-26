@@ -51,7 +51,7 @@ endef
 
 # LinkML schema files
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
-DOMAINS := harbour core gaiax-domain
+DOMAINS := harbour gaiax-domain
 ifdef CI
     GEN_OWL := gen-owl
     GEN_SHACL := gen-shacl
@@ -207,7 +207,6 @@ validate-shacl:
 		for required in \
 			"imports/cs/cs.owl.ttl" \
 			"imports/cred/cred.owl.ttl" \
-			"../../artifacts/core/core.owl.ttl" \
 			"../../artifacts/harbour/harbour.owl.ttl" \
 			"artifacts/gx/gx.owl.ttl" ; do \
 			if ! grep -q "$$required" $$tmp_output ; then \
