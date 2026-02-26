@@ -141,5 +141,9 @@ jobs:
         working-directory: src/typescript/harbour
         run: yarn install --immutable
 
+      - name: Build TypeScript
+        working-directory: src/typescript/harbour
+        run: yarn build
+
       - name: Run interop tests
         run: PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v --tb=short

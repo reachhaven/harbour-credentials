@@ -274,6 +274,7 @@ all:
 # Run all tests (Python + TypeScript)
 test-all:
 	@echo "🔧 Running all tests (Python + SHACL + TypeScript)..."
+	@$(MAKE) --no-print-directory build-ts
 	@$(MAKE) --no-print-directory test
 	@$(MAKE) --no-print-directory validate-shacl
 	@$(MAKE) --no-print-directory test-ts
