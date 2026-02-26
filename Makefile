@@ -262,12 +262,12 @@ build-ts:
 
 test-ts:
 	@echo "Running TypeScript tests..."
-	@cd $(TS_DIR) && corepack enable && yarn test
+	@cd $(TS_DIR) && corepack enable && yarn install && yarn test
 	@echo "OK: TypeScript tests complete"
 
 lint-ts:
 	@echo "Linting TypeScript..."
-	@cd $(TS_DIR) && corepack enable && yarn lint
+	@cd $(TS_DIR) && corepack enable && yarn install && yarn lint
 	@echo "OK: TypeScript lint complete"
 
 # Cross-runtime interop tests (requires both Python + TypeScript)
