@@ -201,7 +201,7 @@ validate-shacl:
 	@echo "Running SHACL data conformance check on examples..."
 	@cd $(OMB_SUBMODULE_DIR) && \
 		tmp_output=$$(mktemp) && \
-		$(PYTHON) -m src.tools.validators.validation_suite \
+		$(abspath $(PYTHON)) -m src.tools.validators.validation_suite \
 			--run check-data-conformance \
 			--data-paths ../../examples/ ../../examples/gaiax/ ../../tests/validation-probe/ontology-loading-probe.json \
 			--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
