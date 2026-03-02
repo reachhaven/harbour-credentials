@@ -22,6 +22,15 @@ endif
 # Bootstrap interpreter used only to create the venv
 BOOTSTRAP_PYTHON := python3
 
+# Absolute path to Python (for use after cd into subdirectories).
+# In CI, PYTHON is a bare command ('python3') so resolve via PATH;
+# locally it is a relative venv path so abspath works.
+ifdef CI
+    PYTHON_ABS := $(shell which $(PYTHON))
+else
+    PYTHON_ABS := $(abspath $(PYTHON))
+endif
+
 # Tooling inside the selected virtual environment
 PIP := $(PYTHON) -m pip
 PRECOMMIT := $(PYTHON) -m pre_commit
@@ -137,10 +146,10 @@ submodule-setup:
 	elif [ -f "$(OMB_SUBMODULE_DIR)/Makefile" ]; then \
 		$(MAKE) --no-print-directory -C $(OMB_SUBMODULE_DIR) setup \
 			VENV="$(abspath $(VENV))" \
-			PYTHON="$(abspath $(PYTHON))" \
-			PIP="$(abspath $(PYTHON)) -m pip" \
-			PRECOMMIT="$(abspath $(PYTHON)) -m pre_commit" \
-			PYTEST="$(abspath $(PYTHON)) -m pytest"; \
+			PYTHON="$(PYTHON_ABS)" \
+			PIP="$(PYTHON_ABS) -m pip" \
+			PRECOMMIT="$(PYTHON_ABS) -m pre_commit" \
+			PYTEST="$(PYTHON_ABS) -m pytest"; \
 		echo "OK: ontology-management-base submodule setup complete"; \
 	else \
 		echo "WARNING: Skipping ontology-management-base submodule setup (not found)"; \
@@ -201,7 +210,7 @@ validate-shacl:
 	@echo "Running SHACL data conformance check on examples..."
 	@cd $(OMB_SUBMODULE_DIR) && \
 		tmp_output=$$(mktemp) && \
-		$(abspath $(PYTHON)) -m src.tools.validators.validation_suite \
+		$(PYTHON_ABS) -m src.tools.validators.validation_suite \
 			--run check-data-conformance \
 			--data-paths ../../examples/ ../../examples/gaiax/ ../../tests/validation-probe/ontology-loading-probe.json \
 			--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
@@ -214,7 +223,7 @@ validate-shacl:
 		for required in \
 			"imports/cs/cs.owl.ttl" \
 			"imports/cred/cred.owl.ttl" \
-			"../../artifacts/harbour-core-credential/harbour-core-credential.owl.ttl" \
+			"../../artifacts/harbour-gx-credential/harbour-gx-credential.owl.ttl" \
 			"artifacts/gx/gx.owl.ttl" ; do \
 			if ! grep -q "$$required" $$tmp_output ; then \
 				echo "ERROR: Required ontology not loaded by validation suite: $$required" >&2 ; \
