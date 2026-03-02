@@ -51,7 +51,7 @@ endef
 
 # LinkML schema files
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
-DOMAINS := harbour gaiax-domain
+DOMAINS := harbour-core-credential harbour-gx-credential
 ifdef CI
     GEN_OWL := gen-owl
     GEN_SHACL := gen-shacl
@@ -214,7 +214,7 @@ validate-shacl:
 		for required in \
 			"imports/cs/cs.owl.ttl" \
 			"imports/cred/cred.owl.ttl" \
-			"../../artifacts/harbour/harbour.owl.ttl" \
+			"../../artifacts/harbour-core-credential/harbour-core-credential.owl.ttl" \
 			"artifacts/gx/gx.owl.ttl" ; do \
 			if ! grep -q "$$required" $$tmp_output ; then \
 				echo "ERROR: Required ontology not loaded by validation suite: $$required" >&2 ; \

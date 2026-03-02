@@ -100,7 +100,7 @@ const payload = await verifyVcJose(jwt, publicKey);
 
 ## Harbour Credential Types
 
-Harbour provides a base credential framework (`harbour.yaml`) with **skeleton credentials** that define the minimum required structure. A Gaia-X domain layer (`gaiax-domain.yaml`) extends the skeletons with participant types using a **composition pattern**:
+Harbour provides a base credential framework (`harbour-core-credential.yaml`) with **skeleton credentials** that define the minimum required structure. A Gaia-X domain layer (`harbour-gx-credential.yaml`) extends the skeletons with participant types using a **composition pattern**:
 
 | Credential Type                     | Subject Type              | Composition Slot      | Gaia-X Inner Type     |
 | ----------------------------------- | ------------------------- | --------------------- | --------------------- |
@@ -240,12 +240,12 @@ tests/
 └── typescript/harbour/            # TypeScript tests
 
 linkml/
-├── harbour.yaml           # Harbour base credential framework
-└── gaiax-domain.yaml      # Gaia-X domain layer (participant/service types)
+├── harbour-core-credential.yaml   # Harbour base credential framework
+└── harbour-gx-credential.yaml    # Gaia-X domain layer (participant/service types)
 
-artifacts/                 # Generated per domain (make generate)
-├── harbour/               # Base OWL/SHACL/context
-└── gaiax-domain/          # Domain OWL/SHACL/context
+artifacts/                         # Generated per domain (make generate)
+├── harbour-core-credential/       # Base OWL/SHACL/context
+└── harbour-gx-credential/        # Domain OWL/SHACL/context
 ```
 
 ## Testing

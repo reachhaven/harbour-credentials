@@ -168,7 +168,7 @@ signed_vc = sign_vc_jose(credential, issuer_private_key)
 
 ## Schema Definition
 
-Evidence types are defined in `linkml/harbour.yaml`:
+Evidence types are defined in `linkml/harbour-core-credential.yaml`:
 
 ```yaml
 Evidence:

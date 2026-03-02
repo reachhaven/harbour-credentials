@@ -47,7 +47,7 @@ harbour-credentials/
 │   ├── python/credentials/    # Python credentials module tests
 │   ├── typescript/harbour/    # TypeScript tests (vitest)
 │   └── interop/               # Cross-runtime interop tests
-├── linkml/                    # LinkML schemas (harbour.yaml, core.yaml, gaiax-domain.yaml)
+├── linkml/                    # LinkML schemas (harbour-core-credential.yaml, harbour-gx-credential.yaml)
 ├── artifacts/                 # Generated OWL/SHACL/JSON-LD context
 └── docs/
 ```

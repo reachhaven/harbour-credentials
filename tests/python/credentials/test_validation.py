@@ -5,8 +5,8 @@ Tests:
 2. Context consistency: fixture property names match the generated contexts
 3. SHACL conformance: credential structure conforms to generated SHACL shapes
 
-Harbour base artifacts live in artifacts/harbour/.
-Gaia-X domain artifacts live in artifacts/gaiax-domain/.
+Harbour base artifacts live in artifacts/harbour-core-credential/.
+Gaia-X domain artifacts live in artifacts/harbour-gx-credential/.
 """
 
 import json
@@ -21,14 +21,14 @@ while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.pare
 EXAMPLES_DIR = _REPO_ROOT / "examples"
 
 # Harbour base artifacts
-HARBOUR_ARTIFACTS_DIR = _REPO_ROOT / "artifacts" / "harbour"
-HARBOUR_CONTEXT_PATH = HARBOUR_ARTIFACTS_DIR / "harbour.context.jsonld"
-HARBOUR_SHACL_PATH = HARBOUR_ARTIFACTS_DIR / "harbour.shacl.ttl"
+HARBOUR_ARTIFACTS_DIR = _REPO_ROOT / "artifacts" / "harbour-core-credential"
+HARBOUR_CONTEXT_PATH = HARBOUR_ARTIFACTS_DIR / "harbour-core-credential.context.jsonld"
+HARBOUR_SHACL_PATH = HARBOUR_ARTIFACTS_DIR / "harbour-core-credential.shacl.ttl"
 
 # Gaia-X domain artifacts
-DOMAIN_ARTIFACTS_DIR = _REPO_ROOT / "artifacts" / "gaiax-domain"
-DOMAIN_CONTEXT_PATH = DOMAIN_ARTIFACTS_DIR / "gaiax-domain.context.jsonld"
-DOMAIN_SHACL_PATH = DOMAIN_ARTIFACTS_DIR / "gaiax-domain.shacl.ttl"
+DOMAIN_ARTIFACTS_DIR = _REPO_ROOT / "artifacts" / "harbour-gx-credential"
+DOMAIN_CONTEXT_PATH = DOMAIN_ARTIFACTS_DIR / "harbour-gx-credential.context.jsonld"
+DOMAIN_SHACL_PATH = DOMAIN_ARTIFACTS_DIR / "harbour-gx-credential.shacl.ttl"
 
 
 def _load_json(path: Path) -> dict:
@@ -180,18 +180,18 @@ class TestHarbourContextConsistency:
 
 
 # ---------------------------------------------------------------------------
-# 2b. Context consistency — gaiax-domain
+# 2b. Context consistency — harbour-gx-credential
 # ---------------------------------------------------------------------------
 
 _skip_no_domain_artifacts = pytest.mark.skipif(
     not DOMAIN_CONTEXT_PATH.exists(),
-    reason="Generated gaiax-domain artifacts not found — run 'make generate'",
+    reason="Generated harbour-gx-credential artifacts not found — run 'make generate'",
 )
 
 
 @_skip_no_domain_artifacts
 class TestDomainContextConsistency:
-    """Verify that generated gaiax-domain context covers domain types."""
+    """Verify that generated harbour-gx-credential context covers domain types."""
 
     def test_context_has_domain_classes(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
@@ -202,7 +202,7 @@ class TestDomainContextConsistency:
             "NaturalPerson",
         ]
         for cls in domain_classes:
-            assert cls in ctx, f"Missing {cls} in gaiax-domain context"
+            assert cls in ctx, f"Missing {cls} in harbour-gx-credential context"
 
     def test_context_has_composition_slots(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
@@ -288,16 +288,16 @@ class TestHarbourShaclShapes:
 
 
 # ---------------------------------------------------------------------------
-# 3b. SHACL conformance — gaiax-domain shapes
+# 3b. SHACL conformance — harbour-gx-credential shapes
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(
     not DOMAIN_SHACL_PATH.exists(),
-    reason="Generated gaiax-domain artifacts not found — run 'make generate'",
+    reason="Generated harbour-gx-credential artifacts not found — run 'make generate'",
 )
 class TestDomainShaclShapes:
-    """Verify that SHACL shapes exist for gaiax-domain types."""
+    """Verify that SHACL shapes exist for harbour-gx-credential types."""
 
     def test_shacl_is_non_empty(self):
         content = DOMAIN_SHACL_PATH.read_text()
