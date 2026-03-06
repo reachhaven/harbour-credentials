@@ -18,7 +18,7 @@
   },
   "credentialStatus": [
     {
-      "id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ:services:revocation-registry#f7e8d9c0b1a23456",
+      "id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ:services:revocation-registry/f7e8d9c0b1a23456",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }

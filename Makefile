@@ -61,15 +61,6 @@ endef
 # LinkML schema files
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
 DOMAINS := harbour-core-credential harbour-gx-credential
-ifdef CI
-    GEN_OWL := gen-owl
-    GEN_SHACL := gen-shacl
-    GEN_JSONLD_CONTEXT := gen-jsonld-context
-else
-    GEN_OWL := $(VENV)/bin/gen-owl
-    GEN_SHACL := $(VENV)/bin/gen-shacl
-    GEN_JSONLD_CONTEXT := $(VENV)/bin/gen-jsonld-context
-endif
 
 # Default target
 help:
@@ -187,13 +178,7 @@ endif
 generate:
 	$(call check_dev_setup)
 	@echo "Generating artifacts from LinkML schemas..."
-	@for domain in $(DOMAINS); do \
-		echo "  Processing $$domain..."; \
-		mkdir -p artifacts/$$domain; \
-		$(GEN_OWL) linkml/$$domain.yaml > artifacts/$$domain/$$domain.owl.ttl; \
-		$(GEN_SHACL) linkml/$$domain.yaml > artifacts/$$domain/$$domain.shacl.ttl; \
-		$(GEN_JSONLD_CONTEXT) linkml/$$domain.yaml > artifacts/$$domain/$$domain.context.jsonld; \
-	done
+	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTHON) src/python/harbour/generate_artifacts.py
 	@echo ""
 	@echo "OK: Artifacts generated in artifacts/"
 
