@@ -86,11 +86,11 @@ describe("signVpJose", () => {
   it("includes nonce and audience in payload", async () => {
     const token = await signVpJose(sampleVp, privateKey, {
       nonce: "test-nonce",
-      audience: "did:web:verifier.example.com",
+      audience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     });
     const payload = decodePayload(token);
     expect(payload.nonce).toBe("test-nonce");
-    expect(payload.aud).toBe("did:web:verifier.example.com");
+    expect(payload.aud).toBe("did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0");
     expect(payload.type).toEqual(["VerifiablePresentation"]);
   });
 });

@@ -572,7 +572,7 @@ def main():
 Examples:
   # Issue an SD-JWT VP with selective disclosure
   python -m harbour.sd_jwt_vp issue --sd-jwt-vc vc.txt --key holder-key.jwk \\
-      --disclosures memberOf --nonce abc123 --audience did:web:verifier.example.com
+      --disclosures memberOf --nonce abc123 --audience did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0
 
   # Issue with evidence (DelegatedSignatureEvidence)
   python -m harbour.sd_jwt_vp issue --sd-jwt-vc vc.txt --key holder-key.jwk \\

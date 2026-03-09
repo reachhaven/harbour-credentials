@@ -200,8 +200,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m harbour.kb_jwt create --sd-jwt token.txt --key key.jwk --nonce abc --audience did:web:verifier
-  python -m harbour.kb_jwt verify --sd-jwt token.txt --public-key key.jwk --nonce abc --audience did:web:verifier
+  python -m harbour.kb_jwt create --sd-jwt token.txt --key key.jwk --nonce abc --audience did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0
+  python -m harbour.kb_jwt verify --sd-jwt token.txt --public-key key.jwk --nonce abc --audience did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0
         """,
     )
 

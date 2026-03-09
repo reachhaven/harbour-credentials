@@ -11,7 +11,7 @@ from harbour.sd_jwt import issue_sd_jwt_vc
 from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
-    "iss": "did:web:issuer.example.com",
+    "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
     "legalName": "Example Corporation GmbH",
     "email": "info@example.com",
 }

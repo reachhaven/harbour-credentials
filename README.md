@@ -9,7 +9,7 @@ JOSE signing and verification library for W3C Verifiable Credentials, supporting
 - **ES256 (P-256)**: EUDI HAIP compliant algorithm
 - **EdDSA (Ed25519)**: Supported (deprecated per RFC 9864, use ES256 for production)
 - **X.509 Support**: Certificate chains via `x5c` header
-- **DID Support**: `did:key` key identifiers plus `did:web` / `did:webs` subject identifiers (resolution handled by integrators)
+- **DID Support**: `did:key` key identifiers plus `did:ethr` subject identifiers (resolution handled by integrators)
 - **Selective Disclosure**: Native SD-JWT-VC with disclosable claims
 - **Key Binding**: KB-JWT for holder binding in presentations
 - **Harbour Credential Types**: Base credential framework with composition slots for Gaia-X compliance
@@ -64,7 +64,7 @@ private_key, public_key = generate_p256_keypair()
 vc = {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiableCredential"],
-    "issuer": "did:web:example.com",
+    "issuer": "did:ethr:0x14a34:0x4ff70ba2fe8c4724a11da529381cbc391e5d8423",
     "credentialSubject": {"id": "did:example:holder", "name": "Alice"}
 }
 jwt = sign_vc_jose(vc, private_key)
@@ -89,7 +89,7 @@ const { privateKey, publicKey } = await generateP256Keypair();
 const vc = {
   "@context": ["https://www.w3.org/ns/credentials/v2"],
   type: ["VerifiableCredential"],
-  issuer: "did:web:example.com",
+  issuer: "did:ethr:0x14a34:0x4ff70ba2fe8c4724a11da529381cbc391e5d8423",
   credentialSubject: { id: "did:example:holder", name: "Alice" },
 };
 const jwt = await signVcJose(vc, privateKey);
@@ -124,10 +124,10 @@ Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain exten
     "https://w3id.org/reachhaven/harbour/credentials/v1/"
   ],
   "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
-  "issuer": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
+  "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSubject": {
-    "id": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
+    "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH",
     "gxParticipant": {
@@ -146,7 +146,7 @@ Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain exten
   },
   "credentialStatus": [
     {
-      "id": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo:services:revocation-registry#abc123",
+      "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3:services:revocation-registry#abc123",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }
@@ -226,7 +226,7 @@ examples/
 ├── legal-person-credential.json       # Harbour skeleton credentials
 ├── natural-person-credential.json     # (canonical unsigned JSON-LD)
 ├── gaiax/                             # Gaia-X domain extensions
-└── did-webs/                          # Example did:webs DID documents used by examples
+└── did-ethr/                          # Example did:ethr DID documents used by examples
 
 tests/
 ├── fixtures/                      # Shared test fixtures

@@ -15,7 +15,7 @@ const VCT =
   "https://w3id.org/reachhaven/harbour/credentials/v1/LegalPersonCredential";
 
 const SAMPLE_CLAIMS = {
-  iss: "did:web:issuer.example.com",
+  iss: "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
   iat: 1723972522,
   legalName: "Example Corporation GmbH",
   legalForm: "GmbH",

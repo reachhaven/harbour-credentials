@@ -83,7 +83,7 @@ console.log(JSON.stringify(payload));
             sample_vp,
             p256_private_key,
             nonce="interop-nonce",
-            audience="did:web:verifier.test",
+            audience="did:ethr:0x14a34:0x1e08782b4131f1f60f88c3ab6de01649f90bf7af",
         )
         fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
         pub_jwk = {
@@ -99,7 +99,7 @@ const key = await importJWK({json.dumps(pub_jwk)}, "ES256");
 const result = await compactVerify("{token}", key);
 const payload = JSON.parse(new TextDecoder().decode(result.payload));
 if (payload.nonce !== "interop-nonce") throw new Error("nonce mismatch");
-if (payload.aud !== "did:web:verifier.test") throw new Error("aud mismatch");
+if (payload.aud !== "did:ethr:0x14a34:0x1e08782b4131f1f60f88c3ab6de01649f90bf7af") throw new Error("aud mismatch");
 console.log("OK");
 """
         assert _run_node(script) == "OK"
@@ -134,7 +134,7 @@ console.log(token);
             "type": ["VerifiablePresentation"],
             "verifiableCredential": [],
             "nonce": "cross-nonce",
-            "aud": "did:web:verifier.test",
+            "aud": "did:ethr:0x14a34:0x1e08782b4131f1f60f88c3ab6de01649f90bf7af",
         }
 
         script = f"""
@@ -152,7 +152,7 @@ console.log(token);
             token,
             p256_public_key,
             expected_nonce="cross-nonce",
-            expected_audience="did:web:verifier.test",
+            expected_audience="did:ethr:0x14a34:0x1e08782b4131f1f60f88c3ab6de01649f90bf7af",
         )
         assert result["type"] == ["VerifiablePresentation"]
 
@@ -162,7 +162,10 @@ class TestPythonSDJWTNodeVerify:
 
     def test_sd_jwt_signature_interop(self, p256_private_key):
         """Python-issued SD-JWT-VC can be signature-verified by Node.js."""
-        claims = {"iss": "did:web:test", "name": "Test"}
+        claims = {
+            "iss": "did:ethr:0x14a34:0x2e4daa1c54bd2ced7de6048cb26224d2fc52ccfd",
+            "name": "Test",
+        }
         sd_jwt = issue_sd_jwt_vc(
             claims,
             p256_private_key,
@@ -205,7 +208,7 @@ const jwk = {json.dumps(fixture)};
 const key = await importJWK(jwk, "ES256");
 const payload = new TextEncoder().encode(JSON.stringify({{
   vct: "https://example.com/vc",
-  iss: "did:web:node-issuer",
+  iss: "did:ethr:0x14a34:0x927a94223e7cd1012bcf3851c1dcc0ff9f8eeda5",
   name: "NodeTest"
 }}));
 const signer = new CompactSign(payload);
@@ -216,7 +219,10 @@ console.log(token + "~");
 """
         sd_jwt = _run_node(script)
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
-        assert result["iss"] == "did:web:node-issuer"
+        assert (
+            result["iss"]
+            == "did:ethr:0x14a34:0x927a94223e7cd1012bcf3851c1dcc0ff9f8eeda5"
+        )
         assert result["vct"] == "https://example.com/vc"
 
 

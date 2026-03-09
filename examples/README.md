@@ -9,12 +9,12 @@ delegated blockchain transaction with privacy-preserving audit.
 ```mermaid
 flowchart LR
     subgraph "1. Org Onboarding"
-        TA[Trust Anchor<br/>did:webs] -->|authorization VP| SS1[Signing Service]
-        SS1 -->|LegalPersonCredential| LP[Legal Person<br/>did:webs]
+        TA[Trust Anchor<br/>did:ethr] -->|authorization VP| SS1[Signing Service]
+        SS1 -->|LegalPersonCredential| LP[Legal Person<br/>did:ethr]
     end
     subgraph "2. Employee Onboarding"
         LP -->|authorization VP<br/>SD-JWT, PII redacted| SS2[Signing Service]
-        SS2 -->|NaturalPersonCredential| NP[Alice<br/>did:webs]
+        SS2 -->|NaturalPersonCredential| NP[Alice<br/>did:ethr]
         NP -.->|memberOf| LP
     end
     subgraph "3. Consent"
@@ -65,21 +65,21 @@ Anchor's DID document. See [`trust-anchor-credential.json`](trust-anchor-credent
 
 ## Actors and Identities
 
-Every actor has a `did:webs` identity (KERI-backed, long-lived). Users also have
+Every actor has a `did:ethr` identity (ERC-1056-backed, long-lived). Users also have
 a `did:jwk` wallet key (P-256) in the Altme wallet. When a user requests a
 credential, the authorizing party presents a VP to the Signing Service. Harbour
-then creates the `did:webs` identifier and embeds **the same P-256 public key**
-from the wallet into the new `did:webs` DID document.
+then creates the `did:ethr` identifier and embeds **the same P-256 public key**
+from the wallet into the new `did:ethr` DID document.
 
-| Actor | Role | Identity (`did:webs`) | DID Document |
+| Actor | Role | Identity (`did:ethr`) | DID Document |
 |-------|------|-----------------------|--------------|
-| **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo` | [`harbour-trust-anchor.did.json`](did-webs/harbour-trust-anchor.did.json) |
-| **Harbour Signing Service** | Issues ALL credentials (`#key-1`), signs delegated txns (`#key-2`) | `did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ` | [`harbour-signing-service.did.json`](did-webs/harbour-signing-service.did.json) |
-| **Example Corporation GmbH** | Legal person (organization) | `did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-...:ENro7uf0eP...` | [`legal-person-0aa6d7ea-...did.json`](did-webs/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
-| **Alice Smith** | Natural person (employee) | `did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-Ft...` | [`natural-person-550e8400-...did.json`](did-webs/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
-| **ENVITED Marketplace** | Data marketplace (external) | `did:web:dataspace.envited.io` | — |
+| **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3` | [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) |
+| **Harbour Signing Service** | Issues ALL credentials (`#key-1`), signs delegated txns (`#key-2`) | `did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
+| **Example Corporation GmbH** | Legal person (organization) | `did:ethr:0x14a34:0xf7ef...dab` | [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
+| **Alice Smith** | Natural person (employee) | `did:ethr:0x14a34:0x26e4...16c9` | [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
+| **ENVITED Marketplace** | Data marketplace (external) | `did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c` | — |
 
-> **Privacy note**: All `did:webs` identifiers use UUID path segments — never
+> **Privacy note**: All `did:ethr` identifiers use UUID path segments — never
 > real names or organization names. This prevents DID IRIs from leaking identity
 > information at the public layer.
 
@@ -105,15 +105,15 @@ with this VP as evidence.
 
 ```mermaid
 sequenceDiagram
-    participant TA as Trust Anchor<br/>(did:webs)
-    participant SS as Signing Service<br/>(did:webs)
-    participant DW as did:webs Registry
+    participant TA as Trust Anchor<br/>(did:ethr)
+    participant SS as Signing Service<br/>(did:ethr)
+    participant DW as did:ethr Registry
 
     TA->>SS: Authorize org credential issuance
     TA->>TA: Create VP with self-signed<br/>LegalPersonCredential
     TA->>SS: Authorization VP (Trust Anchor's credential inside)
     SS->>SS: Verify VP + Trust Anchor credential
-    SS->>DW: Create did:webs for legal person
+    SS->>DW: Create did:ethr for legal person
     SS->>SS: Sign LegalPersonCredential<br/>(evidence = Trust Anchor's VP)
     SS->>DW: Deliver LegalPersonCredential
 ```
@@ -131,7 +131,7 @@ self-signed LegalPersonCredential, establishing the chain of trust.
 | [`signed/legal-person-credential.jwt`](signed/legal-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
 | [`signed/legal-person-credential.decoded.json`](signed/legal-person-credential.decoded.json) | Decoded JWT (header + payload) |
 | [`signed/legal-person-credential.evidence-vp.jwt`](signed/legal-person-credential.evidence-vp.jwt) | Evidence VP (Trust Anchor authorization) |
-| [`did-webs/legal-person-0aa6d7ea-...did.json`](did-webs/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Legal person DID document |
+| [`did-ethr/legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Legal person DID document |
 
 ### Code
 
@@ -159,22 +159,22 @@ as evidence.
 
 ```mermaid
 sequenceDiagram
-    participant ORG as Organization<br/>(did:webs)
-    participant SS as Signing Service<br/>(did:webs)
-    participant DW as did:webs Registry
+    participant ORG as Organization<br/>(did:ethr)
+    participant SS as Signing Service<br/>(did:ethr)
+    participant DW as did:ethr Registry
 
     ORG->>SS: Authorize employee credential issuance
     ORG->>ORG: Create VP with LegalPersonCredential<br/>(SD-JWT, PII redacted)
     ORG->>SS: Authorization VP (org credential inside)
     SS->>SS: Verify VP + org credential<br/>(name disclosed, PII redacted)
-    SS->>DW: Create did:webs for natural person
+    SS->>DW: Create did:ethr for natural person
     SS->>SS: Sign NaturalPersonCredential<br/>(evidence = org's VP, memberOf link)
     SS->>DW: Deliver NaturalPersonCredential
 ```
 
 **Chain of trust**: The Trust Anchor authorized the org (Step 1), the org
 authorizes the employee (Step 2), and the Signing Service issues both credentials.
-The `memberOf` field references the legal person's opaque `did:webs` identifier
+The `memberOf` field references the legal person's opaque `did:ethr` identifier
 (UUID-based, no company name). A verifier can resolve this DID to confirm
 organizational affiliation without the credential itself leaking PII.
 
@@ -190,7 +190,7 @@ organizational affiliation without the credential itself leaking PII.
 | [`signed/natural-person-credential.jwt`](signed/natural-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
 | [`signed/natural-person-credential.decoded.json`](signed/natural-person-credential.decoded.json) | Decoded JWT (header + payload) |
 | [`signed/natural-person-credential.evidence-vp.jwt`](signed/natural-person-credential.evidence-vp.jwt) | Evidence VP (org authorization) |
-| [`did-webs/natural-person-550e8400-...did.json`](did-webs/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) | Alice's DID document |
+| [`did-ethr/natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) | Alice's DID document |
 
 ### Code
 
@@ -199,7 +199,7 @@ organizational affiliation without the credential itself leaking PII.
 from credentials.claim_mapping import vc_to_sd_jwt_claims, MAPPINGS
 mapping = MAPPINGS["harbour:NaturalPersonCredential"]
 claims, disclosable = vc_to_sd_jwt_claims(credential, mapping)
-# claims: {"iss": ..., "vct": ..., "givenName": "Alice", "memberOf": "did:webs:..."}
+# claims: {"iss": ..., "vct": ..., "givenName": "Alice", "memberOf": "did:ethr:0x14a34:0x..."}
 # disclosable: ["givenName", "familyName", "email", "memberOf"]
 ```
 
@@ -220,7 +220,7 @@ purchase. Alice's wallet creates an **SD-JWT VP** with:
 ```mermaid
 sequenceDiagram
     participant A as Alice's Wallet<br/>(did:jwk)
-    participant SS as Signing Service<br/>(did:webs)
+    participant SS as Signing Service<br/>(did:ethr)
     participant MP as ENVITED Marketplace
 
     A->>SS: "Buy asset X for 100 ENVITED"
@@ -266,7 +266,7 @@ tx = TransactionData.create(
         "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
         "price": "100",
         "currency": "ENVITED",
-        "marketplace": "did:web:dataspace.envited.io",
+        "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c",
     },
     credential_ids=["harbour_natural_person"],
 )
@@ -285,10 +285,10 @@ sd_jwt_vp = issue_sd_jwt_vp(
     evidence=[{
         "type": "DelegatedSignatureEvidence",
         "transaction_data": tx.to_dict(),
-        "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+        "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
     }],
     nonce=tx.nonce,
-    audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+    audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
 )
 ```
 
@@ -310,7 +310,7 @@ proof embedded as evidence.
 
 ```mermaid
 sequenceDiagram
-    participant SS as Signing Service<br/>(did:webs)
+    participant SS as Signing Service<br/>(did:ethr)
     participant BC as Blockchain
     participant A as Alice's Wallet
 
@@ -352,7 +352,7 @@ result = verify_sd_jwt_vp(
     issuer_public_key,
     holder_public_key,
     expected_nonce="da9b1009",
-    expected_audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+    expected_audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
 )
 
 # Python — sign receipt credential
@@ -397,14 +397,14 @@ For each credential, the signer produces:
 | `.evidence-vp.jwt` | Evidence VP as signed JWS (if credential has evidence) |
 | `.evidence-vp.decoded.json` | Decoded evidence VP |
 
-### DID documents (`did-webs/`)
+### DID documents (`did-ethr/`)
 
 | File | Actor | Method |
 |------|-------|--------|
-| [`harbour-trust-anchor.did.json`](did-webs/harbour-trust-anchor.did.json) | Harbour Trust Anchor | `did:webs` |
-| [`harbour-signing-service.did.json`](did-webs/harbour-signing-service.did.json) | Harbour Signing Service | `did:webs` |
-| [`legal-person-0aa6d7ea-...did.json`](did-webs/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Example Corporation GmbH | `did:webs` |
-| [`natural-person-550e8400-...did.json`](did-webs/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) | Alice Smith | `did:webs` |
+| [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) | Harbour Trust Anchor | `did:ethr` |
+| [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) | Harbour Signing Service | `did:ethr` |
+| [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Example Corporation GmbH | `did:ethr` |
+| [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) | Alice Smith | `did:ethr` |
 
 ## Regenerating Signed Examples
 
@@ -426,4 +426,4 @@ artifacts to `examples/signed/` and `examples/gaiax/signed/` respectively.
 - [Evidence types](../docs/guide/evidence.md) — CredentialEvidence + DelegatedSignatureEvidence
 - [Delegated signing flow](../docs/guide/delegated-signing.md) — Complete OID4VP consent flow
 - [Delegation challenge spec](../docs/specs/delegation-challenge-encoding.md) — Challenge format + transaction data
-- [DID documents](did-webs/README.md) — All example `did:webs` identifiers
+- [DID documents](did-ethr/README.md) — All example `did:ethr` identifiers

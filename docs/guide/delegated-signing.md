@@ -62,30 +62,30 @@ The user needs a Harbour credential (e.g., `NaturalPersonCredential`) issued as 
 ```json
 {
   "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "credentialSubject": {
-    "id": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
+    "id": "did:ethr:0x14a34:0x26e4...16c9",
     "type": "harbour:NaturalPerson",
     "name": "Alice Smith",                // ← Disclosable (PII)
     "email": "alice.smith@example.com",   // ← Disclosable (PII)
-    "memberOf": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-...:ENro7uf0eP..."
+    "memberOf": "did:ethr:0x14a34:0xf7ef...dab"
   }
 }
 ```
 
 ### 2. DID Document
 
-The user's `did:webs` DID document must contain a verification method with their P-256 public key (the same key as in their `did:jwk` wallet):
+The user's `did:ethr` DID document must contain a verification method with their P-256 public key (the same key as in their `did:jwk` wallet):
 
 ```json
 {
   "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/jwk/v1"],
-  "id": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
-  "controller": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
+  "id": "did:ethr:0x14a34:0x26e4...16c9",
+  "controller": "did:ethr:0x14a34:0x26e4...16c9",
   "verificationMethod": [{
-    "id": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...#key-1",
+    "id": "did:ethr:0x14a34:0x26e4...16c9#key-1",
     "type": "JsonWebKey2020",
-    "controller": "did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...",
+    "controller": "did:ethr:0x14a34:0x26e4...16c9",
     "publicKeyJwk": {
       "kty": "EC",
       "crv": "P-256",
@@ -98,15 +98,15 @@ The user's `did:webs` DID document must contain a verification method with their
 }
 ```
 
-See [`examples/did-webs/`](../../examples/did-webs/) for complete DID documents.
+See [`examples/did-ethr/`](../../examples/did-ethr/) for complete DID documents.
 
-### Repository Boundary (did:web / did:webs)
+### Repository Boundary (did:ethr)
 
 This repository verifies signatures and hash bindings, but it does **not** host or publish DID documents.
 
-- Integrators must publish DID documents at the correct HTTPS location for the chosen method (`did:web` or `did:webs`).
+- Integrators must publish DID documents at the correct HTTPS location for the chosen method (`did:ethr` or `did:ethr`).
 - Integrators must run DID resolution and pass the resolved holder key into `verify_sd_jwt_vp(...)`.
-- Repository examples now use `did:webs` identifiers for person subjects. See `examples/did-webs/` for static example DID documents used by `examples/*.json`.
+- Repository examples now use `did:ethr` identifiers for person subjects. See `examples/did-ethr/` for static example DID documents used by `examples/*.json`.
 - Naming policy in examples:
   - All identifiers use UUID-based path segments (no real names or organization names in DID paths).
 
@@ -114,7 +114,7 @@ Current integration hooks and TODOs:
 
 - `issue_sd_jwt_vp(..., holder_did=...)` allows the wallet DID to be embedded in the consent VP.
 - `verify_sd_jwt_vp(..., holder_public_key=...)` accepts the DID-resolved public key from your resolver stack.
-- TODO: Add optional resolver callback adapters for `did:web`/`did:webs` so verification can resolve keys in-process.
+- TODO: Add optional resolver callback adapters for `did:ethr` so verification can resolve keys in-process.
 
 ## OID4VP Transaction Data
 
@@ -131,7 +131,7 @@ The signing service creates an OID4VP-aligned transaction data object (see [Dele
     "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
-    "marketplace": "did:web:dataspace.envited.io"
+    "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
   }
 }
 ```
@@ -171,7 +171,7 @@ evidence = [{
             "currency": "ENVITED"
         }
     },
-    "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+    "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
 }]
 
 # Create VP with selective disclosure (redact PII)
@@ -181,7 +181,7 @@ sd_jwt_vp = issue_sd_jwt_vp(
     disclosures=["memberOf"],  # Only disclose non-PII claims
     evidence=evidence,
     nonce="da9b1009",
-    audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+    audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
 )
 ```
 
@@ -205,10 +205,10 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
         currency: 'ENVITED'
       }
     },
-    delegatedTo: 'did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ'
+    delegatedTo: 'did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697'
   }],
   nonce: 'da9b1009',
-  audience: 'did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ'
+  audience: 'did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697'
 });
 ```
 
@@ -226,7 +226,7 @@ result = verify_sd_jwt_vp(
     issuer_public_key,      # From credential issuer's DID
     holder_public_key,      # From user's DID document
     expected_nonce="da9b1009",
-    expected_audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+    expected_audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
 )
 
 # Check transaction data matches original request
@@ -247,11 +247,11 @@ After executing the transaction, the signing service issues a **receipt credenti
 ```json
 {
   "type": ["VerifiableCredential", "harbour:DelegatedSigningReceipt"],
-  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "evidence": [{
     "type": "harbour:DelegatedSignatureEvidence",
     "verifiablePresentation": "<consent VP with PII redacted>",
-    "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+    "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
     "transaction_data": { "..." }
   }],
   "credentialStatus": [{
@@ -295,7 +295,7 @@ The `audience` field ensures the VP was created for a specific verifier:
 verify_sd_jwt_vp(
     vp,
     ...,
-    expected_audience="did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+    expected_audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
 )
 ```
 
@@ -317,7 +317,7 @@ Verify the VP signature matches the public key in the user's DID document:
 
 ```python
 # Resolve DID document (integrator-provided resolver)
-did_doc = resolve_did("did:webs:users.altme.example:natural-persons:550e8400-...:EKYGGh-...")
+did_doc = resolve_did("did:ethr:0x14a34:0x26e4...16c9")
 
 # Extract public key
 public_key = did_doc["verificationMethod"][0]["publicKeyJwk"]

@@ -155,7 +155,7 @@ Important: `txn` keys are part of canonicalization and hashing. Renaming a key (
     "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
-    "marketplace": "did:web:dataspace.envited.io"
+    "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
   }
 }
 ```
@@ -192,17 +192,17 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
 {
   "@context": ["https://www.w3.org/ns/credentials/v2"],
   "type": ["VerifiableCredential"],
-  "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "validFrom": "2026-02-24T12:00:00Z",
   "credentialSubject": {
-    "id": "did:webs:users.example.com:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP"
+    "id": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9"
   },
   "evidence": [{
     "type": ["CredentialEvidence"],
     "verifiablePresentation": {
       "@context": ["https://www.w3.org/ns/credentials/v2"],
       "type": ["VerifiablePresentation"],
-      "holder": "did:webs:users.example.com:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP",
+      "holder": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9",
       "verifiableCredential": [
         "<SD-JWT-VC with PII redacted>"
       ],
@@ -211,8 +211,8 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
         "cryptosuite": "ecdsa-rdfc-2019",
         "proofPurpose": "authentication",
         "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
-        "domain": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
-        "verificationMethod": "did:webs:users.example.com:EKYGGh-FtAphGmSZbsuBs_t4qpsjYJ2ZqvMKluq9OxmP#key-1",
+        "domain": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+        "verificationMethod": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9#key-1",
         "created": "2026-02-24T12:00:05Z",
         "proofValue": "z5vgFc..."
       }
@@ -287,7 +287,7 @@ This specification is designed for seamless integration with [OpenID for Verifia
     "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
-    "marketplace": "did:web:dataspace.envited.io"
+    "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
   }
 }
 ```
@@ -299,7 +299,7 @@ Per OID4VP Appendix B.3.3, the KB-JWT includes:
 ```json
 {
   "nonce": "n-0S6_WzA2Mj",
-  "aud": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "aud": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "iat": 1709838604,
   "sd_hash": "Dy-RYwZfaaoC3inJbLslgPvMp09bH-clYP_3qbRqtW4",
   "transaction_data_hashes": ["7W0LFUTpMvb6nJK7ngamNNY0zNvxqJ-2jNXTmLzhWQE"],
@@ -376,7 +376,7 @@ tx = TransactionData.create(
         "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
         "price": "100",
         "currency": "ENVITED",
-        "marketplace": "did:web:dataspace.envited.io",
+        "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c",
     },
     credential_ids=["harbour_natural_person"],
 )
@@ -405,7 +405,7 @@ const tx = createTransactionData({
     asset_id: 'urn:uuid:550e8400-e29b-41d4-a716-446655440000',
     price: '100',
     currency: 'ENVITED',
-    marketplace: 'did:web:dataspace.envited.io',
+    marketplace: 'did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c',
   },
   credentialIds: ['harbour_natural_person'],
 });
@@ -434,7 +434,7 @@ Following the design philosophy of [SIWE (EIP-4361)](https://eips.ethereum.org/E
 ║  Amount:      100 ENVITED                                             ║
 ║                                                                       ║
 ╠═══════════════════════════════════════════════════════════════════════╣
-║  Service:     did:webs:harbour.reachhaven.com:Er9_mnFst...            ║
+║  Service:     did:ethr:0x14a34:0x9c2f...c697            ║
 ║  Nonce:       da9b1009                                                ║
 ║  Time:        2026-02-24 12:00:00 UTC                                 ║
 ╚═══════════════════════════════════════════════════════════════════════╝
@@ -509,7 +509,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
     "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
     "price": "100",
     "currency": "ENVITED",
-    "marketplace": "did:web:dataspace.envited.io"
+    "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
   }
 }
 ```
@@ -557,7 +557,7 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
   "description": "Sign partnership agreement",
   "txn": {
     "document_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "parties": ["did:webs:alice.example:EAbc123", "did:webs:bob.example:EDef456"]
+    "parties": ["did:ethr:0x14a34:0xAA11...2233", "did:ethr:0x14a34:0xBB44...5566"]
   }
 }
 ```
@@ -606,7 +606,7 @@ OID4VP authorization request:
 ```json
 {
   "response_type": "vp_token",
-  "client_id": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "client_id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "nonce": "da9b1009",
   "transaction_data": [{
     "type": "harbour_delegate:data.purchase",
@@ -618,7 +618,7 @@ OID4VP authorization request:
       "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
       "price": "100",
       "currency": "ENVITED",
-      "marketplace": "did:web:dataspace.envited.io"
+      "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
     }
   }]
 }

@@ -62,7 +62,7 @@ def sample_sd_jwt_vc(issuer_keypair, holder_keypair):
 
     # SD-JWT-VC uses flat claims (not nested credentialSubject)
     claims = {
-        "iss": "did:web:issuer.example.com",
+        "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
         "sub": holder_did,
         "givenName": "Alice",
         "familyName": "Smith",
@@ -93,7 +93,7 @@ class TestIssueSDJWTVP:
             sample_sd_jwt_vc,
             holder_private,
             nonce="test-nonce-123",
-            audience="did:web:verifier.example.com",
+            audience="did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
         )
 
         # Should be a ~-separated string
@@ -153,7 +153,7 @@ class TestIssueSDJWTVP:
         """Test VP issuance with DelegatedSignatureEvidence."""
         holder_private, _ = holder_keypair
         tx_nonce = "tx-consent-nonce"
-        audience = "did:web:signing-service.example.com"
+        audience = "did:ethr:0x14a34:0xab645824d16971b89a2243f21881864ad57b9166"
 
         evidence = [
             {
@@ -253,7 +253,7 @@ class TestVerifySDJWTVP:
         holder_private, holder_public = holder_keypair
 
         nonce = "verify-test-nonce"
-        audience = "did:web:verifier.example.com"
+        audience = "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0"
 
         vp = issue_sd_jwt_vp(
             sample_sd_jwt_vc,
@@ -395,11 +395,13 @@ class TestVerifySDJWTVP:
             sample_sd_jwt_vc,
             holder_private,
             nonce="aud-nonce",
-            audience="did:web:signing-service.example.com",
+            audience="did:ethr:0x14a34:0xab645824d16971b89a2243f21881864ad57b9166",
         )
         parts = vp.split("~")
         kb_payload = _decode_jwt_payload(parts[-1])
-        kb_payload["aud"] = "did:web:evil.example.com"
+        kb_payload["aud"] = (
+            "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace"
+        )
         tampered_kb_jwt = _resign_jwt(parts[-1], kb_payload, holder_private)
         tampered_vp = "~".join(parts[:-1] + [tampered_kb_jwt])
 
@@ -493,7 +495,7 @@ class TestVerifySDJWTVP:
         vp = issue_sd_jwt_vp(
             sample_sd_jwt_vc,
             holder_private,
-            audience="did:web:expected-verifier.example.com",
+            audience="did:ethr:0x14a34:0x3c85cd0f7f6333319143a1b21306a3339445ad0a",
         )
 
         with pytest.raises(VerificationError, match="Audience mismatch"):
@@ -501,7 +503,7 @@ class TestVerifySDJWTVP:
                 vp,
                 issuer_public,
                 holder_public,
-                expected_audience="did:web:wrong-verifier.example.com",
+                expected_audience="did:ethr:0x14a34:0x33d113d8e2426612046f29da322c159855de0ba0",
             )
 
 
@@ -522,7 +524,7 @@ class TestDelegatedSigningFlow:
 
         # Step 1: Issue credential to holder (SD-JWT-VC uses flat claims)
         claims = {
-            "iss": "did:web:trusted-issuer.example.com",
+            "iss": "did:ethr:0x14a34:0xb0771a9447399cd33e0cad1228a33ac914715105",
             "sub": holder_did,
             "givenName": "Carlo",
             "familyName": "Rossi",
@@ -538,7 +540,9 @@ class TestDelegatedSigningFlow:
         )
 
         # Step 2: Holder creates consent VP
-        signing_service_did = "did:webs:harbour.signing-service.example.com"
+        signing_service_did = (
+            "did:ethr:0x14a34:0x1d19e55b17c018b6704b8217c95975d97e531269"
+        )
         consent_nonce = secrets.token_urlsafe(32)
 
         transaction_data = {
@@ -616,7 +620,7 @@ class TestDelegatedSigningFlow:
 
         # Issue credential with PII (SD-JWT-VC uses flat claims)
         claims = {
-            "iss": "did:web:issuer.example.com",
+            "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
             "sub": holder_did,
             "name": "Confidential Person",
             "email": "secret@example.com",

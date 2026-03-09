@@ -1,0 +1,42 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/suites/secp256k1recovery-2020/v2"
+  ],
+  "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+  "controller": "did:ethr:0x14a34:0xC0FFEEbabe000000000000000000000000000001",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#controller",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+      "blockchainAccountId": "eip155:84532:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3"
+    },
+    {
+      "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#delegate-1",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "aBzuAd1MlQAeJxCitiz-AqlMgsw1K1L_tuJ8u8hptxY",
+        "y": "ZRY5BsEos8y7QP4hKstg7uzFjduqq_zZlyFIES6Kagk"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#controller",
+    "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#delegate-1"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#controller",
+    "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#delegate-1"
+  ],
+  "service": [
+    {
+      "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3#linked-credential",
+      "type": "harbour:LinkedCredentialService",
+      "serviceEndpoint": "https://reachhaven.com/.well-known/credentials/trust-anchor.jwt"
+    }
+  ]
+}

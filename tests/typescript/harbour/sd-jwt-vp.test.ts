@@ -63,7 +63,7 @@ beforeAll(async () => {
 
   // SD-JWT-VC uses flat claims
   const claims = {
-    iss: "did:web:issuer.example.com",
+    iss: "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
     sub: holderDid,
     givenName: "Alice",
     familyName: "Smith",
@@ -86,7 +86,7 @@ describe("issueSdJwtVp", () => {
   it("issues a basic VP with all disclosures", async () => {
     const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
       nonce: "test-nonce-123",
-      audience: "did:web:verifier.example.com",
+      audience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     });
 
     expect(vp).toContain("~");
@@ -121,7 +121,7 @@ describe("issueSdJwtVp", () => {
 
   it("issues with evidence", async () => {
     const txNonce = "tx-consent-nonce";
-    const audience = "did:web:signing-service.example.com";
+    const audience = "did:ethr:0x14a34:0xab645824d16971b89a2243f21881864ad57b9166";
     const evidence = [
       {
         type: "DelegatedSignatureEvidence",
@@ -208,7 +208,7 @@ describe("issueSdJwtVp", () => {
 describe("verifySdJwtVp", () => {
   it("verifies a basic VP", async () => {
     const nonce = "verify-test-nonce";
-    const audience = "did:web:verifier.example.com";
+    const audience = "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0";
 
     const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
       nonce,
@@ -308,11 +308,11 @@ describe("verifySdJwtVp", () => {
   it("fails when VP and KB audiences differ", async () => {
     const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
       nonce: "aud-nonce",
-      audience: "did:web:signing-service.example.com",
+      audience: "did:ethr:0x14a34:0xab645824d16971b89a2243f21881864ad57b9166",
     });
     const parts = vp.split("~");
     const kbPayload = decodeJwtPayload(parts[parts.length - 1]);
-    kbPayload.aud = "did:web:evil.example.com";
+    kbPayload.aud = "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace";
     const tamperedKbJwt = await resignJwt(
       parts[parts.length - 1],
       kbPayload,
@@ -386,12 +386,12 @@ describe("verifySdJwtVp", () => {
 
   it("fails with audience mismatch", async () => {
     const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
-      audience: "did:web:expected.example.com",
+      audience: "did:ethr:0x14a34:0x62ed6f3003261ad826c5c4adae4934072f772dae",
     });
 
     await expect(
       verifySdJwtVp(vp, issuerPublic, holderPublic, {
-        expectedAudience: "did:web:wrong.example.com",
+        expectedAudience: "did:ethr:0x14a34:0x62f7f3546fdd7c013d1f206179d867c13bcb47da",
       })
     ).rejects.toThrow(/Audience mismatch/);
   });

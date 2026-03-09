@@ -9,6 +9,7 @@ The generator patches the property shape to ``sh:nodeKind sh:IRIOrLiteral``
 (accepting both IRIs from JSON-LD and literal strings from plain JSON).
 """
 
+import json
 from pathlib import Path
 
 from linkml.generators.jsonldcontextgen import ContextGenerator
@@ -74,9 +75,18 @@ def main() -> None:
         )
 
         ctx_gen = ContextGenerator(schema)
-        (out_dir / f"{domain}.context.jsonld").write_text(
-            ctx_gen.serialize(), encoding="utf-8"
-        )
+        ctx_text = ctx_gen.serialize()
+
+        # Ensure "type": "@type" is present in the generated context.
+        # See harbour-core-credential.yaml §slots comment for rationale.
+        ctx_data = json.loads(ctx_text)
+        ctx_obj = ctx_data.get("@context", {})
+        if isinstance(ctx_obj, dict) and "type" not in ctx_obj:
+            ctx_obj["type"] = "@type"
+            ctx_data["@context"] = ctx_obj
+            ctx_text = json.dumps(ctx_data, indent=3, ensure_ascii=False)
+
+        (out_dir / f"{domain}.context.jsonld").write_text(ctx_text, encoding="utf-8")
 
     print(f"\nDone: {ARTIFACTS_DIR}/")
 

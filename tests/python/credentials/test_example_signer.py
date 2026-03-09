@@ -58,15 +58,15 @@ class TestEvidenceSigning:
         vp = {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiablePresentation"],
-            "holder": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
+            "holder": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
             "verifiableCredential": [
                 {
                     "@context": ["https://www.w3.org/ns/credentials/v2"],
                     "type": ["VerifiableCredential"],
-                    "issuer": "did:web:notary.example.com",
+                    "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
                     "validFrom": "2024-01-10T00:00:00Z",
                     "credentialSubject": {
-                        "id": "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe",
+                        "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
                         "type": "gx:LegalPerson",
                     },
                 }
@@ -102,7 +102,7 @@ class TestEvidenceSigning:
                 {
                     "@context": ["https://www.w3.org/ns/credentials/v2"],
                     "type": ["VerifiableCredential"],
-                    "issuer": "did:web:notary.example.com",
+                    "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
                     "validFrom": "2024-01-10T00:00:00Z",
                     "credentialSubject": {"id": "did:example:sub"},
                 }
@@ -189,7 +189,7 @@ class TestProcessExample:
         assert evidence["transaction_data"]["type"] == "harbour_delegate:data.purchase"
         assert (
             evidence["delegatedTo"]
-            == "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+            == "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
         )
 
         # Evidence VP should be a signed JWT

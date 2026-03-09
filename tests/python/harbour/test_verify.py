@@ -62,17 +62,19 @@ def test_verify_vp_jose_valid(sample_vp, p256_private_key, p256_public_key):
         sample_vp,
         p256_private_key,
         nonce="test-nonce",
-        audience="did:web:verifier.example.com",
+        audience="did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     )
     result = verify_vp_jose(
         token,
         p256_public_key,
         expected_nonce="test-nonce",
-        expected_audience="did:web:verifier.example.com",
+        expected_audience="did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     )
     assert result["type"] == sample_vp["type"]
     assert result["nonce"] == "test-nonce"
-    assert result["aud"] == "did:web:verifier.example.com"
+    assert (
+        result["aud"] == "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0"
+    )
 
 
 def test_verify_vp_jose_wrong_nonce_fails(sample_vp, p256_private_key, p256_public_key):
@@ -85,11 +87,15 @@ def test_verify_vp_jose_wrong_audience_fails(
     sample_vp, p256_private_key, p256_public_key
 ):
     token = sign_vp_jose(
-        sample_vp, p256_private_key, audience="did:web:real.example.com"
+        sample_vp,
+        p256_private_key,
+        audience="did:ethr:0x14a34:0x6176cb54dc4498765590d7e5522523ef9e634906",
     )
     with pytest.raises(VerificationError, match="Audience mismatch"):
         verify_vp_jose(
-            token, p256_public_key, expected_audience="did:web:evil.example.com"
+            token,
+            p256_public_key,
+            expected_audience="did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace",
         )
 
 

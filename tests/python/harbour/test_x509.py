@@ -108,8 +108,12 @@ class TestSignWithX5c:
         vc = {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiableCredential"],
-            "issuer": {"id": "did:web:example.com"},
-            "credentialSubject": {"id": "did:web:holder.example.com"},
+            "issuer": {
+                "id": "did:ethr:0x14a34:0x4ff70ba2fe8c4724a11da529381cbc391e5d8423"
+            },
+            "credentialSubject": {
+                "id": "did:ethr:0x14a34:0x27bfcb7f5bf1c5fe45777694cfa4a499cb61711d"
+            },
         }
 
         token = sign_vc_jose(vc, priv, x5c=x5c)
@@ -118,4 +122,7 @@ class TestSignWithX5c:
         certs = x5c_to_certs(x5c)
         pub = extract_public_key(certs[0])
         result = verify_vc_jose(token, pub)
-        assert result["issuer"]["id"] == "did:web:example.com"
+        assert (
+            result["issuer"]["id"]
+            == "did:ethr:0x14a34:0x4ff70ba2fe8c4724a11da529381cbc391e5d8423"
+        )

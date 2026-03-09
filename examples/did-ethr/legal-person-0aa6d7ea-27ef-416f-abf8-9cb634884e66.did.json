@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/suites/secp256k1recovery-2020/v2"
+  ],
+  "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+  "controller": "did:ethr:0x14a34:0xC0FFEEbabe000000000000000000000000000001",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#controller",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+      "blockchainAccountId": "eip155:84532:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
+    },
+    {
+      "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#delegate-1",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBL",
+        "y": "weN12rGDez3FP0HRkGbMEMN6YPf7rMBMcxmvIRbJboo"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#controller",
+    "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#delegate-1"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#controller",
+    "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#delegate-1"
+  ]
+}

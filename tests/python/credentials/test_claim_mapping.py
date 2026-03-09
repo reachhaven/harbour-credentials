@@ -42,11 +42,11 @@ class TestHarbourLegalPersonMapping:
 
         assert (
             claims["iss"]
-            == "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ"
+            == "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
         )
         assert (
             claims["sub"]
-            == "did:webs:participants.harbour.reachhaven.com:legal-persons:0aa6d7ea-27ef-416f-abf8-9cb634884e66:ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBLe"
+            == "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
         )
         assert claims["name"] == "Example Corporation GmbH"
         # Base mapping has no gx claims
@@ -269,15 +269,15 @@ class TestCustomMapping:
         # Use it
         vc = {
             "type": ["VerifiableCredential", "harbour:CustomCredential"],
-            "issuer": "did:web:issuer.example.com",
+            "issuer": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
             "validFrom": "2024-01-01T00:00:00Z",
             "credentialSubject": {
-                "id": "did:web:subject.example.com",
+                "id": "did:ethr:0x14a34:0xe21cf53752b534301cd285712734ab1710260543",
                 "customField": "custom-value",
             },
             "credentialStatus": [
                 {
-                    "id": "did:web:issuer.example.com:revocation#abc123",
+                    "id": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c:revocation#abc123",
                     "type": "harbour:CRSetEntry",
                     "statusPurpose": "revocation",
                 }

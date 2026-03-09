@@ -29,14 +29,14 @@ The Harbour Signing Service is the **sole issuer** of all credentials. Evidence 
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation"],
-    "holder": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
+    "holder": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
     "verifiableCredential": [
       {
         "@context": ["https://www.w3.org/ns/credentials/v2", "..."],
         "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
-        "issuer": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
+        "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
         "credentialSubject": {
-          "id": "did:webs:reachhaven.com:ENVSnGVU_q39C0Lsim8CtXP_c0TbQW7BBndLVnBeDPXo",
+          "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
           "type": "harbour:LegalPerson",
           "name": "ReachHaven GmbH"
         }
@@ -58,7 +58,7 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
 {
   "type": "harbour:DelegatedSignatureEvidence",
   "verifiablePresentation": "<SD-JWT VP with redacted PII>",
-  "delegatedTo": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+  "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "transaction_data": {
     "type": "harbour_delegate:data.purchase",
     "credential_ids": ["harbour_natural_person"],
@@ -69,7 +69,7 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
       "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
       "price": "100",
       "currency": "ENVITED",
-      "marketplace": "did:web:dataspace.envited.io"
+      "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
     }
   },
   "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52"
@@ -153,7 +153,7 @@ When issuing a credential with evidence:
 credential = {
     "@context": [...],
     "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-    "issuer": "did:webs:harbour.reachhaven.com:Er9_mnFstIFyj7JXhHtf7BTHAaUXkaFoJQq96z8WycDQ",
+    "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
     "credentialSubject": {...},
     "evidence": [
         {

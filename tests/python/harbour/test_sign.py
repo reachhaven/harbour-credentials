@@ -85,11 +85,13 @@ def test_sign_vp_jose_nonce_and_audience(sample_vp, p256_private_key):
         sample_vp,
         p256_private_key,
         nonce="challenge-123",
-        audience="did:web:verifier.example.com",
+        audience="did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     )
     payload = _decode_payload(token)
     assert payload["nonce"] == "challenge-123"
-    assert payload["aud"] == "did:web:verifier.example.com"
+    assert (
+        payload["aud"] == "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0"
+    )
     # Original VP fields are preserved
     assert payload["type"] == sample_vp["type"]
 

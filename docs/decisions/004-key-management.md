@@ -68,7 +68,7 @@ Three mechanisms, serving different ecosystems:
 | Method | Ecosystem | JOSE Header | Example |
 |--------|-----------|-------------|---------|
 | **X.509 chain** | EUDI | `x5c` | Certificate chain in JWT header |
-| **did:webs** | Gaia-X | `kid` | `did:webs:participants.harbour.reachhaven.com:legal-persons:<uuid>:<AID>#key-1` |
+| **did:ethr** | Gaia-X | `kid` | `did:ethr:0x14a34:<address>#delegate-1` |
 | **did:key** | Testing | `kid` | `did:key:zDn...#zDn...` |
 
 **X.509 (EUDI mandatory):**
@@ -77,7 +77,7 @@ Three mechanisms, serving different ecosystems:
 - Trust anchor certificate excluded from chain
 - No self-signed end-entity certificates
 
-**did:webs (Gaia-X):**
+**did:ethr (Gaia-X):**
 - Resolves to DID Document at well-known URL with KERI key history
 - DID Document contains JWK public key(s)
 - Used for all Harbour identities (infrastructure, organizations, users)

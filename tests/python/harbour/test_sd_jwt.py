@@ -10,7 +10,7 @@ from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
-    "iss": "did:web:issuer.example.com",
+    "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
     "iat": 1723972522,
     "exp": 1913990400,
     "legalName": "Example Corporation GmbH",
@@ -68,7 +68,10 @@ class TestSDJWTVCVerification:
         sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
         assert result["legalName"] == "Example Corporation GmbH"
-        assert result["iss"] == "did:web:issuer.example.com"
+        assert (
+            result["iss"]
+            == "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c"
+        )
 
     def test_verify_with_selective_disclosure(self, p256_private_key, p256_public_key):
         sd_jwt = issue_sd_jwt_vc(

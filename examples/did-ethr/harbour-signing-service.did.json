@@ -1,0 +1,52 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/suites/secp256k1recovery-2020/v2"
+  ],
+  "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "controller": "did:ethr:0x14a34:0xC0FFEEbabe000000000000000000000000000001",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+      "blockchainAccountId": "eip155:84532:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+    },
+    {
+      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "W3OIQrEY5e5WOLMSqo82WIiKnNS3YZmCwazJ5jCReGk",
+        "y": "D562mZty35hWJ2V6rKQ5N5IJOKpZkVL52ucujzNcMI8"
+      }
+    },
+    {
+      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "aBzuAd1MlQAeJxCitiz-AqlMgsw1K1L_tuJ8u8hptxY",
+        "y": "ZRY5BsEos8y7QP4hKstg7uzFjduqq_zZlyFIES6Kagk"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller",
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller",
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2"
+  ],
+  "capabilityDelegation": [
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2"
+  ]
+}

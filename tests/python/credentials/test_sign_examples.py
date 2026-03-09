@@ -30,7 +30,9 @@ def test_tamper_detection_jose(
     parts = token.split(".")
 
     payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=="))
-    payload["credentialSubject"]["id"] = "did:web:evil.example.com"
+    payload["credentialSubject"][
+        "id"
+    ] = "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace"
     tampered_payload = (
         base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
     )
