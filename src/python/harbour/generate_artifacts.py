@@ -25,6 +25,7 @@ DOMAINS = ["harbour-core-credential", "harbour-gx-credential"]
 SH = Namespace("http://www.w3.org/ns/shacl#")
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 CRED = Namespace("https://www.w3.org/2018/credentials#")
+LINKML = Namespace("https://w3id.org/linkml/")
 
 
 class HarbourShaclGenerator(_BaseShaclGenerator):
@@ -33,17 +34,24 @@ class HarbourShaclGenerator(_BaseShaclGenerator):
     ``cred:issuer`` is defined as ``@type: @id`` in the W3C VC v2 context,
     meaning JSON-LD processors expand issuer values to IRIs. LinkML has no
     native IRI range type, so we patch the generated graph directly.
+
+    Also removes ``sh:class linkml:Any`` constraints: LinkML emits these for
+    ``range: Any`` slots, but ``linkml:Any`` is a meta-schema type never
+    asserted as ``rdf:type`` on instance data.
+    See https://github.com/linkml/linkml/issues/2914
     """
 
     def as_graph(self):
         g = super().as_graph()
-        # Find property shapes targeting cred:issuer and fix nodeKind
+        # Fix cred:issuer nodeKind (IRI, not Literal)
         for ps in g.subjects(SH.path, CRED.issuer):
             g.remove((ps, SH.nodeKind, SH.Literal))
             g.add((ps, SH.nodeKind, SH.IRIOrLiteral))
-            # Remove sh:datatype — IRI nodes don't carry a datatype
             for dt in list(g.objects(ps, SH.datatype)):
                 g.remove((ps, SH.datatype, dt))
+        # Remove sh:class linkml:Any — meta-type not present in instance data
+        for s, p, o in list(g.triples((None, SH["class"], LINKML.Any))):
+            g.remove((s, p, o))
         return g
 
 
