@@ -170,7 +170,7 @@ Ed25519 is also supported for testing, but **ES256 MUST be the default** for EUD
 
 ## Relationship Between Formats
 
-```
+```text
               ┌────────────────────────────────────────┐
               │   LinkML Schema Definition             │
               │   (harbour-core-credential.yaml, etc.) │

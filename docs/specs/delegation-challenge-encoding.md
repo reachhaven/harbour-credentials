@@ -36,18 +36,19 @@ This separation is critical for QR code flows where the signed proof must be com
 
 The `proof.challenge` field uses a compact, single-line format:
 
-```
+```text
 <nonce> HARBOUR_DELEGATE <sha256-hash>
 ```
 
 Where:
+
 - `<nonce>` is a unique identifier (hex string, min 8 chars)
 - `HARBOUR_DELEGATE` is the action type identifier
 - `<sha256-hash>` is the lowercase hex-encoded SHA-256 hash of the transaction data
 
 ### 2.2 Example
 
-```
+```text
 da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
 ```
 
@@ -176,7 +177,8 @@ def compute_transaction_hash(transaction_data: dict) -> str:
 ```
 
 The resulting challenge:
-```
+
+```text
 da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
 ```
 
@@ -249,7 +251,7 @@ This specification is designed for seamless integration with [OpenID for Verifia
 
 ### 5.1 Request Flow
 
-```
+```text
 ┌─────────┐                    ┌─────────┐                    ┌─────────┐
 │ Verifier│                    │ Wallet  │                    │ Signing │
 │(Service)│                    │ (User)  │                    │ Service │
@@ -424,7 +426,7 @@ Following the design philosophy of [SIWE (EIP-4361)](https://eips.ethereum.org/E
 
 ### 9.1 Display Format
 
-```
+```text
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║  Harbour Signing Service requests your authorization                  ║
 ╠═══════════════════════════════════════════════════════════════════════╣
@@ -498,6 +500,7 @@ console.log(renderTransactionDisplay(tx));
 These examples use the shared test vectors from `tests/fixtures/canonicalization-vectors.json`.
 
 **Transaction Data:**
+
 ```json
 {
   "type": "harbour_delegate:data.purchase",
@@ -515,13 +518,15 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
 ```
 
 **Challenge:**
-```
+
+```text
 da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
 ```
 
 ### 10.2 Blockchain Transfer Transaction
 
 **Transaction Data:**
+
 ```json
 {
   "type": "harbour_delegate:blockchain.transfer",
@@ -539,13 +544,15 @@ da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba
 ```
 
 **Challenge:**
-```
+
+```text
 ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c422252b845d4c1
 ```
 
 ### 10.3 Contract Signature Transaction
 
 **Transaction Data:**
+
 ```json
 {
   "type": "harbour_delegate:contract.sign",
@@ -563,7 +570,8 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
 ```
 
 **Challenge:**
-```
+
+```text
 ab12cd34 HARBOUR_DELEGATE 0863ac13bc5f15c7dfcdee71b8beea1aead4b822d0a7c03154405da4f192af08
 ```
 
@@ -603,6 +611,7 @@ This specification aligns with [OID4VP Transaction Data (§8.4)](https://openid.
 ### Integration Example
 
 OID4VP authorization request:
+
 ```json
 {
   "response_type": "vp_token",

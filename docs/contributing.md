@@ -90,7 +90,7 @@ When adding features, implement in **both** Python and TypeScript to maintain fe
 
 Use [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 feat(harbour): add KB-JWT verification
 fix(sd-jwt): handle empty disclosure arrays
 docs: update quickstart guide

@@ -48,7 +48,7 @@ Read these BEFORE making changes:
 
 ## Project Structure
 
-```
+```text
 src/
 ├── python/
 │   ├── harbour/        # Crypto library (keys, sign, verify, sd-jwt, kb-jwt, x509)

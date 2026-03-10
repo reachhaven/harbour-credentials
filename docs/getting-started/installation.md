@@ -49,18 +49,18 @@ npm run build
 
 ## Verify Installation
 
-=== "Python"
+**Python:**
 
-    ```bash
-    python -m harbour.keys --help
-    make test
-    ```
+```bash
+python -m harbour.keys --help
+make test
+```
 
-=== "TypeScript"
+**TypeScript:**
 
-    ```bash
-    npm test
-    ```
+```bash
+npm test
+```
 
 ## Dependencies
 

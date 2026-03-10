@@ -7,14 +7,19 @@ LinkML maps ``range: string`` to ``sh:nodeKind sh:Literal``, but the W3C VC v2
 context defines ``issuer`` with ``@type: @id``, so the RDF value is an IRI.
 The generator patches the property shape to ``sh:nodeKind sh:IRIOrLiteral``
 (accepting both IRIs from JSON-LD and literal strings from plain JSON).
+
+The custom HarbourContextGenerator excludes terms imported from external
+vocabularies (e.g. W3C VC v2) so the generated JSON-LD context does not
+redefine ``@protected`` terms already provided by the W3C VC v2 context.
 """
 
 import json
 from pathlib import Path
 
-from linkml.generators.jsonldcontextgen import ContextGenerator
+from linkml.generators.jsonldcontextgen import ContextGenerator as _BaseContextGenerator
 from linkml.generators.owlgen import OwlSchemaGenerator
 from linkml.generators.shaclgen import ShaclGenerator as _BaseShaclGenerator
+from linkml_runtime.linkml_model.meta import SlotDefinition
 from rdflib import Namespace
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -56,6 +61,25 @@ class HarbourShaclGenerator(_BaseShaclGenerator):
         return g
 
 
+class HarbourContextGenerator(_BaseContextGenerator):
+    """Context generator that excludes imported vocabulary terms.
+
+    W3C VC v2 envelope terms (issuer, validFrom, validUntil, evidence,
+    credentialStatus) are defined in ``w3c-vc.yaml`` and imported into
+    harbour schemas. With ``mergeimports=False`` these slots are marked
+    with ``imported_from``. This generator skips them so the harbour
+    JSON-LD context does not redefine ``@protected`` terms already
+    provided by ``https://www.w3.org/ns/credentials/v2``.
+    """
+
+    def visit_slot(self, aliased_slot_name: str, slot: SlotDefinition) -> None:
+        if getattr(slot, "imported_from", None) and not str(
+            slot.imported_from
+        ).startswith("linkml"):
+            return
+        super().visit_slot(aliased_slot_name, slot)
+
+
 def main() -> None:
     for domain in DOMAINS:
         schema = str(LINKML_DIR / f"{domain}.yaml")
@@ -64,7 +88,7 @@ def main() -> None:
 
         print(f"  Processing {domain}...")
 
-        owl_gen = OwlSchemaGenerator(schema)
+        owl_gen = OwlSchemaGenerator(schema, mergeimports=False)
         (out_dir / f"{domain}.owl.ttl").write_text(
             owl_gen.serialize(), encoding="utf-8"
         )
@@ -74,7 +98,7 @@ def main() -> None:
             shacl_gen.serialize(), encoding="utf-8"
         )
 
-        ctx_gen = ContextGenerator(schema)
+        ctx_gen = HarbourContextGenerator(schema, mergeimports=False)
         ctx_text = ctx_gen.serialize()
 
         # Ensure "type": "@type" is present in the generated context.

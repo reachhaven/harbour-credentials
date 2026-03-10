@@ -22,7 +22,7 @@ The key innovation is **cryptographic proof of consent** — the user's VP serve
 
 ## How It Works
 
-```
+```text
 User                    Signing Service              Blockchain
   |                           |                          |
   |  1. Request transaction   |                          |
@@ -137,6 +137,7 @@ The signing service creates an OID4VP-aligned transaction data object (see [Dele
 ```
 
 Naming note:
+
 - `transaction_data` and `credential_ids` are OID4VP-defined snake_case fields.
 - `txn` is profile-defined payload; Harbour v1 standardizes snake_case keys such as `asset_id`.
 

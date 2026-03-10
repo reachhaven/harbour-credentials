@@ -73,6 +73,7 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 ### Test Layout
 
 Tests live in `tests/` with shared fixtures:
+
 - `tests/fixtures/` — shared keys (`keys/`), tokens (`tokens/`), credentials (`credentials/`), `sample-vc.json`
 - `tests/python/harbour/` — Python harbour module tests
 - `tests/python/credentials/` — Python credentials pipeline tests
@@ -134,12 +135,14 @@ All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python
 ## Coding Conventions
 
 ### Python
+
 - **Python 3.12+** with type hints on public APIs
 - **pathlib.Path** (never `os.path`)
 - All modules must have `main()` with `argparse` and `--help`
 - Formatter: black (line-length 88), isort (profile: black)
 
 ### TypeScript
+
 - **TypeScript 5.x** with strict mode, ES2022 target
 - **async/await** for crypto operations
 - Export types alongside functions

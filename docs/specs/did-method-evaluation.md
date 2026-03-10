@@ -43,7 +43,7 @@
 
 ## DID Format
 
-```
+```text
 did:ethr:<chainId>:<address>
 
 # Base Sepolia Testnet (development)

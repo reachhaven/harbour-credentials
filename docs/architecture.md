@@ -2,7 +2,7 @@
 
 ## Package Structure (Current)
 
-```
+```text
 harbour-credentials/
 ├── src/
 │   ├── python/
@@ -44,7 +44,7 @@ harbour-credentials/
 
 ## Format Relationship
 
-```
+```text
 LinkML Schema → JSON-LD Context + SHACL (schema validation)
                        │
           ┌────────────┼────────────┐

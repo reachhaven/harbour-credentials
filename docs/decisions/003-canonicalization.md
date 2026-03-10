@@ -36,7 +36,7 @@ In standard JWT signing:
 3. The verifier decodes the same bytes from the JWT
 4. The signature covers the exact bytes in the JWT, not a re-serialized version
 
-```
+```text
 Signer:   VC dict → JSON bytes → base64url → JWT(header.payload.signature)
 Verifier: JWT → base64url decode → JSON bytes → verify signature → parse JSON
 ```

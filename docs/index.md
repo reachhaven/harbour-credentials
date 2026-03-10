@@ -13,55 +13,55 @@
 
 ## Quick Start
 
-=== "Python"
+**Python:**
 
-    ```python
-    from harbour.keys import generate_p256_keypair, p256_public_key_to_did_key
-    from harbour.signer import sign_vc_jose
-    from harbour.verifier import verify_vc_jose
+```python
+from harbour.keys import generate_p256_keypair, p256_public_key_to_did_key
+from harbour.signer import sign_vc_jose
+from harbour.verifier import verify_vc_jose
 
-    # Generate keypair
-    private_key, public_key = generate_p256_keypair()
-    did = p256_public_key_to_did_key(public_key)
+# Generate keypair
+private_key, public_key = generate_p256_keypair()
+did = p256_public_key_to_did_key(public_key)
 
-    # Sign a credential
-    credential = {"type": ["VerifiableCredential"], "issuer": did, ...}
-    jwt = sign_vc_jose(credential, private_key)
+# Sign a credential
+credential = {"type": ["VerifiableCredential"], "issuer": did, ...}
+jwt = sign_vc_jose(credential, private_key)
 
-    # Verify
-    result = verify_vc_jose(jwt, public_key)
-    ```
+# Verify
+result = verify_vc_jose(jwt, public_key)
+```
 
-=== "TypeScript"
+**TypeScript:**
 
-    ```typescript
-    import { generateP256Keypair, p256PublicKeyToDid, signJwt, verifyJwt } from '@reachhaven/harbour-credentials';
+```typescript
+import { generateP256Keypair, p256PublicKeyToDid, signJwt, verifyJwt } from '@reachhaven/harbour-credentials';
 
-    // Generate keypair
-    const { privateKey, publicKey } = await generateP256Keypair();
-    const did = await p256PublicKeyToDid(publicKey);
+// Generate keypair
+const { privateKey, publicKey } = await generateP256Keypair();
+const did = await p256PublicKeyToDid(publicKey);
 
-    // Sign a credential
-    const credential = { type: ['VerifiableCredential'], issuer: did, ... };
-    const jwt = await signJwt(credential, privateKey);
+// Sign a credential
+const credential = { type: ['VerifiableCredential'], issuer: did, ... };
+const jwt = await signJwt(credential, privateKey);
 
-    // Verify
-    const result = await verifyJwt(jwt, publicKey);
-    ```
+// Verify
+const result = await verifyJwt(jwt, publicKey);
+```
 
 ## Installation
 
-=== "Python"
+**Python:**
 
-    ```bash
-    pip install harbour-credentials
-    ```
+```bash
+pip install harbour-credentials
+```
 
-=== "TypeScript"
+**TypeScript:**
 
-    ```bash
-    npm install @reachhaven/harbour-credentials
-    ```
+```bash
+npm install @reachhaven/harbour-credentials
+```
 
 ## Documentation
 

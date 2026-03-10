@@ -14,8 +14,9 @@ stand_alone: yes
 smart_quotes: no
 pi: [toc, sortrefs, symrefs]
 
-author:
+author
  -
+
     name: S. Smith
     organization: ProSapien LLC
     email: sam@prosapien.com
@@ -82,7 +83,6 @@ normative:
   MGPK:
     target: https://github.com/msgpack/msgpack/blob/master/spec.md
     title: Msgpack Mapping Object Codes
-
 
 informative:
 
@@ -456,15 +456,11 @@ informative:
     target: https://en.wikipedia.org/wiki/Ricardian_contract
     title: Ricardian Contract
 
-
 --- abstract
 
 An identity system-based secure overlay for the Internet is presented. This is based on a Key Event Receipt Infrastructure (KERI) or the KERI protocol {{KERI}}{{KERI-ID}}{{RFC0791}}. This includes a primary root-of-trust in self-certifying identifiers (SCIDs) {{UIT}}{{SCPK}}{{SFS}}{{SCPN}}{{SCURL}}. It presents a formalism for Autonomic Identifiers (AIDs) and Autonomic Namespaces (ANs). They are part of an Autonomic Identity System (AIS). This system uses the design principle of minimally sufficient means to provide a candidate trust spanning layer for the internet. Associated with this system is a decentralized key management infrastructure (DKMI). The primary root-of-trust are self-certifying identifiers that are strongly bound at issuance to a cryptographic signing (public, private) keypair. These are self-contained until/unless control needs to be transferred to a new keypair. In that event, an append-only chained key-event log of signed transfer statements provides end verifiable control provenance. This makes intervening operational infrastructure replaceable because the event logs may be served up by any infrastructure including ambient infrastructure. End verifiable logs on ambient infrastructure enable ambient verifiability (verifiable by anyone, anywhere, at any time).
 The primary key management operation is key rotation (transference) via a novel key pre-rotation scheme {{DAD}}{{KERI}}. Two primary trust modalities motivated the design, these are a direct (one-to-one) mode and an indirect (one-to-any) mode. The indirect mode depends on witnessed key event receipt logs (KERL) as a secondary root-of-trust for validating events. This gives rise to the acronym KERI for key event receipt infrastructure. In the direct mode, the identity controller establishes control via verified signatures of the controlling keypair. The indirect mode extends that trust basis with witnessed key event receipt logs (KERL) for validating events. The security and accountability guarantees of indirect mode are provided by KA2CE or KERI’s Agreement Algorithm for Control Establishment among a set of witnesses.
 The KA2CE approach may be much more performant and scalable than more complex approaches that depend on a total ordering distributed consensus ledger. Nevertheless, KERI may employ a distributed consensus ledger when other considerations make it the best choice. The KERI approach to DKMI allows for more granular composition. Moreover, because KERI is event streamed it enables DKMI that operates in-stride with data events streaming applications such as web 3.0, IoT, and others where performance and scalability are more important. The core KERI engine is identifier namespace independent. This makes KERI a candidate for a universal portable DKMI {{KERI}}{{KERI-ID}}{{UIT}}.
-
-
-
 
 --- middle
 
@@ -487,12 +483,11 @@ This family of generalized enhanced SCIDs we call ***autonomic identifiers*** (A
 
 An important innovation of KERI is that it solves the key rotation problem of PKI (including that of simple self-certifying identifiers) via a novel but elegant mechanism we call ***key pre-rotation*** {{DAD}}{{KERI}}. This *pre-rotation* mechanism enables an entity to persistently maintain or regain control over an identifier in spite of the exposure-related weakening over time or even compromise of the current set of controlling (signing) keypairs. With key pre-rotation, control over the identifier can be re-established by rotating to a one-time use set of unexposed but pre-committed rotation keypairs that then become the current signing keypairs. Each rotation in turn cryptographically commits to a new set of rotation keys but without exposing them. Because the pre-rotated keypairs need never be exposed prior to their one-time use, their attack surface may be optimally minimized. The current key-state is maintained via an append-only ***verifiable data structure*** we call a ***key event log*** (KEL).
 
-
 ## Cryptographic Primitives
 
 ### CESR
 
-A ***cryptographic primitive ***is a serialization of a value associated with a cryptographic operation including but not limited to a digest (hash), a salt, a seed, a private key, a public key, or a signature. All cryptographic primitives in KERI MUST be expressed using the CESR (Compact Event Streaming Representation) protocol {{CESR-ID}}.  CESR supports round trip lossless conversion between its text, binary, and raw domain representations and lossless composability between its text and binary domain representations. Composability is ensured between any concatenated group of text primitives and the binary equivalent of that group because all CESR primitives are aligned on 24-bit boundaries. Both the text and binary domain representations are serializations suitable for transmission over the wire. The text domain representation is also suitable to be embedded as a string value of a field or array element as part of a field map serialization such as JSON, CBOR, or MsgPack {{RFC8259}}{{JSOND}}{{RFC8949}}{{CBORC}}{{MGPK}}. The text domain uses the set of characters from the URL-safe variant of Base64 which in turn is a subset of the ASCII character set {{RFC4648}}{{RFC0020}}. For the sake of readability, all examples in this specification will be expressed in CESR's text-domain.
+A ***cryptographic primitive***is a serialization of a value associated with a cryptographic operation including but not limited to a digest (hash), a salt, a seed, a private key, a public key, or a signature. All cryptographic primitives in KERI MUST be expressed using the CESR (Compact Event Streaming Representation) protocol {{CESR-ID}}.  CESR supports round trip lossless conversion between its text, binary, and raw domain representations and lossless composability between its text and binary domain representations. Composability is ensured between any concatenated group of text primitives and the binary equivalent of that group because all CESR primitives are aligned on 24-bit boundaries. Both the text and binary domain representations are serializations suitable for transmission over the wire. The text domain representation is also suitable to be embedded as a string value of a field or array element as part of a field map serialization such as JSON, CBOR, or MsgPack {{RFC8259}}{{JSOND}}{{RFC8949}}{{CBORC}}{{MGPK}}. The text domain uses the set of characters from the URL-safe variant of Base64 which in turn is a subset of the ASCII character set {{RFC4648}}{{RFC0020}}. For the sake of readability, all examples in this specification will be expressed in CESR's text-domain.
 
 ### Qualified Cryptographic Primitive
 
@@ -516,7 +511,6 @@ The *second major flaw* is that when rotating the valid signing keys there is no
 We call the state of the controlling keys for an identifier at any time the key state. Cryptographic verifiability of the key state over time is essential to remove this ambiguity. Without this verifiability, the detection of potential ambiguity requires yet another bolt-on security overlay such as the certificate transparency system {{CTE}}{{CTAOL}}{{RFC6962}}{{RT}}{{VDS}}{{ESMT}}.
 
 The KERI protocol fixes both of these flaws using a combination of ***autonomic identifiers***, ***key pre-rotation***, a ***verifiable data structure*** (VDS) called a KEL as verifiable proof of key-state, and ***duplicity-evident*** mechanisms for evaluating and reconciling key state by validators {{KERI}}. Unlike certificate transparency, KERI enables the detection of duplicity in the key state via non-repudiable cryptographic proofs of duplicity not merely the detection of inconsistency in the key state that may or may not be duplicitous {{KERI}}{{CTAOL}}.
-
 
 ### Triad Bindings
 
@@ -610,7 +604,8 @@ Verifiable
 Duplicity
 : Means the existence of more than one version of a verifiable KEL for a given AID. Because every event in a KEL must be signed with non-repudiable signatures any inconsistency between any two instances of the KEL for a given AID is provable evidence of duplicity on the part of the signers with respect to either or both the key-state of that AID and/or any anchored data at a given key-state.  A shorter KEL that does not differ in any of its events with respect to another but longer KEL is not duplicitous but merely incomplete.  To clarify, duplicity evident means that duplicity is provable via the presentation of a set of two or more mutually inconsistent but independently verifiable instances of a KEL.
 
-Verifier: Any entity or agent that cryptographically verifies the signature(s) and/or digests on an event message. In order to verify a signature, a verifier must first determine which set of keys are or were the controlling set for an identifier when an event was issued. In other words, a verifier must first establish control authority for an identifier. For identifiers that are declared as non-transferable at inception, this control establishment merely requires a copy of the inception event for the identifier. For identifiers that are declared transferable at inception, this control establishment requires a complete copy of the sequence of establishment events (inception and all rotations) for the identifier up to the time at which the statement was issued.
+Verifier
+: Any entity or agent that cryptographically verifies the signature(s) and/or digests on an event message. In order to verify a signature, a verifier must first determine which set of keys are or were the controlling set for an identifier when an event was issued. In other words, a verifier must first establish control authority for an identifier. For identifiers that are declared as non-transferable at inception, this control establishment merely requires a copy of the inception event for the identifier. For identifiers that are declared transferable at inception, this control establishment requires a complete copy of the sequence of establishment events (inception and all rotations) for the identifier up to the time at which the statement was issued.
 
 Validator
 : Any entity or agent that evaluates whether or not a given signed statement as attributed to an identifier is valid at the time of its issuance.  A valid statement MUST be verifiable, that is, has a verifiable signature from the current controlling keypair(s) at the time of its issuance. Therefore a *Validator* must first act as a *Verifier* in order to establish the root authoritative set of keys. Once verified, the *Validator* may apply other criteria or constraints to the statement in order to determine its validity for a given use case. When that statement is part of a verifiable data structure then the cryptographic verification includes verifying digests and any other structural commitments or constraints.  To elaborate, with respect to an AID, for example, a *Validator* first evaluates one or more KELs in order to determine if it can rely on (trust) the key state (control authority) provided by any given KEL. A necessary but insufficient condition for a valid KEL is it is verifiable i.e. is internally inconsistent with respect to compliance with the KERI protocol. An invalid KEL from the perspective of a Validator may be either unverifiable or may be verifiable but duplicitous with respect to some other verifiable version of that KEL.  Detected duplicity by a given validator means that the validator has seen more than one verifiable version of a KEL for a given AID. Reconciliable duplicity means that one and only one version of a KEL as seen by a Validator is accepted as the authoritative version for that validator. Irreconcilable duplicity means that none of the versions of a KEL as seen by a validator are accepted as the authoritative one for that validator. The conditions for reconcilable duplicity are described later.
@@ -624,14 +619,13 @@ Key Event Message
 Key Event Receipt
 : Message whose body references a key event and whose attachments MUST include one or more signatures on that key event.
 
-
 # Keypair Labeling Convention
 
 In order to make key event expressions both clearer and more concise, we use a keypair labeling convention. When an AID's key state is dynamic, i.e. the set of controlling keypairs is transferable, then the keypair labels are indexed in order to represent the successive sets of keypairs that constitute the key state at any position in the KEL (key event log). To elaborate, we use indexes on the labels for AIDs that are transferable to indicate which set of keypairs is associated with the AID at any given point in its key state or KEL. In contrast, when the key state is static, i.e. the set of controlling keypairs is non-transferable then no indexes are needed because the key state never changes.
 
 Recall that, a keypair is a two tuple, *(public, private)*, of the respective public and private keys in the keypair. For a given AID, the labeling convention uses an uppercase letter label to represent that AID. When the key state is dynamic, a superscripted index on that letter is used to indicate which keypair is used at a given key state. Alternatively, the index may be omitted when the context defines which keypair and which key state, such as, for example, the latest or current key state. To reiterate, when the key state is static no index is needed.
 
-In general, without loss of specificity, we use an uppercase letter label to represent both an AID and when indexed to represent its keypair or keypairs that are authoritative at a given key state for that AID. In addition, when expressed in tuple form the uppercase letter also represents the public key and the lowercase letter represents the private key for a given keypair. For example, let *A* denote and AID, then let* A* also denote a keypair which may be also expressed in tuple form as *(A, a)*. Therefore, when referring to the keypair itself as a pair and not the individual members of the pair, either the uppercase label, *A*, or the tuple, *(A, a)*, may be used to refer to the keypair itself. When referring to the individual members of the keypair then the uppercase letter, *A*, refers to the public key, and the lowercase letter, *a*, refers to the private key.
+In general, without loss of specificity, we use an uppercase letter label to represent both an AID and when indexed to represent its keypair or keypairs that are authoritative at a given key state for that AID. In addition, when expressed in tuple form the uppercase letter also represents the public key and the lowercase letter represents the private key for a given keypair. For example, let *A* denote and AID, then let*A* also denote a keypair which may be also expressed in tuple form as *(A, a)*. Therefore, when referring to the keypair itself as a pair and not the individual members of the pair, either the uppercase label, *A*, or the tuple, *(A, a)*, may be used to refer to the keypair itself. When referring to the individual members of the keypair then the uppercase letter, *A*, refers to the public key, and the lowercase letter, *a*, refers to the private key.
 
 Let the sequence of keypairs that are authoritative (i.e establish control authority) for an AID be indexed by the zero-based integer-valued, strictly increasing by one, variable *i*. Furthermore, as described above, an establishment key event may change the key state. Let the sequence of establishment events be indexed by the zero-based integer-valued, strictly increasing by one, variable *j*. When the set of controlling keypairs that are authoritative for a given key state includes only one member, then *i = j* for every keypair, and only one index is needed. But when the set of keypairs used at any time for a given key state includes more than one member, then *i != j* for every keypair, and both indices are needed.
 
@@ -687,9 +681,9 @@ The following example illustrates the lifecycle roles of the key sets drawn from
 |1| *[A<sup>3,1</sup>, A<sup>4,1</sup>]* | 1 | *[H(A<sup>5,2</sup>), H(A<sup>6,2</sup>), H(A<sup>7,2</sup>)]* | 2 |
 |2| *[A<sup>5,2</sup>, A<sup>6,2</sup>, A<sup>7,2</sup>]* | 2 | *[H(A<sup>8,3</sup>), H(A<sup>9,3</sup>), H(A<sup>10,3</sup>]* | 2 |
 
-+ *CTH* means Current Threshold.
+* *CTH* means Current Threshold.
 
-+ *NTH* means Next Threshold.
+* *NTH* means Next Threshold.
 
 ## Reserve Rotation
 
@@ -748,25 +742,24 @@ Provided here is an illustrative example to help to clarify the pre-rotation pro
 
 The meaning of the column labels is as follows:
 
-+ SN is the sequence number of the event. Each event uses two rows in the table.
-+ Role is either Current (Crnt) or Next and indicates the role of the key list and threshold on that row.
-+ Keys is the list of public keys denoted with indexed label of the keypair sequence.
-+ Threshold is the threshold of signatures that must be satisfied for validity.
+* SN is the sequence number of the event. Each event uses two rows in the table.
+* Role is either Current (Crnt) or Next and indicates the role of the key list and threshold on that row.
+* Keys is the list of public keys denoted with indexed label of the keypair sequence.
+* Threshold is the threshold of signatures that must be satisfied for validity.
 
 Commentary of each event follows:
 
-+ (0) Inception: Five keypairs have signing authority and five other keypairs have rotation authority. Any two of the first three or any one of the first three and both the last two are sufficient. This anticipates holding the last two in reserve.
+* (0) Inception: Five keypairs have signing authority and five other keypairs have rotation authority. Any two of the first three or any one of the first three and both the last two are sufficient. This anticipates holding the last two in reserve.
 
-+ (1) Rotation: The first three keypairs from the prior next, A<sup>5</sup>, A<sup>6</sup>, and A<sup>7</sup>, are rotated at the new current signing keypairs. This exposes the keypairs. The last two from the prior next, A<sup>8</sup> and A<sup>9</sup>, are held in reserve. They have not been exposed are included in the next key list.
+* (1) Rotation: The first three keypairs from the prior next, A<sup>5</sup>, A<sup>6</sup>, and A<sup>7</sup>, are rotated at the new current signing keypairs. This exposes the keypairs. The last two from the prior next, A<sup>8</sup> and A<sup>9</sup>, are held in reserve. They have not been exposed are included in the next key list.
 
-+ (2) Rotation: The prior next keypairs, A<sup>11</sup> and A<sup>12</sup> are unavalible to sign the rotation and particpate as the part of the newly current signing keys. Therefore A<sup>8</sup> and A<sup>9</sup> must be activated (pulled out of reserve) and included and exposed as both one time rotation keys and newly current signing keys. The signing authority (weight) of each of A<sup>8</sup> and A<sup>9</sup> has been increased to 1/2 from 1/4. This means that any two of the three of A<sup>10</sup>, A<sup>8</sup>, and A<sup>9</sup> may satisfy the signing threshold. Nonetheless, the rotation event \#2 MUST be signed by all three of A<sup>10</sup>, A<sup>8</sup>, and A<sup>9</sup> in order to satisfy the prior next threshold because in that threshold A<sup>8</sup>, and A<sup>9</sup>  only have a weight of 1/4.
+* (2) Rotation: The prior next keypairs, A<sup>11</sup> and A<sup>12</sup> are unavalible to sign the rotation and particpate as the part of the newly current signing keys. Therefore A<sup>8</sup> and A<sup>9</sup> must be activated (pulled out of reserve) and included and exposed as both one time rotation keys and newly current signing keys. The signing authority (weight) of each of A<sup>8</sup> and A<sup>9</sup> has been increased to 1/2 from 1/4. This means that any two of the three of A<sup>10</sup>, A<sup>8</sup>, and A<sup>9</sup> may satisfy the signing threshold. Nonetheless, the rotation event \#2 MUST be signed by all three of A<sup>10</sup>, A<sup>8</sup>, and A<sup>9</sup> in order to satisfy the prior next threshold because in that threshold A<sup>8</sup>, and A<sup>9</sup>  only have a weight of 1/4.
 
-+ (3) Rotation: The keypairs H(A<sup>16</sup>),H(A<sup>17</sup> have been held in reserve from event \#2
+* (3) Rotation: The keypairs H(A<sup>16</sup>),H(A<sup>17</sup> have been held in reserve from event \#2
 
-+ (4) Rotation: The keypairs H(A<sup>16</sup>), H(A<sup>17</sup> continue to be held in reserve.
+* (4) Rotation: The keypairs H(A<sup>16</sup>), H(A<sup>17</sup> continue to be held in reserve.
 
-+ (5) Rotation: The keypairs A<sup>16</sup>, and A<sup>17</sup> are pulled out of reserved and exposed in order to perform the rotation because A<sup>23</sup>, and A<sup>24</sup> are unavailable. Two new keypairs, A<sup>25</sup>, A<sup>26</sup>, are added to the current signing key list. The current signing authority of A<sup>16</sup>, and A<sup>17</sup> is none because they are assigned a weight of 0 in the new current signing threshold. For the rotation event to be valid it must be signed by A<sup>22</sup>, A<sup>16</sup>, and A<sup>17</sup> in order to satisfy the prior next threshold for rotation authority and also must be signed by any two of A<sup>22</sup>, A<sup>25</sup>, and A<sup>26</sup> in order to satisfy the new current signing authority for the event itself. This illustrates how reserved keypairs may be used exclusively for rotation authority and not for signing authority.
-
+* (5) Rotation: The keypairs A<sup>16</sup>, and A<sup>17</sup> are pulled out of reserved and exposed in order to perform the rotation because A<sup>23</sup>, and A<sup>24</sup> are unavailable. Two new keypairs, A<sup>25</sup>, A<sup>26</sup>, are added to the current signing key list. The current signing authority of A<sup>16</sup>, and A<sup>17</sup> is none because they are assigned a weight of 0 in the new current signing threshold. For the rotation event to be valid it must be signed by A<sup>22</sup>, A<sup>16</sup>, and A<sup>17</sup> in order to satisfy the prior next threshold for rotation authority and also must be signed by any two of A<sup>22</sup>, A<sup>25</sup>, and A<sup>26</sup> in order to satisfy the new current signing authority for the event itself. This illustrates how reserved keypairs may be used exclusively for rotation authority and not for signing authority.
 
 ## Custodial Rotation Example
 
@@ -783,21 +776,18 @@ Provided here is an illustrative example to help to clarify the pre-rotation pro
 
 The meaning of the column labels is as follows:
 
-+ SN is the sequence number of the event. Each event uses two rows in the table.
-+ Role is either Current (Crnt) or Next and indicates the role of the key list and threshold on that row.
-+ Keys is the list of public keys denoted with indexed label of the keypair sequence.
-+ Threshold is the threshold of signatures that must be satisfied for validity.
-
+* SN is the sequence number of the event. Each event uses two rows in the table.
+* Role is either Current (Crnt) or Next and indicates the role of the key list and threshold on that row.
+* Keys is the list of public keys denoted with indexed label of the keypair sequence.
+* Threshold is the threshold of signatures that must be satisfied for validity.
 
 Commentary of each event follows:
 
-+ (0) Inception: The private keys from current signing keypairs  A<sup>0</sup>, A<sup>1</sup>, and A<sup>2</sup> are held by the custodian of the identifier. The owner of the identifier provides the digests of the next rotation keypairs, H(A<sup>3</sup>), H(A<sup>4</sup>), and H(A<sup>5</sup>) to the custodian in order that the custodian may include them in the event and then sign the event. The owner holds the private keys from the next rotation keypairs A<sup>3</sup>, A<sup>4</sup>, and A<sup>5</sup>. A self-addressing AID would then be created by the formulation of the inception event. Once formed, the custodian controls the signing authority over the identifier by virtue of holding the associated private keys for the current key list. But the owner controls the rotation authority by virtue of holding the associated private keys for the next key list. Because the controller of the rotation authority may at their sole discretion revoke and replace the keys that hold signing authority, the owner, holder of the next private keys, is ultimately in control of the identifier so constituted by this inception event.
+* (0) Inception: The private keys from current signing keypairs  A<sup>0</sup>, A<sup>1</sup>, and A<sup>2</sup> are held by the custodian of the identifier. The owner of the identifier provides the digests of the next rotation keypairs, H(A<sup>3</sup>), H(A<sup>4</sup>), and H(A<sup>5</sup>) to the custodian in order that the custodian may include them in the event and then sign the event. The owner holds the private keys from the next rotation keypairs A<sup>3</sup>, A<sup>4</sup>, and A<sup>5</sup>. A self-addressing AID would then be created by the formulation of the inception event. Once formed, the custodian controls the signing authority over the identifier by virtue of holding the associated private keys for the current key list. But the owner controls the rotation authority by virtue of holding the associated private keys for the next key list. Because the controller of the rotation authority may at their sole discretion revoke and replace the keys that hold signing authority, the owner, holder of the next private keys, is ultimately in control of the identifier so constituted by this inception event.
 
-+ (1) Rotation: The owner changes custodians with this event. The new custodian creates new current signing keypairs, A<sup>6</sup>, A<sup>7</sup>, and A<sup>8</sup> and holds the associated private keys. The new custodian provides the public keys A<sup>6</sup>, A<sup>7</sup>, and A<sup>8</sup> to the owner so that the owner can formulate and sign the rotation event that transfers signing authority to the new custodian. The owner exposes its rotation public keys,  A<sup>3</sup>, A<sup>4</sup>, and A<sup>5</sup> by including them in the new current key list. But the weights of those rotation keys in the new current signing threshold are all 0 so they have no signing authority.  The owner creates a new set of next keypairs and includes their public key digests, H(A<sup>9</sup>), H(A<sup>10</sup>), H(A<sup>11</sup>) in the new next key list. The owner holds the associated private keys and thereby retains rotation authority. This event MUST be signed by any two of A<sup>3</sup>, A<sup>4</sup>, and A<sup>5</sup> in order to satisfy the prior next threshold and also MUST be signed by any two A<sup>6</sup>, A<sup>7</sup>, and A<sup>8</sup> in order to satisfy the new current signing threshold. The new current threshold and new next threshold clearly delineate that the new custodian now holds exclusive signing authority and owner continues to retain exclusive rotation authority.
+* (1) Rotation: The owner changes custodians with this event. The new custodian creates new current signing keypairs, A<sup>6</sup>, A<sup>7</sup>, and A<sup>8</sup> and holds the associated private keys. The new custodian provides the public keys A<sup>6</sup>, A<sup>7</sup>, and A<sup>8</sup> to the owner so that the owner can formulate and sign the rotation event that transfers signing authority to the new custodian. The owner exposes its rotation public keys,  A<sup>3</sup>, A<sup>4</sup>, and A<sup>5</sup> by including them in the new current key list. But the weights of those rotation keys in the new current signing threshold are all 0 so they have no signing authority.  The owner creates a new set of next keypairs and includes their public key digests, H(A<sup>9</sup>), H(A<sup>10</sup>), H(A<sup>11</sup>) in the new next key list. The owner holds the associated private keys and thereby retains rotation authority. This event MUST be signed by any two of A<sup>3</sup>, A<sup>4</sup>, and A<sup>5</sup> in order to satisfy the prior next threshold and also MUST be signed by any two A<sup>6</sup>, A<sup>7</sup>, and A<sup>8</sup> in order to satisfy the new current signing threshold. The new current threshold and new next threshold clearly delineate that the new custodian now holds exclusive signing authority and owner continues to retain exclusive rotation authority.
 
-+ (2) Rotation: Change to yet another custodian following the same pattern as event \#1
-
-
+* (2) Rotation: Change to yet another custodian following the same pattern as event \#1
 
 # KERI Data Structures
 
@@ -837,10 +827,7 @@ Because the order of appearance of fields is enforced in all KERI data structure
 
 The primary field labels are compact in that they use only one or two characters. KERI is meant to support resource-constrained applications such as supply chain or IoT (Internet of Things) applications. Compact labels better support resource-constrained applications in general. With compact labels, the over-the-wire verifiable signed serialization consumes a minimum amount of bandwidth. Nevertheless, without loss of generality, a one-to-one normative semantic overlay using more verbose expressive field labels may be applied to the normative compact labels after verification of the over-the-wire serialization. This approach better supports bandwidth and storage constraints on transmission while not precluding any later semantic post-processing. This is a well-known design pattern for resource-constrained applications.
 
-
 ## Special Label Ordering Requirements
-
-
 
 ## Version String Field
 
@@ -848,12 +835,7 @@ The version string, `v`, field MUST be the first field in any top-level KERI fie
 
 The format of the version string is `KERIvvSSSShhhhhh_`. The first four characters `KERI` indicate the enclosing field map serialization. The next two characters, `vv` provide the lowercase hexadecimal notation for the major and minor version numbers of the version of the KERI specification used for the serialization. The first `v` provides the major version number and the second `v` provides the minor version number. For example, `01` indicates major version 0 and minor version 1 or in dotted-decimal notation `0.1`. Likewise `1c` indicates major version 1 and minor version decimal 12 or in dotted-decimal notation `1.12`. The next four characters `SSSS` indicate the serialization type in uppercase. The four supported serialization types are `JSON`, `CBOR`, `MGPK`, and `CESR` for the JSON, CBOR, MessagePack, and CESR serialization standards respectively {{JSOND}}{{RFC4627}}{{CBORC}}{{RFC8949}}{{MGPK}}{{CESR-ID}}. The next six characters provide in lowercase hexadecimal notation the total number of characters in the serialization of the KERI message body. The maximum length of a given KERI message body is thereby constrained to be *2<sup>24</sup> = 16,777,216* characters in length. The final character `-` is the version string terminator. This enables later versions of ACDC to change the total version string size and thereby enable versioned changes to the composition of the fields in the version string while preserving deterministic regular expression extractability of the version string. Although a given KERI serialization type may use field map delimiters or framing code characters that appear before (i.e. prefix) the version string field in a serialization, the set of possible prefixes is sufficiently constrained by the allowed serialization protocols to guarantee that a regular expression can determine unambiguously the start of any ordered field map serialization that includes the version string as the first field value. Given the version string, a parser may then determine the end of the serialization so that it can extract the full serialization (KERI message body) from the stream without first deserializing it or parsing it field-by-field. This enables performant stream parsing and off-loading of KERI message streams that include any or all of the supported serialization types interleaved in a single stream.
 
-
-
-
-
 ## SAID (Self-Addressing IDentifier) Fields
-
 
 Some fields in KERI data structures may have for their value a SAID. In this context, `d` is short for digest, which is short for Self-Addressing IDentifier (SAID). A SAID follows the SAID protocol {{SAID-ID}}. Essentially a SAID is a Self-Addressing IDentifier (self-referential content addressable). A SAID is a special type of cryptographic digest of its encapsulating *field map* (block). The encapsulating block of a SAID is called a SAD (Self-Addressed Data). Using a SAID as a *field value* enables a more compact but secure representation of the associated block (SAD) from which the SAID is derived. Any nested field map that includes a SAID field (i.e. is, therefore, a SAD) may be compacted into its SAID. The uncompacted blocks for each associated SAID may be attached or cached to optimize bandwidth and availability without decreasing security.
 
@@ -861,24 +843,19 @@ Each SAID provides a stable universal cryptographically verifiable and agile ref
 
 Recall that a cryptographic commitment (such as a digital signature or cryptographic digest) on a given digest with sufficient cryptographic strength including collision resistance {{HCR}}{{QCHC}} is equivalent to a commitment to the block from which the given digest was derived.  Specifically, a digital signature on a SAID makes a verifiable cryptographic non-repudiable commitment that is equivalent to a commitment on the full serialization of the associated block from which the SAID was derived. This enables reasoning about KERI data structures in whole or in part via their SAIDS in a fully interoperable, verifiable, compact, and secure manner. This also supports the well-known bow-tie model of Ricardian Contracts {{RC}}. This includes reasoning about the whole KERI data structure given by its top-level SAID, `d`, field as well as reasoning about any nested or attached data structures using their SAIDS.
 
-
-
 ## AID (Autonomic IDentifier) Fields
 
 Some fields, such as the `i` and `di` fields, MUST each have an AID (Autonomic IDentifier) as its value. An AID is a fully qualified Self-Certifying IDentifier (SCID) as described above {{KERI}}{{KERI-ID}}. An AID MUST be self-certifying.
 In this context, `i` is short for `ai`, which is short for the Autonomic IDentifier (AID). The AID given by the `i` field may also be thought of as a securely attributable identifier, authoritative identifier, authenticatable identifier, authorizing identifier, or authoring identifier.Another way of thinking about an `i` field is that it is the identifier of the authoritative entity to which a statement may be securely attributed, thereby making the statement verifiably authentic via a non-repudiable signature made by that authoritative entity as the Controller of the private key(s).
 
-
-
-
 ### Namespaced AIDs
+
 Because KERI is agnostic about the namespace for any particular AID, different namespace standards may be used to express KERI AIDs within AID fields in an ACDC. The examples below use the W3C DID namespace specification with the `did:keri` method {{DIDK-ID}}. But the examples would have the same validity from a KERI perspective if some other supported namespace was used or no namespace was used at all. The latter case consists of a bare KERI AID (identifier prefix).
 
 ToDo Explain agnosticism vis a vis namespaces
  Because AIDs may be namespaced, the essential component of an AID is the cryptographically derived Controller identifier prefix.  An AID MUST be the Controller identifier prefix.  part of a W3C Decentralized IDentifier (DID) {{W3C_DID}} or other namespace convention.
 
 Version string namespaces the AIDs as KERI so don't need any namespacing on a per identifier basis.
-
 
 ## Version String Field
 
@@ -888,7 +865,6 @@ Get from ACDC
 
 The `nt` field is next threshold for the next establishment event.
 
-
 ## Common Normalized ACDC and KERI Labels
 
 `v` is the version string
@@ -896,12 +872,7 @@ The `nt` field is next threshold for the next establishment event.
 `i` is a KERI identifier AID
 `a` is the data attributes or data anchors depending on the message type
 
-
-
-
 # Seals
-
-
 
 ## Digest Seal
 
@@ -930,6 +901,7 @@ The `nt` field is next threshold for the next establishment event.
 ~~~
 
 ## Event Seal
+
 ~~~json
 {
 
@@ -938,7 +910,6 @@ The `nt` field is next threshold for the next establishment event.
   "d": "Eabcde8JZAoTNZH3ULvaU6JR2nmwyYAfSVPzhzS6b5CM"
 }
 ~~~
-
 
 ## Last Establishment Event Seal
 
@@ -949,15 +920,11 @@ The `nt` field is next threshold for the next establishment event.
 
 ~~~
 
-
-
 # Key Event Messages (Non-delegated)
 
 Because adding the `d` field SAID to every key event message type will break all the explicit test vectors. Its no additional pain to normalize the field ordering across all message types and seals.
 Originally all messages included an `i` field but that is not true anymore. So the changed field ordering is to put the fields that are common to all message types first in order followed by fields that are not common. The common fields are `v`, `t`, `d`.
 The newly revised messages and seals are shown below.
-
-
 
 ## Inception Event
 
@@ -967,9 +934,7 @@ The derivation of the `d` and `i` fields is special. Both the `d` and `i` fields
 
 When the AID is not self-addressing, i.e. the `i` field derivation code is not a digest. Then the `i` is given its value and the `d` field is replaced with dummy characters `#` of the correct length and then the digest is computed. This is the standard SAID algorithm.
 
-
 ## Inception Event Message Body
-
 
 ~~~json
 {
@@ -1006,8 +971,6 @@ When the AID is not self-addressing, i.e. the `i` field derivation code is not a
 }
 ~~~
 
-
-
 ## Rotation Event Message Body
 
 ~~~json
@@ -1041,7 +1004,6 @@ When the AID is not self-addressing, i.e. the `i` field derivation code is not a
 }
 ~~~
 
-
 ## Interaction Event Message Body
 
 ~~~json
@@ -1063,13 +1025,9 @@ When the AID is not self-addressing, i.e. the `i` field derivation code is not a
 }
 ~~~
 
-
 # Delegated Key Event Messages
 
-
 ToDo in delegation section below. Delegated custodial example with partial rotation and using 0 fraction signing weights on exposed pre-rotated keys
-
-
 
 ## Delegated Inception Event Message Body
 
@@ -1109,9 +1067,6 @@ ToDo in delegation section below. Delegated custodial example with partial rotat
 }
 ~~~
 
-
-
-
 ## Delegated Rotation Event Message Body
 
 ~~~json
@@ -1146,12 +1101,11 @@ ToDo in delegation section below. Delegated custodial example with partial rotat
 }
 ~~~
 
-
 # Receipt Messages
 
 ## Non-Transferable Prefix Signer Receipt Message Body
-For receipts, the `d` field is the SAID of the associated event, not the receipt message itself.
 
+For receipts, the `d` field is the SAID of the associated event, not the receipt message itself.
 
 ~~~json
 {
@@ -1164,6 +1118,7 @@ For receipts, the `d` field is the SAID of the associated event, not the receipt
 ~~~
 
 ## Transferable Prefix Signer Receipt Message Body
+
 For receipts, the `d` field is the SAID of the associated event, not the receipt message itself.
 
 ~~~json
@@ -1181,7 +1136,6 @@ For receipts, the `d` field is the SAID of the associated event, not the receipt
     }
 }
 ~~~
-
 
 # Other Messages
 
@@ -1277,7 +1231,6 @@ For receipts, the `d` field is the SAID of the associated event, not the receipt
 }
 ~~~
 
-
 ## Bare Message Body
 
 Reference to the anchoring seal is provided as an attachment to the bare, `bre` message.
@@ -1299,7 +1252,6 @@ A bare, 'bre', message is a SAD item with an associated derived SAID in its 'd' 
   }
 }
 ~~~
-
 
 ## Exchange Message Body
 
@@ -1556,9 +1508,6 @@ A bare, 'bre', message is a SAD item with an associated derived SAID in its 'd' 
 }
 ~~~
 
-
-
-
 # Appendix: Cryptographic Strength and Security
 
 ## Cryptographic Strength
@@ -1567,35 +1516,29 @@ For crypto-systems with *perfect-security*, the critical design parameter is the
 
 An N-bit long base-2 random number has 2<sup>N</sup> different possible values. Given that no other information is available to an attacker with perfect security, the attacker may need to try every possible value before finding the correct one. Thus the number of attempts that the attacker would have to try maybe as much as 2<sup>N-1</sup>.  Given available computing power, one can easily show that 128 is a large enough N to make brute force attack computationally infeasible.
 
-Let's suppose that the adversary has access to supercomputers. Current supercomputers can perform on the order of one quadrillion operations per second. Individual CPU cores can only perform about 4 billion operations per second, but a supercomputer will parallelly employ many cores. A quadrillion is approximately 2<sup>50</sup> = 1,125,899,906,842,624. Suppose somehow an adversary had control over one million (2<sup>20</sup> = 1,048,576) supercomputers which could be employed in parallel when mounting a brute force attack. The adversary could then try 2<sup>50</sup> * 2<sup>20</sup> = 2<sup>70</sup> values per second (assuming very conservatively that each try only took one operation).
-There are about 3600 * 24 * 365 = 313,536,000 = 2<sup>log<sub>2</sub>313536000</sup>=2<sup>24.91</sup> ~= 2<sup>25</sup> seconds in a year. Thus this set of a million super computers could try 2<sup>50+20+25</sup> = 2<sup>95</sup> values per year. For a 128-bit random number this means that the adversary would need on the order of 2<sup>128-95</sup> = 2<sup>33</sup> = 8,589,934,592 years to find the right value. This assumes that the value of breaking the cryptosystem is worth the expense of that much computing power. Consequently, a cryptosystem with perfect security and 128 bits of cryptographic strength is computationally infeasible to break via brute force attack.
+Let's suppose that the adversary has access to supercomputers. Current supercomputers can perform on the order of one quadrillion operations per second. Individual CPU cores can only perform about 4 billion operations per second, but a supercomputer will parallelly employ many cores. A quadrillion is approximately 2<sup>50</sup> = 1,125,899,906,842,624. Suppose somehow an adversary had control over one million (2<sup>20</sup> = 1,048,576) supercomputers which could be employed in parallel when mounting a brute force attack. The adversary could then try 2<sup>50</sup> *2<sup>20</sup> = 2<sup>70</sup> values per second (assuming very conservatively that each try only took one operation).
+There are about 3600* 24 * 365 = 313,536,000 = 2<sup>log<sub>2</sub>313536000</sup>=2<sup>24.91</sup> ~= 2<sup>25</sup> seconds in a year. Thus this set of a million super computers could try 2<sup>50+20+25</sup> = 2<sup>95</sup> values per year. For a 128-bit random number this means that the adversary would need on the order of 2<sup>128-95</sup> = 2<sup>33</sup> = 8,589,934,592 years to find the right value. This assumes that the value of breaking the cryptosystem is worth the expense of that much computing power. Consequently, a cryptosystem with perfect security and 128 bits of cryptographic strength is computationally infeasible to break via brute force attack.
 
 ## Information Theoretic Security and Perfect Security
 
 The highest level of cryptographic security with respect to a cryptographic secret (seed, salt, or private key) is called  *information-theoretic security* {{ITPS}}. A cryptosystem that has this level of security cannot be broken algorithmically even if the adversary has nearly unlimited computing power including quantum computing. It must be broken by brute force if at all. Brute force means that in order to guarantee success the adversary must search for every combination of key or seed. A special case of *information-theoretic security* is called *perfect-security* {{ITPS}}.  *Perfect-security* means that the ciphertext provides no information about the key. There are two well-known cryptosystems that exhibit *perfect security*. The first is a *one-time-pad* (OTP) or Vernum Cipher {{OTP}}{{VCphr}}, the other is *secret splitting* {{SSplt}}, a type of secret sharing {{SShr}} that uses the same technique as a *one-time-pad*.
 
-
-
-
-
 # Conventions and Definitions
 
 {::boilerplate bcp14-tagged}
-
 
 # Security Considerations
 
 TODO Security
 
-
 # IANA Considerations
 
 This document has no IANA actions.
 
-
 --- back
 
 # Acknowledgments
+
 {:numbered="false"}
 
 KERI Community at the WebOfTrust Github project.

@@ -385,7 +385,6 @@ import { verifySdJwtVp, signJwt } from '@reachhaven/harbour-credentials';
 | [`gaiax/legal-person-credential.json`](gaiax/legal-person-credential.json) | `legal-person-credential.json` | `gxParticipant` with registration number, addresses |
 | [`gaiax/natural-person-credential.json`](gaiax/natural-person-credential.json) | `natural-person-credential.json` | `gxParticipant` with `gx:Participant` |
 
-
 ### Signed artifacts (`signed/`)
 
 For each credential, the signer produces:

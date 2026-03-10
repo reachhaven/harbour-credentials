@@ -12,7 +12,7 @@ Read these before making changes; they are authoritative for repo workflows.
 
 ## Project Structure
 
-```
+```text
 src/
 ├── python/
 │   ├── harbour/        # Crypto library (sign, verify, keys, sd-jwt, kb-jwt, x509)
@@ -78,6 +78,7 @@ When instructed to prepare a commit or PR, **do not commit directly**. Instead:
    - `.playground/pr-description.md` — PR description following the repository's PR template
 
 The human operator will review these files and either:
+
 - Use them to manually commit/push and create a PR, or
 - Use automated tooling with signed commits (`git commit -s -S`)
 
@@ -125,6 +126,7 @@ Closes #42
 ## Coding Style
 
 ### Python
+
 - Python 3.12+ with type hints on public APIs
 - Use `pathlib.Path` (not `os.path`)
 - 4-space indentation
@@ -132,6 +134,7 @@ Closes #42
 - Run `make lint` before committing
 
 ### TypeScript
+
 - TypeScript 5.x with strict mode
 - Use async/await for crypto operations
 - Export types alongside functions

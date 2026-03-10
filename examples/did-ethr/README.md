@@ -24,9 +24,11 @@ Each document follows the `did:ethr` resolved format:
 ## Controller
 
 All identities are governed by a smart contract controller:
-```
+
+```text
 did:ethr:0x14a34:0xC0FFEEbabe000000000000000000000000000001
 ```
+
 This is a placeholder address — the actual contract will be deployed to Base.
 
 ## Key Management
@@ -37,6 +39,7 @@ The secp256k1 controller key provides blockchain-native identity ownership.
 ## Usage
 
 These DID documents are referenced by:
+
 - `examples/*.json` — Credential examples (issuer, subject, holder)
 - `examples/gaiax/*.json` — Gaia-X specific credential examples
 - `tests/` — Test fixtures and assertions

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted**
+**Status:** Accepted
 
 ## Context
 
@@ -16,6 +16,7 @@ This creates dependencies on DNS, TLS certificate authorities, and hosting avail
 conflict with the project's goal of decentralised, self-sovereign identity.
 
 The ENVITED-X ecosystem requires:
+
 1. Decentralised identity anchoring without web server dependencies
 2. Verifiable key rotation history
 3. P-256 key support (for EUDI/HAIP compliance)

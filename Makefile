@@ -1,7 +1,7 @@
 # Harbour Credentials Makefile
 # ============================
 
-.PHONY: setup install install-dev submodule-setup ts-bootstrap generate validate validate-shacl lint format test test-cov test-ts test-interop build-ts lint-ts test-all all clean help
+.PHONY: setup install install-dev submodule-setup ts-bootstrap generate validate validate-shacl lint lint-md format format-md test test-cov test-ts test-interop build-ts lint-ts test-all all clean help
 
 TS_DIR := src/typescript/harbour
 OMB_SUBMODULE_DIR := submodules/ontology-management-base
@@ -78,9 +78,11 @@ help:
 	@echo "  make validate-shacl - Run SHACL conformance on examples (via ontology-management-base)"
 	@echo ""
 	@echo "Linting:"
-	@echo "  make lint    - Run pre-commit checks (Python)"
-	@echo "  make lint-ts - Run TypeScript linting"
-	@echo "  make format  - Format Python code with black/isort"
+	@echo "  make lint       - Run pre-commit checks (Python + Markdown)"
+	@echo "  make lint-md    - Lint Markdown files with markdownlint-cli2"
+	@echo "  make lint-ts    - Run TypeScript linting"
+	@echo "  make format     - Format Python code with black/isort"
+	@echo "  make format-md  - Auto-fix Markdown lint violations"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test         - Run Python pytest suite"
@@ -226,6 +228,12 @@ lint:
 	@$(PYTHON) -m pre_commit run --all-files
 	@echo "OK: Pre-commit checks complete"
 
+# Lint Markdown files
+lint-md: ## Lint Markdown files with markdownlint-cli2
+	@echo "Linting Markdown files..."
+	@npx --yes markdownlint-cli2
+	@echo "OK: Markdown lint complete"
+
 # Auto-format code
 format:
 	$(call check_dev_setup)
@@ -233,6 +241,12 @@ format:
 	@$(PYTHON) -m black src/python/ tests/
 	@$(PYTHON) -m isort src/python/ tests/
 	@echo "OK: Python formatting complete"
+
+# Auto-fix Markdown lint violations
+format-md: ## Auto-fix Markdown lint violations
+	@echo "Fixing Markdown files..."
+	@npx --yes markdownlint-cli2 --fix
+	@echo "OK: Markdown formatting complete"
 
 # Run tests
 test:

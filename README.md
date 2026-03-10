@@ -107,7 +107,6 @@ Harbour provides a base credential framework (`harbour-core-credential.yaml`) wi
 | `harbour:LegalPersonCredential`     | `harbour:LegalPerson`     | `gxParticipant`       | `gx:LegalPerson`     |
 | `harbour:NaturalPersonCredential`   | `harbour:NaturalPerson`   | `gxParticipant`       | `gx:Participant`     |
 
-
 All harbour credentials require:
 
 - `issuer` - DID of the credential issuer
@@ -197,7 +196,7 @@ python -m harbour.x509 generate --key key.jwk --subject "Test Issuer" --output c
 
 ## Package Structure
 
-```
+```text
 src/
 ├── python/
 │   ├── harbour/           # Crypto library
