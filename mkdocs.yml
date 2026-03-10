@@ -76,10 +76,13 @@ nav:
   - API Reference:
       - Python: api/python/index.md
       - TypeScript: api/typescript/index.md
+  - Schema:
+      - Credential Data Model: schema/credential-model.md
   - Architecture:
       - Overview: architecture.md
       - ADR-001 VC Securing Mechanism: decisions/001-vc-securing-mechanism.md
       - ADR-002 Dual Runtime: decisions/002-dual-runtime-architecture.md
       - ADR-003 Canonicalization: decisions/003-canonicalization.md
       - ADR-004 Key Management: decisions/004-key-management.md
+      - ADR-005 did:ethr Migration: decisions/005-did-ethr-migration.md
   - Contributing: contributing.md
