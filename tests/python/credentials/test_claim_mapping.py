@@ -138,8 +138,8 @@ class TestHarbourNaturalPersonMapping:
             claims, mapping, "harbour:NaturalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["schema:givenName"]
-            == vc["credentialSubject"]["schema:givenName"]
+            reconstructed["credentialSubject"]["givenName"]
+            == vc["credentialSubject"]["givenName"]
         )
 
 
@@ -154,7 +154,7 @@ class TestGaiaxLegalPersonMapping:
         mapping = GAIAX_MAPPINGS["harbour:LegalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
-        # Gaia-X extension uses gxParticipant.schema:name, not outer name
+        # Gaia-X extension uses gxParticipant.name, not outer name
         assert "name" not in claims
         assert claims["legalName"] == "Example Corporation GmbH"
         assert "registrationNumber" in claims
@@ -166,7 +166,7 @@ class TestGaiaxLegalPersonMapping:
         subject = vc["credentialSubject"]
         gx = subject["gxParticipant"]
         assert gx["type"] == "gx:LegalPerson"
-        assert "schema:name" in gx
+        assert "name" in gx
         assert "gx:registrationNumber" in gx
         # gx properties must NOT be on the outer node
         assert "gx:registrationNumber" not in subject
@@ -189,8 +189,8 @@ class TestGaiaxLegalPersonMapping:
             claims, mapping, "harbour:LegalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["gxParticipant"]["schema:name"]
-            == vc["credentialSubject"]["gxParticipant"]["schema:name"]
+            reconstructed["credentialSubject"]["gxParticipant"]["name"]
+            == vc["credentialSubject"]["gxParticipant"]["name"]
         )
 
 
@@ -235,7 +235,7 @@ class TestMappingDiscovery:
         assert mapping is not None
         assert "LegalPersonCredential" in mapping["vct"]
         # Base mapping should NOT have gxParticipant paths
-        assert "credentialSubject.gxParticipant.schema:name" not in mapping["claims"]
+        assert "credentialSubject.gxParticipant.name" not in mapping["claims"]
 
     def test_get_mapping_for_gaiax_extension(self):
         """Gaia-X extension (with Gaia-X context) should return Gaia-X mapping."""
@@ -244,7 +244,7 @@ class TestMappingDiscovery:
         assert mapping is not None
         assert "LegalPersonCredential" in mapping["vct"]
         # Gaia-X mapping should have gxParticipant paths
-        assert "credentialSubject.gxParticipant.schema:name" in mapping["claims"]
+        assert "credentialSubject.gxParticipant.name" in mapping["claims"]
 
     def test_get_mapping_for_unknown(self):
         vc = {"type": ["VerifiableCredential", "UnknownType"]}

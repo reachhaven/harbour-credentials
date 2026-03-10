@@ -44,9 +44,9 @@ HARBOUR_LEGAL_PERSON_MAPPING = {
 HARBOUR_NATURAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.schema:givenName": "givenName",
-        "credentialSubject.schema:familyName": "familyName",
-        "credentialSubject.schema:email": "email",
+        "credentialSubject.givenName": "givenName",
+        "credentialSubject.familyName": "familyName",
+        "credentialSubject.email": "email",
         "credentialSubject.memberOf": "memberOf",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp"],
@@ -60,7 +60,7 @@ HARBOUR_NATURAL_PERSON_MAPPING = {
 GAIAX_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}LegalPersonCredential",
     "claims": {
-        "credentialSubject.gxParticipant.schema:name": "legalName",
+        "credentialSubject.gxParticipant.name": "legalName",
         "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
         "credentialSubject.gxParticipant.gx:headquartersAddress": "headquartersAddress",
         "credentialSubject.gxParticipant.gx:legalAddress": "legalAddress",
@@ -76,10 +76,10 @@ GAIAX_LEGAL_PERSON_MAPPING = {
 GAIAX_NATURAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.gxParticipant.schema:name": "gxName",
-        "credentialSubject.schema:givenName": "givenName",
-        "credentialSubject.schema:familyName": "familyName",
-        "credentialSubject.schema:email": "email",
+        "credentialSubject.gxParticipant.name": "gxName",
+        "credentialSubject.givenName": "givenName",
+        "credentialSubject.familyName": "familyName",
+        "credentialSubject.email": "email",
         "credentialSubject.memberOf": "memberOf",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp"],
