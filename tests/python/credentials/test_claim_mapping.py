@@ -36,6 +36,7 @@ def _load_fixture(name: str, gaiax: bool = False) -> dict:
 
 class TestHarbourLegalPersonMapping:
     def test_vc_to_claims(self):
+        """Skeleton LegalPerson is minimal — no name, no gxParticipant."""
         vc = _load_fixture("legal-person-credential.json")
         mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
@@ -48,8 +49,8 @@ class TestHarbourLegalPersonMapping:
             claims["sub"]
             == "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
         )
-        assert claims["name"] == "Example Corporation GmbH"
-        # Base mapping has no gx claims
+        # Skeleton has no name — identity data lives in gxParticipant (Gaia-X layer)
+        assert "name" not in claims
         assert "legalName" not in claims
         assert "registrationNumber" not in claims
         assert disclosable == []
@@ -72,35 +73,43 @@ class TestHarbourLegalPersonMapping:
         vc = _load_fixture("legal-person-credential.json")
         assert "gxParticipant" not in vc["credentialSubject"]
 
+    def test_no_name_on_outer_node(self):
+        """Base skeleton must not have name on the outer node."""
+        vc = _load_fixture("legal-person-credential.json")
+        assert "name" not in vc["credentialSubject"]
+
     def test_no_gaiax_context(self):
         """Base skeleton must not reference the Gaia-X namespace."""
         vc = _load_fixture("legal-person-credential.json")
         assert GAIAX_NS not in vc["@context"]
 
     def test_roundtrip(self):
+        """Roundtrip skeleton — no claims to map, just envelope."""
         vc = _load_fixture("legal-person-credential.json")
         mapping = MAPPINGS["harbour:LegalPersonCredential"]
         claims, _ = vc_to_sd_jwt_claims(vc, mapping)
         reconstructed = sd_jwt_claims_to_vc(
             claims, mapping, "harbour:LegalPersonCredential"
         )
-        assert (
-            reconstructed["credentialSubject"]["name"]
-            == vc["credentialSubject"]["name"]
-        )
+        # Skeleton has no name — just verify subject ID roundtrips
+        assert reconstructed["credentialSubject"]["id"] == vc["credentialSubject"]["id"]
 
 
 class TestHarbourNaturalPersonMapping:
     def test_vc_to_claims(self):
+        """Skeleton NaturalPerson is minimal — just memberOf, no personal attributes."""
         vc = _load_fixture("natural-person-credential.json")
         mapping = MAPPINGS["harbour:NaturalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
-        assert claims["givenName"] == "Alice"
-        assert claims["familyName"] == "Smith"
-        assert claims["email"] == "alice.smith@example.com"
-        assert "givenName" in disclosable
-        assert "email" in disclosable
+        assert (
+            claims["memberOf"]
+            == "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
+        )
+        assert "memberOf" in disclosable
+        # No personal attributes in skeleton — those come via gxParticipant
+        assert "givenName" not in claims
+        assert "familyName" not in claims
 
     def test_has_credential_status(self):
         vc = _load_fixture("natural-person-credential.json")
@@ -115,32 +124,29 @@ class TestHarbourNaturalPersonMapping:
         assert evidence["type"] == "harbour:CredentialEvidence"
 
     def test_subject_is_harbour_natural_person(self):
-        """Verify the subject uses harbour:NaturalPerson (outer node only)."""
+        """Verify the subject uses harbour:NaturalPerson (outer node)."""
         vc = _load_fixture("natural-person-credential.json")
         subject_type = vc["credentialSubject"]["type"]
         assert subject_type == "harbour:NaturalPerson"
 
     def test_no_gx_participant(self):
-        """Base skeleton must not contain gxParticipant."""
+        """Skeleton is minimal — no gxParticipant."""
         vc = _load_fixture("natural-person-credential.json")
         assert "gxParticipant" not in vc["credentialSubject"]
+
+    def test_no_personal_attributes(self):
+        """Skeleton carries no personal attributes — identity comes via gx layer."""
+        vc = _load_fixture("natural-person-credential.json")
+        subject = vc["credentialSubject"]
+        assert "givenName" not in subject
+        assert "familyName" not in subject
+        assert "email" not in subject
+        assert "name" not in subject
 
     def test_no_gaiax_context(self):
         """Base skeleton must not reference the Gaia-X namespace."""
         vc = _load_fixture("natural-person-credential.json")
         assert GAIAX_NS not in vc["@context"]
-
-    def test_roundtrip(self):
-        vc = _load_fixture("natural-person-credential.json")
-        mapping = MAPPINGS["harbour:NaturalPersonCredential"]
-        claims, _ = vc_to_sd_jwt_claims(vc, mapping)
-        reconstructed = sd_jwt_claims_to_vc(
-            claims, mapping, "harbour:NaturalPersonCredential"
-        )
-        assert (
-            reconstructed["credentialSubject"]["givenName"]
-            == vc["credentialSubject"]["givenName"]
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -201,20 +207,25 @@ class TestGaiaxNaturalPersonMapping:
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
         assert claims["givenName"] == "Alice"
-        assert claims["gxName"] == "Alice Smith"
-        assert "gxName" in disclosable
+        assert claims["familyName"] == "Smith"
+        assert "givenName" in disclosable
 
-    def test_gx_inner_node_exists(self):
-        """Verify gx:Participant data lives in the gxParticipant inner node."""
+    def test_gx_natural_person_inner_node(self):
+        """Verify gx:NaturalPerson data lives in the gxParticipant inner node."""
         vc = _load_fixture("natural-person-credential.json", gaiax=True)
         subject = vc["credentialSubject"]
         gx = subject["gxParticipant"]
-        assert gx["type"] == "gx:Participant"
+        assert gx["type"] == "gx:NaturalPerson"
+        assert "givenName" in gx
+        assert "familyName" in gx
 
-    def test_no_outer_name(self):
-        """Gaia-X extension should NOT have name on the outer node."""
+    def test_no_personal_attributes_on_outer_node(self):
+        """givenName/familyName/email must NOT be on the outer node."""
         vc = _load_fixture("natural-person-credential.json", gaiax=True)
-        assert "name" not in vc["credentialSubject"]
+        subject = vc["credentialSubject"]
+        assert "givenName" not in subject
+        assert "familyName" not in subject
+        assert "name" not in subject
 
     def test_has_gaiax_context(self):
         """Gaia-X extension must include the Gaia-X namespace in @context."""

@@ -34,19 +34,17 @@ GAIAX_NS = "https://w3id.org/gaia-x/development#"
 
 HARBOUR_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}LegalPersonCredential",
-    "claims": {
-        "credentialSubject.name": "name",
-    },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "name"],
+    "claims": {},
+    "always_disclosed": ["iss", "vct", "iat", "exp"],
     "selectively_disclosed": [],
 }
 
 HARBOUR_NATURAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.givenName": "givenName",
-        "credentialSubject.familyName": "familyName",
-        "credentialSubject.email": "email",
+        "credentialSubject.gxParticipant.givenName": "givenName",
+        "credentialSubject.gxParticipant.familyName": "familyName",
+        "credentialSubject.gxParticipant.email": "email",
         "credentialSubject.memberOf": "memberOf",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp"],
@@ -76,15 +74,13 @@ GAIAX_LEGAL_PERSON_MAPPING = {
 GAIAX_NATURAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.gxParticipant.name": "gxName",
-        "credentialSubject.givenName": "givenName",
-        "credentialSubject.familyName": "familyName",
-        "credentialSubject.email": "email",
+        "credentialSubject.gxParticipant.givenName": "givenName",
+        "credentialSubject.gxParticipant.familyName": "familyName",
+        "credentialSubject.gxParticipant.email": "email",
         "credentialSubject.memberOf": "memberOf",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp"],
     "selectively_disclosed": [
-        "gxName",
         "givenName",
         "familyName",
         "email",
