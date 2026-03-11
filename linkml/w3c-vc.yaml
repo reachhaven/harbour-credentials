@@ -94,3 +94,30 @@ slots:
     description: >
       [VCDM2] §4.10 — credentialStatus is OPTIONAL (0..*), each MUST have
       id and type.
+
+  # [VCDM2] §4.6 — A verifiable credential MUST contain a
+  # credentialSubject property. The value is a set of objects containing
+  # claims about the subject(s) of the credential. Each subject MAY
+  # have an id property.
+  credentialSubject:
+    slot_uri: cred:credentialSubject
+    multivalued: true
+    description: >
+      [VCDM2] §4.6 — credentialSubject is REQUIRED (1..*), each MAY have id.
+
+  # [VCDM2] §6.1 — A verifiable presentation MUST have a holder property.
+  # The value MUST be a URL (typically a DID) identifying the entity
+  # presenting the credentials.
+  holder:
+    slot_uri: cred:holder
+    range: string
+    description: >
+      [VCDM2] §6.1 — holder MUST exist on a VP; value MUST be a URL (DID).
+
+  # [VCDM2] §6.1 — verifiableCredential contains the VCs being presented.
+  # Each entry is a VerifiableCredential or an enveloped credential.
+  verifiableCredential:
+    slot_uri: cred:verifiableCredential
+    multivalued: true
+    description: >
+      [VCDM2] §6.1 — verifiableCredential is REQUIRED (1..*) on a VP.

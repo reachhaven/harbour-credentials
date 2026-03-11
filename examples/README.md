@@ -26,22 +26,22 @@ flowchart LR
     end
 ```
 
-## Skeleton Credentials vs Domain Extensions
+## Core Credentials vs Gaia-X Domain
 
-The examples in this directory are **harbour skeletons** — they define the
-minimum base structure required for each credential type, without any
-domain-specific compliance data. The `delegated-signing-receipt.json` is the
-canonical reference for the skeleton pattern.
+The examples use a **two-tier layout**:
 
-Domain extensions live in subdirectories and add compliance data on top of the
-skeleton. Currently:
+- **Root (`examples/`)**: Core harbour credential skeletons that demonstrate the
+  envelope structure (evidence VP nesting, CRSet status) without domain-specific data.
+  Currently: `credential-with-evidence.json` and `credential-with-nested-evidence.json`.
 
-- **`gaiax/`** — [Gaia-X domain extensions](gaiax/README.md): adds
-  `gxParticipant` inner nodes with Gaia-X properties (registration number,
-  addresses) and the `https://w3id.org/gaia-x/development#` context.
+- **`gaiax/`**: [Gaia-X domain credentials](gaiax/README.md) — the complete
+  end-to-end user journey. These credentials carry Gaia-X properties
+  (registration number, addresses) and reference the
+  `https://w3id.org/gaia-x/development#` context.
 
-The `gxParticipant` composition slot is defined as `required: false` in the
-harbour schema — it is only populated when a domain extension needs it.
+Credential types in the Gaia-X layer use the `harbour_gx:` namespace prefix
+(e.g. `harbour_gx:LegalPersonCredential`, `harbour_gx:NaturalPerson`) while core
+types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:CredentialEvidence`).
 
 ## Credential Issuance Model
 
@@ -61,7 +61,7 @@ contains a VP proving who authorized the issuance:
 The Trust Anchor holds a **self-signed LegalPersonCredential** (analogous to a
 root CA certificate) where `issuer == credentialSubject.id`. This credential is
 publicly resolvable via a `LinkedCredentialService` endpoint in the Trust
-Anchor's DID document. See [`trust-anchor-credential.json`](trust-anchor-credential.json).
+Anchor's DID document. See [`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json).
 
 ## Actors and Identities
 
@@ -126,11 +126,11 @@ self-signed LegalPersonCredential, establishing the chain of trust.
 
 | File | Description |
 |------|-------------|
-| [`trust-anchor-credential.json`](trust-anchor-credential.json) | Trust Anchor's self-signed credential (root of trust) |
-| [`legal-person-credential.json`](legal-person-credential.json) | Unsigned credential (expanded JSON-LD) |
-| [`signed/legal-person-credential.jwt`](signed/legal-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
-| [`signed/legal-person-credential.decoded.json`](signed/legal-person-credential.decoded.json) | Decoded JWT (header + payload) |
-| [`signed/legal-person-credential.evidence-vp.jwt`](signed/legal-person-credential.evidence-vp.jwt) | Evidence VP (Trust Anchor authorization) |
+| [`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json) | Trust Anchor's self-signed credential (root of trust) |
+| [`gaiax/legal-person-credential.json`](gaiax/legal-person-credential.json) | Unsigned credential (expanded JSON-LD) |
+| [`gaiax/signed/legal-person-credential.jwt`](gaiax/signed/legal-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
+| [`gaiax/signed/legal-person-credential.decoded.json`](gaiax/signed/legal-person-credential.decoded.json) | Decoded JWT (header + payload) |
+| [`gaiax/signed/legal-person-credential.evidence-vp.jwt`](gaiax/signed/legal-person-credential.evidence-vp.jwt) | Evidence VP (Trust Anchor authorization) |
 | [`did-ethr/legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Legal person DID document |
 
 ### Code
@@ -186,10 +186,10 @@ organizational affiliation without the credential itself leaking PII.
 
 | File | Description |
 |------|-------------|
-| [`natural-person-credential.json`](natural-person-credential.json) | Unsigned credential (expanded JSON-LD) |
-| [`signed/natural-person-credential.jwt`](signed/natural-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
-| [`signed/natural-person-credential.decoded.json`](signed/natural-person-credential.decoded.json) | Decoded JWT (header + payload) |
-| [`signed/natural-person-credential.evidence-vp.jwt`](signed/natural-person-credential.evidence-vp.jwt) | Evidence VP (org authorization) |
+| [`gaiax/natural-person-credential.json`](gaiax/natural-person-credential.json) | Unsigned credential (expanded JSON-LD) |
+| [`gaiax/signed/natural-person-credential.jwt`](gaiax/signed/natural-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
+| [`gaiax/signed/natural-person-credential.decoded.json`](gaiax/signed/natural-person-credential.decoded.json) | Decoded JWT (header + payload) |
+| [`gaiax/signed/natural-person-credential.evidence-vp.jwt`](gaiax/signed/natural-person-credential.evidence-vp.jwt) | Evidence VP (org authorization) |
 | [`did-ethr/natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) | Alice's DID document |
 
 ### Code
@@ -197,7 +197,7 @@ organizational affiliation without the credential itself leaking PII.
 ```python
 # Python — convert to SD-JWT-VC flat claims
 from credentials.claim_mapping import vc_to_sd_jwt_claims, MAPPINGS
-mapping = MAPPINGS["harbour:NaturalPersonCredential"]
+mapping = MAPPINGS["harbour_gx:NaturalPersonCredential"]
 claims, disclosable = vc_to_sd_jwt_claims(credential, mapping)
 # claims: {"iss": ..., "vct": ..., "givenName": "Alice", "memberOf": "did:ethr:0x14a34:0x..."}
 # disclosable: ["givenName", "familyName", "email", "memberOf"]
@@ -251,7 +251,7 @@ On the wire, the consent VP is an SD-JWT compact serialization:
 
 The consent VP is not persisted as a standalone example — it is an ephemeral
 artifact between Alice's wallet and the Signing Service. The receipt credential
-([`delegated-signing-receipt.json`](delegated-signing-receipt.json)) embeds the
+([`gaiax/delegated-signing-receipt.json`](gaiax/delegated-signing-receipt.json)) embeds the
 consent VP as evidence, making it the durable audit record.
 
 ### Code
@@ -336,10 +336,10 @@ layers of information:
 
 | File | Description |
 |------|-------------|
-| [`delegated-signing-receipt.json`](delegated-signing-receipt.json) | Unsigned receipt (expanded JSON-LD) |
-| [`signed/delegated-signing-receipt.jwt`](signed/delegated-signing-receipt.jwt) | Signed receipt (VC-JOSE-COSE wire format) |
-| [`signed/delegated-signing-receipt.decoded.json`](signed/delegated-signing-receipt.decoded.json) | Decoded JWT (header + payload) |
-| [`signed/delegated-signing-receipt.evidence-vp.jwt`](signed/delegated-signing-receipt.evidence-vp.jwt) | Evidence VP (consent proof, signed) |
+| [`gaiax/delegated-signing-receipt.json`](gaiax/delegated-signing-receipt.json) | Unsigned receipt (expanded JSON-LD) |
+| [`gaiax/signed/delegated-signing-receipt.jwt`](gaiax/signed/delegated-signing-receipt.jwt) | Signed receipt (VC-JOSE-COSE wire format) |
+| [`gaiax/signed/delegated-signing-receipt.decoded.json`](gaiax/signed/delegated-signing-receipt.decoded.json) | Decoded JWT (header + payload) |
+| [`gaiax/signed/delegated-signing-receipt.evidence-vp.jwt`](gaiax/signed/delegated-signing-receipt.evidence-vp.jwt) | Evidence VP (consent proof, signed) |
 
 ### Code
 
@@ -369,21 +369,21 @@ import { verifySdJwtVp, signJwt } from '@reachhaven/harbour-credentials';
 
 ## File Index
 
-### Harbour skeletons (unsigned, expanded JSON-LD)
+### Core skeletons (unsigned, expanded JSON-LD)
+
+| File | Description |
+|------|-------------|
+| [`credential-with-evidence.json`](credential-with-evidence.json) | Generic VC with evidence VP |
+| [`credential-with-nested-evidence.json`](credential-with-nested-evidence.json) | Generic VC with nested evidence chain |
+
+### Gaia-X domain storyline (`gaiax/`)
 
 | File | Step | Description |
 |------|------|-------------|
-| [`trust-anchor-credential.json`](trust-anchor-credential.json) | — | Trust Anchor self-signed credential (root of trust) |
-| [`legal-person-credential.json`](legal-person-credential.json) | 1 | Organization credential (harbour skeleton) |
-| [`natural-person-credential.json`](natural-person-credential.json) | 2 | Employee credential with `memberOf` link (harbour skeleton) |
-| [`delegated-signing-receipt.json`](delegated-signing-receipt.json) | 3+4 | Transaction receipt with embedded consent VP as evidence |
-
-### Gaia-X domain extensions (`gaiax/`)
-
-| File | Derives from | What's added |
-|------|-------------|--------------|
-| [`gaiax/legal-person-credential.json`](gaiax/legal-person-credential.json) | `legal-person-credential.json` | `gxParticipant` with registration number, addresses |
-| [`gaiax/natural-person-credential.json`](gaiax/natural-person-credential.json) | `natural-person-credential.json` | `gxParticipant` with `gx:Participant` |
+| [`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json) | — | Trust Anchor self-signed credential (root of trust) |
+| [`gaiax/legal-person-credential.json`](gaiax/legal-person-credential.json) | 1 | Organization credential |
+| [`gaiax/natural-person-credential.json`](gaiax/natural-person-credential.json) | 2 | Employee credential with `memberOf` link |
+| [`gaiax/delegated-signing-receipt.json`](gaiax/delegated-signing-receipt.json) | 3+4 | Transaction receipt with embedded consent VP as evidence |
 
 ### Signed artifacts (`signed/`)
 

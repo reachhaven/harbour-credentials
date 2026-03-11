@@ -1,7 +1,8 @@
 {
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
-    "https://w3id.org/reachhaven/harbour/credentials/v1/"
+    "https://w3id.org/reachhaven/harbour/credentials/v1/",
+    "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
   ],
   "type": [
     "VerifiableCredential",
@@ -11,7 +12,7 @@
   "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "validFrom": "2025-06-25T10:00:00Z",
   "credentialSubject": {
-    "id": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9",
+    "id": "urn:uuid:receipt-b7c8d9e0-f1a2-3456-789a-bcdef0123456",
     "type": "harbour:TransactionReceipt",
     "transactionHash": "cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
     "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
@@ -25,29 +26,34 @@
   ],
   "evidence": [
     {
-      "type": "harbour:DelegatedSignatureEvidence",
+      "type": [
+        "harbour:Evidence",
+        "harbour:DelegatedSignatureEvidence"
+      ],
       "verifiablePresentation": {
         "@context": [
           "https://www.w3.org/ns/credentials/v2"
         ],
         "type": [
-          "VerifiablePresentation"
+          "VerifiablePresentation",
+          "harbour:VerifiablePresentation"
         ],
         "holder": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6IjZka1U2Wk1GSzc5V3dpY3dKNXJieEUxM3pTdWtCWTJPb0VpVlVFanFNRWMiLCJ5IjoiUm5Iem55VmxyUFNNVDdpckRzMTVEOXd4Z01vamlTREFRcGZGaHFUa0xSWSJ9",
         "verifiableCredential": [
           {
             "@context": [
               "https://www.w3.org/ns/credentials/v2",
-              "https://w3id.org/reachhaven/harbour/credentials/v1/"
+              "https://w3id.org/reachhaven/harbour/credentials/v1/",
+              "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
             ],
             "type": [
-              "VerifiableCredential",
-              "harbour:NaturalPersonCredential"
+              "VerifiableCredential"
             ],
             "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+            "validFrom": "2024-01-15T00:00:00Z",
             "credentialSubject": {
               "id": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9",
-              "type": "harbour:NaturalPerson",
+              "type": "harbour_gx:NaturalPerson",
               "memberOf": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
             }
           }

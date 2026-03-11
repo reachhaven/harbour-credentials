@@ -1,41 +1,34 @@
-# Gaia-X Domain Extensions
+# Gaia-X Domain Credentials
 
-This directory contains **Gaia-X domain extensions** of the harbour credential
-skeletons in the parent `examples/` directory. Each file adds Gaia-X compliance
-data to the base harbour skeleton using the **composition pattern**.
+This directory contains the **complete Gaia-X credential storyline** — the
+end-to-end user journey from trust anchor through organization and employee
+onboarding to delegated blockchain transactions.
 
-## Composition Pattern
+## Structure
 
-Harbour credentials use a two-layer model:
+Credentials use the `harbour_gx:` namespace prefix
+(`https://w3id.org/reachhaven/harbour/gaiax-domain/v1/`) for domain types
+and properties, while core envelope types use `harbour:`.
 
-1. **Outer node** (`harbour:LegalPerson` / `harbour:NaturalPerson`) — harbour-owned
-   properties (`name`, `memberOf`, CRSet status).
-2. **Inner node** (`gxParticipant`) — a Gaia-X typed blank node
-   (`gx:LegalPerson`, `gx:Participant`) carrying Gaia-X properties
-   (`gx:registrationNumber`, `gx:headquartersAddress`, etc.).
+| File | Step | Description |
+|------|------|-------------|
+| `trust-anchor-credential.json` | — | Trust Anchor self-signed credential (root of trust) |
+| `legal-person-credential.json` | 1 | Organization credential with registration data |
+| `natural-person-credential.json` | 2 | Employee credential with identity and `memberOf` link |
+| `delegated-signing-receipt.json` | 3+4 | Transaction receipt with embedded consent VP as evidence |
 
-This keeps harbour and Gaia-X SHACL shapes validating independently. The
-`gxParticipant` slot is defined as `required: false` in the harbour schema — it
-is only populated when Gaia-X compliance is needed.
+## Context Stack
 
-## Skeleton to Extension Derivation
-
-| Skeleton (parent `examples/`) | Gaia-X extension (this directory) | What's added |
-|-------------------------------|-----------------------------------|--------------|
-| `legal-person-credential.json` | `legal-person-credential.json` | `gxParticipant` with `gx:LegalPerson`, registration number, addresses |
-| `natural-person-credential.json` | `natural-person-credential.json` | `gxParticipant` with `gx:Participant` |
-
-The `@context` array in Gaia-X extensions includes the Gaia-X namespace:
+All credentials use a stacked `@context` array:
 
 ```json
 "@context": [
   "https://www.w3.org/ns/credentials/v2",
   "https://w3id.org/gaia-x/development#",
-  "https://w3id.org/reachhaven/harbour/credentials/v1/"
+  "https://w3id.org/reachhaven/harbour/credentials/v1/",
+  "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
 ]
 ```
-
-Base skeletons omit this context entry entirely.
 
 ## Regenerating Signed Artifacts
 
@@ -46,3 +39,6 @@ PYTHONPATH=src/python:$PYTHONPATH python -m credentials.example_signer examples/
 
 This processes both `examples/*.json` and `examples/gaiax/*.json`, producing
 signed artifacts in `examples/signed/` and `examples/gaiax/signed/` respectively.
+
+See the parent [`examples/README.md`](../README.md) for the full user journey
+with sequence diagrams.

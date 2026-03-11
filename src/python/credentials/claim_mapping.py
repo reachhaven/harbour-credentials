@@ -25,6 +25,9 @@ from typing import Any
 # Harbour namespace
 HARBOUR_NS = "https://w3id.org/reachhaven/harbour/credentials/v1/"
 
+# Harbour Gaia-X domain namespace
+HARBOUR_GX_NS = "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
+
 # Gaia-X namespace
 GAIAX_NS = "https://w3id.org/gaia-x/development#"
 
@@ -33,18 +36,27 @@ GAIAX_NS = "https://w3id.org/gaia-x/development#"
 # ---------------------------------------------------------------------------
 
 HARBOUR_LEGAL_PERSON_MAPPING = {
-    "vct": f"{HARBOUR_NS}LegalPersonCredential",
-    "claims": {},
-    "always_disclosed": ["iss", "vct", "iat", "exp"],
-    "selectively_disclosed": [],
+    "vct": f"{HARBOUR_GX_NS}LegalPersonCredential",
+    "claims": {
+        "credentialSubject.name": "legalName",
+        "credentialSubject.registrationNumber": "registrationNumber",
+        "credentialSubject.headquartersAddress": "headquartersAddress",
+        "credentialSubject.legalAddress": "legalAddress",
+    },
+    "always_disclosed": ["iss", "vct", "iat", "exp", "legalName"],
+    "selectively_disclosed": [
+        "registrationNumber",
+        "headquartersAddress",
+        "legalAddress",
+    ],
 }
 
 HARBOUR_NATURAL_PERSON_MAPPING = {
-    "vct": f"{HARBOUR_NS}NaturalPersonCredential",
+    "vct": f"{HARBOUR_GX_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.gxParticipant.givenName": "givenName",
-        "credentialSubject.gxParticipant.familyName": "familyName",
-        "credentialSubject.gxParticipant.email": "email",
+        "credentialSubject.givenName": "givenName",
+        "credentialSubject.familyName": "familyName",
+        "credentialSubject.email": "email",
         "credentialSubject.memberOf": "memberOf",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp"],
@@ -52,11 +64,12 @@ HARBOUR_NATURAL_PERSON_MAPPING = {
 }
 
 # ---------------------------------------------------------------------------
-# Gaia-X domain mappings (extends base with gxParticipant)
+# Gaia-X domain mappings (with gxParticipant inner node)
+# Used when the credential wraps gx data inside a gxParticipant nested object.
 # ---------------------------------------------------------------------------
 
 GAIAX_LEGAL_PERSON_MAPPING = {
-    "vct": f"{HARBOUR_NS}LegalPersonCredential",
+    "vct": f"{HARBOUR_GX_NS}LegalPersonCredential",
     "claims": {
         "credentialSubject.gxParticipant.name": "legalName",
         "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
@@ -72,7 +85,7 @@ GAIAX_LEGAL_PERSON_MAPPING = {
 }
 
 GAIAX_NATURAL_PERSON_MAPPING = {
-    "vct": f"{HARBOUR_NS}NaturalPersonCredential",
+    "vct": f"{HARBOUR_GX_NS}NaturalPersonCredential",
     "claims": {
         "credentialSubject.gxParticipant.givenName": "givenName",
         "credentialSubject.gxParticipant.familyName": "familyName",
@@ -94,14 +107,14 @@ GAIAX_NATURAL_PERSON_MAPPING = {
 
 # Base harbour mappings (skeleton credentials)
 MAPPINGS: dict[str, dict] = {
-    "harbour:LegalPersonCredential": HARBOUR_LEGAL_PERSON_MAPPING,
-    "harbour:NaturalPersonCredential": HARBOUR_NATURAL_PERSON_MAPPING,
+    "harbour_gx:LegalPersonCredential": HARBOUR_LEGAL_PERSON_MAPPING,
+    "harbour_gx:NaturalPersonCredential": HARBOUR_NATURAL_PERSON_MAPPING,
 }
 
 # Gaia-X domain mappings (extended with gxParticipant)
 GAIAX_MAPPINGS: dict[str, dict] = {
-    "harbour:LegalPersonCredential": GAIAX_LEGAL_PERSON_MAPPING,
-    "harbour:NaturalPersonCredential": GAIAX_NATURAL_PERSON_MAPPING,
+    "harbour_gx:LegalPersonCredential": GAIAX_LEGAL_PERSON_MAPPING,
+    "harbour_gx:NaturalPersonCredential": GAIAX_NATURAL_PERSON_MAPPING,
 }
 
 
@@ -243,10 +256,9 @@ def get_mapping_for_vc(vc: dict) -> dict | None:
         elif isinstance(at_type, list):
             vc_types = vc_types + at_type
 
-    # Choose registry based on context
-    registry = GAIAX_MAPPINGS if _has_gaiax_context(vc) else MAPPINGS
-
-    for vc_type, mapping in registry.items():
+    # Use primary registry — GAIAX_MAPPINGS is reserved for gxParticipant-nested
+    # patterns (not yet used in current examples).
+    for vc_type, mapping in MAPPINGS.items():
         if vc_type in vc_types:
             return mapping
     return None

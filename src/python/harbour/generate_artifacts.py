@@ -35,22 +35,36 @@ LINKML = Namespace("https://w3id.org/linkml/")
 
 
 class HarbourShaclGenerator(_BaseShaclGenerator):
-    """SHACL generator that corrects IRI-valued property shapes.
+    """SHACL generator with importmap-aware initialisation and IRI fixes.
 
-    ``cred:issuer`` is defined as ``@type: @id`` in the W3C VC v2 context,
-    meaning JSON-LD processors expand issuer values to IRIs. LinkML has no
-    native IRI range type, so we patch the generated graph directly.
+    Bypasses ``ShaclGenerator.__post_init__``'s ``SchemaView`` construction
+    which ignores ``importmap`` / ``base_dir``, causing cross-directory
+    imports to fail.
+    See https://github.com/linkml/linkml/issues/2913
 
-    Also removes ``sh:class linkml:Any`` constraints: LinkML emits these for
-    ``range: Any`` slots, but ``linkml:Any`` is a meta-schema type never
-    asserted as ``rdf:type`` on instance data.
+    Also corrects ``cred:issuer`` property shape (IRI, not Literal) and
+    removes ``sh:class linkml:Any`` constraints.
     See https://github.com/linkml/linkml/issues/2914
     """
+
+    uses_schemaloader = False
+
+    def __post_init__(self) -> None:
+        from linkml.utils.generator import Generator
+
+        Generator.__post_init__(self)
+        self.generate_header()
 
     def as_graph(self):
         g = super().as_graph()
         # Fix cred:issuer nodeKind (IRI, not Literal)
         for ps in g.subjects(SH.path, CRED.issuer):
+            g.remove((ps, SH.nodeKind, SH.Literal))
+            g.add((ps, SH.nodeKind, SH.IRIOrLiteral))
+            for dt in list(g.objects(ps, SH.datatype)):
+                g.remove((ps, SH.datatype, dt))
+        # Fix cred:holder nodeKind (IRI, not Literal) — DIDs are IRIs
+        for ps in g.subjects(SH.path, CRED.holder):
             g.remove((ps, SH.nodeKind, SH.Literal))
             g.add((ps, SH.nodeKind, SH.IRIOrLiteral))
             for dt in list(g.objects(ps, SH.datatype)):
@@ -81,24 +95,43 @@ class HarbourContextGenerator(_BaseContextGenerator):
 
 
 def main() -> None:
+    importmap_path = LINKML_DIR / "importmap.json"
+    importmap = None
+    if importmap_path.exists():
+        raw = json.loads(importmap_path.read_text(encoding="utf-8"))
+        # Resolve relative paths against the linkml directory
+        importmap = {}
+        for key, val in raw.items():
+            p = Path(val)
+            if not p.is_absolute():
+                p = (LINKML_DIR / p).resolve()
+            importmap[key] = str(p)
+
     for domain in DOMAINS:
         schema = str(LINKML_DIR / f"{domain}.yaml")
+        base_dir = str(LINKML_DIR)
         out_dir = ARTIFACTS_DIR / domain
         out_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"  Processing {domain}...")
 
-        owl_gen = OwlSchemaGenerator(schema, mergeimports=False)
+        owl_gen = OwlSchemaGenerator(
+            schema, mergeimports=False, importmap=importmap, base_dir=base_dir
+        )
         (out_dir / f"{domain}.owl.ttl").write_text(
             owl_gen.serialize(), encoding="utf-8"
         )
 
-        shacl_gen = HarbourShaclGenerator(schema)
+        shacl_gen = HarbourShaclGenerator(
+            schema, importmap=importmap, base_dir=base_dir
+        )
         (out_dir / f"{domain}.shacl.ttl").write_text(
             shacl_gen.serialize(), encoding="utf-8"
         )
 
-        ctx_gen = HarbourContextGenerator(schema, mergeimports=False)
+        ctx_gen = HarbourContextGenerator(
+            schema, mergeimports=False, importmap=importmap, base_dir=base_dir
+        )
         ctx_text = ctx_gen.serialize()
 
         # Ensure "type": "@type" is present in the generated context.
