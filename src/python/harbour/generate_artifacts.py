@@ -20,7 +20,7 @@ from linkml.generators.jsonldcontextgen import ContextGenerator as _BaseContextG
 from linkml.generators.owlgen import OwlSchemaGenerator
 from linkml.generators.shaclgen import ShaclGenerator as _BaseShaclGenerator
 from linkml_runtime.linkml_model.meta import SlotDefinition
-from rdflib import Namespace
+from rdflib import OWL, Namespace, URIRef
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 LINKML_DIR = REPO_ROOT / "linkml"
@@ -118,9 +118,17 @@ def main() -> None:
         owl_gen = OwlSchemaGenerator(
             schema, mergeimports=False, importmap=importmap, base_dir=base_dir
         )
-        (out_dir / f"{domain}.owl.ttl").write_text(
-            owl_gen.serialize(), encoding="utf-8"
-        )
+        owl_text = owl_gen.serialize()
+
+        # Post-process OWL: add owl:equivalentClass triples for classes
+        # whose class_uri differs from the default OWL class IRI.
+        # LinkML generates OWL class IRIs as default_prefix + ClassName,
+        # but class_uri (used for SHACL targetClass and JSON-LD context)
+        # may differ. Without equivalence, RDFS inference cannot chain
+        # the subclass hierarchy through class_uri URIs.
+        owl_text = _patch_owl_equivalences(owl_gen, owl_text)
+
+        (out_dir / f"{domain}.owl.ttl").write_text(owl_text, encoding="utf-8")
 
         shacl_gen = HarbourShaclGenerator(
             schema, importmap=importmap, base_dir=base_dir
@@ -146,6 +154,55 @@ def main() -> None:
         (out_dir / f"{domain}.context.jsonld").write_text(ctx_text, encoding="utf-8")
 
     print(f"\nDone: {ARTIFACTS_DIR}/")
+
+
+def _patch_owl_equivalences(owl_gen: OwlSchemaGenerator, owl_text: str) -> str:
+    """Add rdfs:subClassOf triples where class_uri differs from the
+    default OWL class IRI (default_prefix + ClassName).
+
+    LinkML generates OWL using default_prefix + class_name as the class IRI,
+    but class_uri (which controls SHACL targetClass and JSON-LD type mapping)
+    can be set to a different URI. Downstream validators that rely on RDFS
+    inference need the subclass chain to be reachable from class_uri URIs.
+
+    For each class where class_uri != owl_uri, we copy all rdfs:subClassOf
+    triples from the owl_uri class to the class_uri URI. This ensures RDFS
+    inference (which doesn't understand owl:equivalentClass) can resolve
+    the type hierarchy via class_uri URIs used in instance data.
+    """
+    from rdflib import RDFS, Graph
+
+    sv = owl_gen.schemaview
+    schema = sv.schema
+    default_pfx = schema.default_prefix or ""
+    pfx_map = {p.prefix_prefix: p.prefix_reference for p in schema.prefixes.values()}
+    default_ns = pfx_map.get(default_pfx, "")
+
+    equivalences: list[tuple[str, str]] = []
+    for cls_name, cls_def in sv.all_classes().items():
+        if cls_def.class_uri:
+            class_uri_str = sv.get_uri(cls_def, expand=True)
+            owl_uri = f"{default_ns}{cls_name}"
+            if class_uri_str and class_uri_str != owl_uri:
+                equivalences.append((owl_uri, class_uri_str))
+
+    if not equivalences:
+        return owl_text
+
+    g = Graph()
+    g.parse(data=owl_text, format="turtle")
+    for owl_uri, class_uri_str in equivalences:
+        owl_ref = URIRef(owl_uri)
+        cu_ref = URIRef(class_uri_str)
+        if (owl_ref, None, None) in g:
+            # Copy rdfs:subClassOf triples from owl_uri to class_uri
+            for _, _, parent in g.triples((owl_ref, RDFS.subClassOf, None)):
+                if isinstance(parent, URIRef):
+                    g.add((cu_ref, RDFS.subClassOf, parent))
+            # Also add equivalence for OWL reasoners
+            g.add((owl_ref, OWL.equivalentClass, cu_ref))
+
+    return g.serialize(format="turtle")
 
 
 if __name__ == "__main__":
