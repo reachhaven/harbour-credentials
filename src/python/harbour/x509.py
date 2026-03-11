@@ -25,6 +25,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.x509.oid import NameOID
+
 from harbour.keys import PrivateKey, PublicKeyType
 
 
@@ -288,6 +289,7 @@ Examples:
         pub_key = extract_public_key(cert)
 
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
         from harbour.keys import p256_public_key_to_jwk, public_key_to_jwk
 
         if isinstance(pub_key, Ed25519PublicKey):

@@ -10,6 +10,7 @@ Verifies:
 from pathlib import Path
 
 import pytest
+
 from credentials.example_signer import (
     decode_evidence_vp,
     load_test_p256_keypair,

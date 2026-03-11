@@ -1,6 +1,7 @@
 """Tests for SD-JWT-VC issuance and verification."""
 
 import pytest
+
 from harbour.keys import (
     generate_p256_keypair,
     p256_public_key_to_jwk,

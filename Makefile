@@ -81,7 +81,7 @@ help:
 	@echo "  make lint       - Run pre-commit checks (Python + Markdown)"
 	@echo "  make lint-md    - Lint Markdown files with markdownlint-cli2"
 	@echo "  make lint-ts    - Run TypeScript linting"
-	@echo "  make format     - Format Python code with black/isort"
+	@echo "  make format     - Format Python code with ruff"
 	@echo "  make format-md  - Auto-fix Markdown lint violations"
 	@echo ""
 	@echo "Testing:"
@@ -238,8 +238,8 @@ lint-md: ## Lint Markdown files with markdownlint-cli2
 format:
 	$(call check_dev_setup)
 	@echo "Formatting Python code..."
-	@$(PYTHON) -m black src/python/ tests/
-	@$(PYTHON) -m isort src/python/ tests/
+	@$(PYTHON) -m ruff format src/python/ tests/
+	@$(PYTHON) -m ruff check --fix src/python/ tests/
 	@echo "OK: Python formatting complete"
 
 # Auto-fix Markdown lint violations

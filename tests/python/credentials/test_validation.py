@@ -77,9 +77,9 @@ def test_has_context(credential_file):
     """Each credential must have an @context array."""
     data = _load_json(credential_file)
     ctx = data.get("@context")
-    assert isinstance(
-        ctx, list
-    ), f"Missing or invalid @context in {credential_file.name}"
+    assert isinstance(ctx, list), (
+        f"Missing or invalid @context in {credential_file.name}"
+    )
     assert "https://www.w3.org/ns/credentials/v2" in ctx
 
 
@@ -87,9 +87,9 @@ def test_has_type(credential_file):
     """Each credential must have a type array with VerifiableCredential."""
     data = _load_json(credential_file)
     types = data.get("type", [])
-    assert (
-        "VerifiableCredential" in types
-    ), f"Missing VerifiableCredential type in {credential_file.name}"
+    assert "VerifiableCredential" in types, (
+        f"Missing VerifiableCredential type in {credential_file.name}"
+    )
 
 
 def test_has_issuer(credential_file):
@@ -113,9 +113,9 @@ def test_has_credential_status(credential_file):
     """Each harbour credential must have a credentialStatus with CRSetEntry."""
     data = _load_json(credential_file)
     status = data.get("credentialStatus")
-    assert (
-        isinstance(status, list) and len(status) > 0
-    ), f"Missing credentialStatus in {credential_file.name}"
+    assert isinstance(status, list) and len(status) > 0, (
+        f"Missing credentialStatus in {credential_file.name}"
+    )
     for entry in status:
         assert entry.get("type") == "harbour:CRSetEntry"
         assert "statusPurpose" in entry
@@ -178,9 +178,9 @@ class TestHarbourContextConsistency:
             entry = ctx.get(cls)
             assert entry is not None, f"Missing {cls} in context"
             aid = entry.get("@id") if isinstance(entry, dict) else entry
-            assert (
-                has_vocab or ":" in aid
-            ), f"{cls} has unprefixed @id without @vocab: {aid}"
+            assert has_vocab or ":" in aid, (
+                f"{cls} has unprefixed @id without @vocab: {aid}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -208,9 +208,9 @@ class TestDomainContextConsistency:
         ]
         for cls in domain_classes:
             # Term resolves either via explicit context entry or @vocab fallback
-            assert (
-                cls in ctx or has_vocab
-            ), f"Missing {cls} in harbour-gx-credential context (no @vocab fallback)"
+            assert cls in ctx or has_vocab, (
+                f"Missing {cls} in harbour-gx-credential context (no @vocab fallback)"
+            )
 
     def test_context_has_composition_slots(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
@@ -232,9 +232,9 @@ class TestDomainContextConsistency:
                 assert has_vocab, f"Missing {cls} in context with no @vocab"
                 continue
             aid = entry.get("@id") if isinstance(entry, dict) else entry
-            assert (
-                has_vocab or ":" in aid
-            ), f"{cls} has unprefixed @id without @vocab: {aid}"
+            assert has_vocab or ":" in aid, (
+                f"{cls} has unprefixed @id without @vocab: {aid}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -262,9 +262,9 @@ class TestHarbourShaclShapes:
             "harbour:DelegatedSignatureEvidence",
         ]
         for shape in expected_shapes:
-            assert (
-                f"{shape} a sh:NodeShape" in content
-            ), f"Missing SHACL NodeShape for {shape}"
+            assert f"{shape} a sh:NodeShape" in content, (
+                f"Missing SHACL NodeShape for {shape}"
+            )
 
     def test_harbour_credential_shape_has_issuer(self):
         """HarbourCredential shape must include cred:issuer as required."""
@@ -276,9 +276,9 @@ class TestHarbourShaclShapes:
         if next_shape == -1:
             next_shape = len(content)
         shape_block = content[shape_start:next_shape]
-        assert (
-            "cred:issuer" in shape_block
-        ), "HarbourCredential shape missing cred:issuer"
+        assert "cred:issuer" in shape_block, (
+            "HarbourCredential shape missing cred:issuer"
+        )
 
     def test_evidence_shapes_require_verifiable_presentation(self):
         """Evidence shapes must require verifiablePresentation."""
@@ -290,12 +290,12 @@ class TestHarbourShaclShapes:
             if next_shape == -1:
                 next_shape = len(content)
             shape_block = content[shape_start:next_shape]
-            assert (
-                "harbour:verifiablePresentation" in shape_block
-            ), f"{ev_type} shape missing harbour:verifiablePresentation"
-            assert (
-                "sh:minCount 1" in shape_block
-            ), f"{ev_type} shape missing sh:minCount 1 for verifiablePresentation"
+            assert "harbour:verifiablePresentation" in shape_block, (
+                f"{ev_type} shape missing harbour:verifiablePresentation"
+            )
+            assert "sh:minCount 1" in shape_block, (
+                f"{ev_type} shape missing sh:minCount 1 for verifiablePresentation"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -323,9 +323,9 @@ class TestDomainShaclShapes:
             "harbour_gx:NaturalPerson",
         ]
         for shape in expected_shapes:
-            assert (
-                f"{shape} a sh:NodeShape" in content
-            ), f"Missing SHACL NodeShape for {shape}"
+            assert f"{shape} a sh:NodeShape" in content, (
+                f"Missing SHACL NodeShape for {shape}"
+            )
 
     def test_credential_shapes_have_required_properties(self):
         """Concrete credential shapes must require validFrom and credentialStatus."""
@@ -341,12 +341,12 @@ class TestDomainShaclShapes:
             if next_shape == -1:
                 next_shape = len(content)
             shape_block = content[shape_start:next_shape]
-            assert (
-                "cred:validFrom" in shape_block
-            ), f"{cred_type} shape missing cred:validFrom"
-            assert (
-                "cred:credentialStatus" in shape_block
-            ), f"{cred_type} shape missing cred:credentialStatus"
+            assert "cred:validFrom" in shape_block, (
+                f"{cred_type} shape missing cred:validFrom"
+            )
+            assert "cred:credentialStatus" in shape_block, (
+                f"{cred_type} shape missing cred:credentialStatus"
+            )
 
     def test_person_credential_shapes_require_evidence(self):
         """LegalPersonCredential and NaturalPersonCredential must require evidence."""
@@ -359,6 +359,6 @@ class TestDomainShaclShapes:
             if next_shape == -1:
                 next_shape = len(content)
             shape_block = content[shape_start:next_shape]
-            assert (
-                "cred:evidence" in shape_block
-            ), f"{cred_type} shape missing cred:evidence"
+            assert "cred:evidence" in shape_block, (
+                f"{cred_type} shape missing cred:evidence"
+            )

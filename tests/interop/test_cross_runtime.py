@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from harbour.delegation import (
     TransactionData,
     compute_transaction_data_param_hash,
@@ -239,9 +240,9 @@ class TestCanonicalizationInterop:
         for v in vectors:
             td = TransactionData.from_dict(v["input"])
             py_canonical = td.to_json(canonical=True)
-            assert (
-                py_canonical == v["canonical_json"]
-            ), f"Python mismatch for {v['name']}"
+            assert py_canonical == v["canonical_json"], (
+                f"Python mismatch for {v['name']}"
+            )
 
         # Run all vectors through TypeScript in a single Node invocation
         inputs_json = json.dumps([v["input"] for v in vectors])
@@ -312,9 +313,9 @@ console.log("OK");
         """Both runtimes produce the same base64url transaction_data request strings."""
         for v in vectors:
             td = TransactionData.from_dict(v["input"])
-            assert (
-                encode_transaction_data_param(td) == v["transaction_data_param"]
-            ), f"Python mismatch for {v['name']}"
+            assert encode_transaction_data_param(td) == v["transaction_data_param"], (
+                f"Python mismatch for {v['name']}"
+            )
 
         inputs_json = json.dumps([v["input"] for v in vectors])
         expected_json = json.dumps([v["transaction_data_param"] for v in vectors])

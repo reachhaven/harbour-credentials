@@ -1,6 +1,7 @@
 """Tests for KB-JWT creation and verification with transaction_data support."""
 
 import pytest
+
 from harbour.kb_jwt import create_kb_jwt, verify_kb_jwt
 from harbour.keys import (
     generate_p256_keypair,

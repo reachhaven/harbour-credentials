@@ -21,6 +21,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from harbour.delegation import (
     ACTION_LABELS,
     ACTION_TYPE,
@@ -339,9 +340,9 @@ class TestHashComputation:
         for change in variations:
             modified = {**base, **change}
             modified_tx = TransactionData(**modified)
-            assert (
-                modified_tx.compute_hash() != base_hash
-            ), f"Hash unchanged for {change}"
+            assert modified_tx.compute_hash() != base_hash, (
+                f"Hash unchanged for {change}"
+            )
 
 
 class TestSharedVectors:

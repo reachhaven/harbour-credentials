@@ -11,11 +11,12 @@ import json
 import sys
 from pathlib import Path
 
+from joserfc import jws
+
 from harbour._crypto import import_public_key as _import_public_key
 from harbour._crypto import load_public_key as _load_public_key
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PublicKeyType
-from joserfc import jws
 
 
 class VerificationError(Exception):
@@ -72,8 +73,7 @@ def verify_vp_jose(
         actual_aud = payload.get("aud")
         if actual_aud != expected_audience:
             raise VerificationError(
-                f"Audience mismatch: expected {expected_audience!r}, "
-                f"got {actual_aud!r}"
+                f"Audience mismatch: expected {expected_audience!r}, got {actual_aud!r}"
             )
 
     return payload

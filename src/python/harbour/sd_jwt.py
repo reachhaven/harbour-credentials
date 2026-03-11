@@ -17,13 +17,14 @@ import secrets
 import sys
 from pathlib import Path
 
+from joserfc import jws
+
 from harbour._crypto import import_private_key as _import_private_key
 from harbour._crypto import import_public_key as _import_public_key
 from harbour._crypto import resolve_private_key_alg as _resolve_alg
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PrivateKey, PublicKeyType
 from harbour.verifier import VerificationError
-from joserfc import jws
 
 # SD-JWT uses ~-delimited format: <issuer-jwt>~<disclosure1>~<disclosure2>~...~
 SD_JWT_SEPARATOR = "~"

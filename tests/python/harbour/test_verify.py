@@ -1,6 +1,7 @@
 """Tests for VC-JOSE-COSE verification."""
 
 import pytest
+
 from harbour.keys import generate_p256_keypair
 from harbour.signer import sign_vc_jose, sign_vp_jose
 from harbour.verifier import VerificationError, verify_vc_jose, verify_vp_jose

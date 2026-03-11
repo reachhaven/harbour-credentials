@@ -139,7 +139,7 @@ All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python
 - **Python 3.12+** with type hints on public APIs
 - **pathlib.Path** (never `os.path`)
 - All modules must have `main()` with `argparse` and `--help`
-- Formatter: black (line-length 88), isort (profile: black)
+- Formatter/linter: ruff (line-length 88, rules: E/F/W/I)
 
 ### TypeScript
 

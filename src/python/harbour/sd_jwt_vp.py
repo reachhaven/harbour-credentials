@@ -30,6 +30,8 @@ import time
 from copy import deepcopy
 from pathlib import Path
 
+from joserfc import jws
+
 from harbour._crypto import import_private_key as _import_private_key
 from harbour._crypto import import_public_key as _import_public_key
 from harbour._crypto import load_private_key as _load_private_key
@@ -43,7 +45,6 @@ from harbour.delegation import (
 )
 from harbour.keys import PrivateKey, PublicKeyType
 from harbour.verifier import VerificationError
-from joserfc import jws
 
 # SD-JWT uses ~-delimited format
 SD_JWT_SEPARATOR = "~"

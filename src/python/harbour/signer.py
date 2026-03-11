@@ -11,11 +11,12 @@ import json
 import sys
 from pathlib import Path
 
+from joserfc import jws
+
 from harbour._crypto import import_private_key as _import_private_key
 from harbour._crypto import load_private_key as _load_private_key
 from harbour._crypto import resolve_private_key_alg as _resolve_alg
 from harbour.keys import PrivateKey
-from joserfc import jws
 
 
 def sign_vc_jose(

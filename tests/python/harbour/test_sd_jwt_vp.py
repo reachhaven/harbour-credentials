@@ -5,6 +5,8 @@ import json
 import secrets
 
 import pytest
+from joserfc import jws
+
 from harbour._crypto import import_private_key as _import_private_key
 from harbour.delegation import (
     TransactionData,
@@ -15,7 +17,6 @@ from harbour.keys import generate_p256_keypair, p256_public_key_to_did_key
 from harbour.sd_jwt import issue_sd_jwt_vc
 from harbour.sd_jwt_vp import issue_sd_jwt_vp, verify_sd_jwt_vp
 from harbour.verifier import VerificationError
-from joserfc import jws
 
 
 def _decode_jwt_payload(token: str) -> dict:

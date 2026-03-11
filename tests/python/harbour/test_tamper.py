@@ -4,6 +4,7 @@ import base64
 import json
 
 import pytest
+
 from harbour.signer import sign_vc_jose
 from harbour.verifier import VerificationError, verify_vc_jose
 
@@ -15,9 +16,9 @@ def test_tamper_payload(sample_vc, p256_private_key, p256_public_key):
 
     # Decode payload, tamper, re-encode
     payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=="))
-    payload["credentialSubject"][
-        "id"
-    ] = "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace"
+    payload["credentialSubject"]["id"] = (
+        "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace"
+    )
     tampered_payload = (
         base64.urlsafe_b64encode(
             json.dumps(payload, ensure_ascii=False).encode("utf-8")

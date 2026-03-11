@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePrivateNumbers,
     EllipticCurvePublicNumbers,
 )
+
 from harbour.keys import p256_public_key_to_did_key
 
 
@@ -74,7 +75,7 @@ def _all_example_credentials() -> list[Path]:
 
 @pytest.fixture(
     params=_all_example_credentials(),
-    ids=lambda p: (f"gaiax/{p.name}" if p.parent.name == "gaiax" else p.name),
+    ids=lambda p: f"gaiax/{p.name}" if p.parent.name == "gaiax" else p.name,
 )
 def example_vc(request):
     """Parametrized fixture for each example credential."""

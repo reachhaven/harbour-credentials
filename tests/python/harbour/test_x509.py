@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 from cryptography import x509
+
 from harbour.keys import generate_ed25519_keypair, generate_p256_keypair
 from harbour.x509 import (
     cert_to_x5c,

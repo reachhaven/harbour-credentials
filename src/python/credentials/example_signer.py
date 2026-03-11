@@ -31,6 +31,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePrivateNumbers,
     EllipticCurvePublicNumbers,
 )
+
 from harbour.keys import PrivateKey, p256_public_key_to_did_key
 from harbour.signer import sign_vc_jose, sign_vp_jose
 
