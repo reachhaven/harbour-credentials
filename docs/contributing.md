@@ -21,7 +21,7 @@ Thank you for your interest in contributing to Harbour Credentials!
 3. **Verify everything works**:
 
    ```bash
-   make test-all
+   make test full
    make lint
    ```
 
@@ -53,19 +53,19 @@ Thank you for your interest in contributing to Harbour Credentials!
 - TypeScript 5.x with strict mode
 - Use `async/await` for crypto operations
 - Export types alongside functions
-- Run `make lint-ts` before committing
+- Run `make lint ts` before committing
 
 ### Testing
 
 ```bash
 # Run all tests
-make test-all
+make test full
 
 # Python only
 make test
 
 # TypeScript only
-make test-ts
+make test ts
 
 # Single Python test file
 PYTHONPATH=src/python:$PYTHONPATH pytest tests/python/harbour/test_keys.py -v
@@ -113,7 +113,7 @@ git commit -s -S -m "feat(harbour): add feature"
 
 ### Before Submitting
 
-- [ ] All tests pass (`make test-all`)
+- [ ] All tests pass (`make test full`)
 - [ ] Linting passes (`make lint`)
 - [ ] Documentation is updated if needed
 - [ ] Commit messages follow conventional format

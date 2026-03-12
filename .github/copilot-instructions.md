@@ -7,26 +7,26 @@ This repository contains cryptographic libraries for signing and verifying verif
 ```bash
 # Install dev dependencies
 make setup
-make install-dev
+make install dev
 
 # Run all tests (Python + TypeScript)
-make test-all
+make test full
 
 # Run Python tests only
 make test
 
 # Run TypeScript tests only
-make test-ts
+make test ts
 
 # Build TypeScript
-make build-ts
+make build
 
 # Lint and format
 make lint
 make format
 
 # Run with coverage
-make test-cov
+make test cov
 ```
 
 ## Instruction Files
@@ -125,4 +125,4 @@ The human operator will review these files and either:
 - ❌ **Don't forget CLI** — All Python modules need `main()` with `--help`
 - ❌ **Don't break parity** — Keep Python and TypeScript APIs consistent
 - ❌ **Don't commit without signing** — Always use `-s -S`
-- ❌ **Don't skip tests** — Run `make test-all` before committing
+- ❌ **Don't skip tests** — Run `make test full` before committing

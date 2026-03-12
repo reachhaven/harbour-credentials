@@ -34,7 +34,7 @@ source .venv/bin/activate
 > **Note:** The `--recurse-submodules` flag is required to clone the ontology-management-base and w3id.org submodules.
 >
 > `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies (`corepack enable` + `yarn install` in `src/typescript/harbour`).
-> Use `make install-dev` only if you need to refresh an existing Python environment.
+> Use `make install dev` only if you need to refresh an existing Python environment.
 
 If you already cloned without submodules:
 
@@ -164,10 +164,13 @@ Validate harbour credentials against SHACL shapes using the ontology-management-
 make generate
 
 # Validate examples against SHACL shapes (harbour + gx)
-make validate-shacl
+make validate shacl
 
 # Run structural validation tests
 make validate
+
+# See validation subcommands
+make validate help
 ```
 
 ## CLI Usage
@@ -253,21 +256,25 @@ artifacts/                         # Generated per domain (make generate)
 # Python tests
 make test
 
-# TypeScript tests (requires make build-ts first)
-make build-ts
-make test-ts
+# TypeScript tests (requires make build first)
+make build
+make test ts
 
-# Cross-runtime interop tests (requires make build-ts first)
-make test-interop
+# Cross-runtime interop tests (requires make build first)
+make test interop
 
 # Full pipeline: Python + SHACL conformance + TypeScript (builds TS automatically)
-make test-all
+make test full
 
 # Python tests with coverage
-make test-cov
+make test cov
 
 # Lint
 make lint
+
+# See grouped subcommands
+make test help
+make story help
 ```
 
 ## Documentation

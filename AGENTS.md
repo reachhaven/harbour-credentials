@@ -34,23 +34,23 @@ tests/
 ```bash
 # Install dev dependencies
 make setup
-make install-dev
+make install dev
 
 # Run all tests (Python + TypeScript)
-make test-all
+make test full
 
 # Run Python tests only
 make test
 
 # Run TypeScript tests only
-make test-ts
+make test ts
 
 # Lint and format
 make lint
 make format
 
 # Build TypeScript
-make build-ts
+make build
 ```
 
 ## Git Commit & Pull Request Policy
@@ -119,8 +119,8 @@ Brief description of the changes.
 ## Testing
 
 - [ ] Python tests pass (`make test`)
-- [ ] TypeScript tests pass (`make test-ts`)
-- [ ] All tests pass (`make test-all`)
+- [ ] TypeScript tests pass (`make test ts`)
+- [ ] All tests pass (`make test full`)
 
 ## Related Issues
 
@@ -142,7 +142,7 @@ Closes #42
 - TypeScript 5.x with strict mode
 - Use async/await for crypto operations
 - Export types alongside functions
-- Run `make lint-ts` before committing
+- Run `make lint ts` before committing
 
 ## Module CLI Requirements
 

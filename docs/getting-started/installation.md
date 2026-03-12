@@ -26,7 +26,7 @@ pip install -e ".[dev]"
 
 ```bash
 make setup
-make install-dev
+make install dev
 ```
 
 ## TypeScript

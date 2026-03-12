@@ -78,7 +78,7 @@ jobs:
   lint:         # black, isort, flake8, eslint, prettier
   test-python:  # pytest tests/
   test-js:      # npm test (vitest or jest)
-  test-interop: # Cross-runtime verification
+  interop-tests: # Cross-runtime verification
 ```
 
 The interop job:

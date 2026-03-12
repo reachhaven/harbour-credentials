@@ -16,13 +16,13 @@ make setup
 source .venv/bin/activate
 
 # Run all tests (Python + TypeScript)
-make test-all
+make test full
 
 # Run Python tests only
 make test
 
 # Run TypeScript tests only
-make test-ts
+make test ts
 
 # Run a single Python test file
 PYTHONPATH=src/python:$PYTHONPATH pytest tests/python/harbour/test_sign.py -v
@@ -40,7 +40,7 @@ cd src/typescript/harbour && yarn vitest run --config vitest.config.ts ../../../
 PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
 
 # Build TypeScript
-make build-ts
+make build
 
 # Lint and format
 make lint
