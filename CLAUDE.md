@@ -162,7 +162,10 @@ git commit -s -S -m "feat(harbour): add KB-JWT support"
 
 ## Change Documentation
 
-When instructed to prepare a commit or PR, **do not commit directly**. Create these files in `.playground/` (gitignored) for human review:
+When instructed to prepare a commit or PR, default to updating these files in
+`.playground/` (gitignored) first. After explicit human confirmation in the
+current session, the agent may use them to create the signed commit, push the
+branch, and open the PR directly. Otherwise, keep them for human review:
 
 | File | Purpose |
 |------|---------|

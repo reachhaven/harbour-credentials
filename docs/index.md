@@ -69,3 +69,4 @@ npm install @reachhaven/harbour-credentials
 - [Quick Start](getting-started/quickstart.md) — Get up and running
 - [CLI Reference](cli/index.md) — Command-line tools
 - [API Reference](api/python/index.md) — Python and TypeScript APIs
+- [DID Method Evaluation](specs/did-method-evaluation.md) — `did:ethr` modeling notes and local reference specs

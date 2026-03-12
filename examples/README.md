@@ -65,34 +65,37 @@ Anchor's DID document. See [`gaiax/trust-anchor-credential.json`](gaiax/trust-an
 
 ## Actors and Identities
 
-Every actor has a `did:ethr` identity (ERC-1056-backed, long-lived). Users also have
-a `did:jwk` wallet key (P-256) in the Altme wallet. When a user requests a
+Every actor has a `did:ethr` identity anchored on Base. Users also have a
+`did:jwk` wallet key (P-256) in the Altme wallet. When a user requests a
 credential, the authorizing party presents a VP to the Signing Service. Harbour
-then creates the `did:ethr` identifier and embeds **the same P-256 public key**
-from the wallet into the new `did:ethr` DID document.
+then creates the `did:ethr` identifier and exposes **the same P-256 public
+key** from the wallet as the local `#controller` verification method in the
+resolved DID document.
 
 | Actor | Role | Identity (`did:ethr`) | DID Document |
 |-------|------|-----------------------|--------------|
 | **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3` | [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) |
-| **Harbour Signing Service** | Issues ALL credentials (`#key-1`), signs delegated txns (`#key-2`) | `did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
+| **Harbour Signing Service** | Issues ALL credentials (`#controller`), signs delegated txns (`#delegate-1`) | `did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
 | **Example Corporation GmbH** | Legal person (organization) | `did:ethr:0x14a34:0xf7ef...dab` | [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
 | **Alice Smith** | Natural person (employee) | `did:ethr:0x14a34:0x26e4...16c9` | [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
 | **ENVITED Marketplace** | Data marketplace (external) | `did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c` | — |
 
-> **Privacy note**: All `did:ethr` identifiers use UUID path segments — never
+> **Privacy note**: All `did:ethr` identifiers use opaque chain/address segments — never
 > real names or organization names. This prevents DID IRIs from leaking identity
 > information at the public layer.
 
 ### Signing Service Key Roles
 
-The Signing Service DID document contains two verification methods:
+The Signing Service DID document contains two P-256 verification methods:
 
 | Key | Relationship | Purpose |
 |-----|-------------|---------|
-| `#key-1` | `assertionMethod` | Credential issuance (signs all VCs) |
-| `#key-2` | `capabilityDelegation` | Delegated transaction signing |
+| `#controller` | `authentication`, `assertionMethod` | Primary controller and credential issuance key |
+| `#delegate-1` | `authentication`, `capabilityDelegation` | Delegated transaction signing |
 
-Both keys are listed under `authentication`.
+Signer DID documents in these Harbour examples expose local P-256 controller
+keys directly. They do not model a separate synthetic secp256k1 recovery method
+in the example JSON output.
 
 ---
 

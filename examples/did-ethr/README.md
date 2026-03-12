@@ -1,7 +1,16 @@
 # did:ethr DID Documents
 
-Example DID documents for the Harbour identity ecosystem, using `did:ethr` (ERC-1056)
-on **Base** (chain ID `84532` / `0x14a34` for testnet).
+Example DID documents for the Harbour identity ecosystem, using `did:ethr` on
+**Base** (chain ID `84532` / `0x14a34` for testnet).
+
+These examples assume the Harbour/Base resolver exposes signer-controlled
+P-256 keys directly in the resolved DID document.
+
+Behind that resolved view, Harbour uses deterministic keyless DID addresses and
+an on-chain `IdentityController` contract that owns the ERC-1056 identities,
+verifies relayed P-256-signed instructions, and publishes DID attributes. The
+JSON files in this directory show the **resolved DID document surface consumed
+by wallets and verifiers**, not the raw registry ownership metadata.
 
 ## Entities
 
@@ -14,27 +23,25 @@ on **Base** (chain ID `84532` / `0x14a34` for testnet).
 
 ## DID Document Structure
 
-Each document follows the `did:ethr` resolved format:
+Each signer DID document follows the Harbour example profile:
 
-- **`@context`** includes `secp256k1recovery-2020/v2` for the controller VM
-- **`controller`** points to the smart contract that manages identity ownership
-- **`#controller`** verification method: `EcdsaSecp256k1RecoveryMethod2020` with `blockchainAccountId`
-- **`#delegate-N`** verification methods: P-256 `JsonWebKey` keys registered as on-chain attributes
+- **`#controller`** is a local P-256 `JsonWebKey` and the primary ES256 signing key
+- **`#delegate-N`** entries are optional additional P-256 keys
+- **`#service-N`** entries represent DID services when present
 
-## Controller
-
-All identities are governed by a smart contract controller:
-
-```text
-did:ethr:0x14a34:0xC0FFEEbabe000000000000000000000000000001
-```
-
-This is a placeholder address — the actual contract will be deployed to Base.
+For Harbour, this means the example JSON output models the signing keys that
+matter to wallets and verifiers, while any chain anchoring or recovery state is
+left to the Base contract and resolver implementation.
 
 ## Key Management
 
-P-256 keys (ES256) are the primary signing keys, registered on-chain via `setAttribute()`.
-The secp256k1 controller key provides blockchain-native identity ownership.
+- Trust Anchor, Legal Person, and Natural Person use `#controller` for issuance or consent flows
+- The Signing Service uses `#controller` for issuing credentials and `#delegate-1`
+  for delegated transaction signing
+- All example signatures use ES256 over P-256 keys
+- Natural persons approve actions with wallet-held P-256 keys; a relay can
+  submit the resulting signed instructions on-chain without requiring users to
+  hold Ethereum private keys
 
 ## Usage
 
@@ -43,3 +50,4 @@ These DID documents are referenced by:
 - `examples/*.json` — Credential examples (issuer, subject, holder)
 - `examples/gaiax/*.json` — Gaia-X specific credential examples
 - `tests/` — Test fixtures and assertions
+- `docs/did-identity-system.md` — detailed Harbour on-chain identity overview

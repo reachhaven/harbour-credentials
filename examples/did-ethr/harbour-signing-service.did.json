@@ -1,19 +1,18 @@
 {
   "@context": [
     "https://www.w3.org/ns/did/v1",
-    "https://w3id.org/security/suites/secp256k1recovery-2020/v2"
+    {
+      "JsonWebKey": "https://w3id.org/security#JsonWebKey",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
   ],
   "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
-  "controller": "did:ethr:0x14a34:0xC0FFEEbabe000000000000000000000000000001",
   "verificationMethod": [
     {
       "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller",
-      "type": "EcdsaSecp256k1RecoveryMethod2020",
-      "controller": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
-      "blockchainAccountId": "eip155:84532:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
-    },
-    {
-      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
       "type": "JsonWebKey",
       "controller": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
       "publicKeyJwk": {
@@ -24,7 +23,7 @@
       }
     },
     {
-      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2",
+      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
       "type": "JsonWebKey",
       "controller": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
       "publicKeyJwk": {
@@ -37,16 +36,12 @@
   ],
   "authentication": [
     "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller",
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2"
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1"
   ],
   "assertionMethod": [
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller",
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2"
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#controller"
   ],
   "capabilityDelegation": [
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1",
-    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-2"
+    "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697#delegate-1"
   ]
 }

@@ -75,26 +75,41 @@ The user needs a Harbour credential (e.g., `NaturalPersonCredential`) issued as 
 
 ### 2. DID Document
 
-The user's `did:ethr` DID document must contain a verification method with their P-256 public key (the same key as in their `did:jwk` wallet):
+The user's `did:ethr` DID document must expose the same P-256 public key as a
+local `#controller` verification method:
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/jwk/v1"],
-  "id": "did:ethr:0x14a34:0x26e4...16c9",
-  "controller": "did:ethr:0x14a34:0x26e4...16c9",
-  "verificationMethod": [{
-    "id": "did:ethr:0x14a34:0x26e4...16c9#key-1",
-    "type": "JsonWebKey2020",
-    "controller": "did:ethr:0x14a34:0x26e4...16c9",
-    "publicKeyJwk": {
-      "kty": "EC",
-      "crv": "P-256",
-      "x": "...",
-      "y": "..."
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "JsonWebKey": "https://w3id.org/security#JsonWebKey",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
     }
-  }],
-  "authentication": ["#key-1"],
-  "assertionMethod": ["#key-1"]
+  ],
+  "id": "did:ethr:0x14a34:0x26e4...16c9",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0x26e4...16c9#controller",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x26e4...16c9",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "...",
+        "y": "..."
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0x26e4...16c9#controller"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0x26e4...16c9#controller"
+  ]
 }
 ```
 
@@ -104,8 +119,8 @@ See [`examples/did-ethr/`](../../examples/did-ethr/) for complete DID documents.
 
 This repository verifies signatures and hash bindings, but it does **not** host or publish DID documents.
 
-- Integrators must publish DID documents at the correct HTTPS location for the chosen method (`did:ethr` or `did:ethr`).
-- Integrators must run DID resolution and pass the resolved holder key into `verify_sd_jwt_vp(...)`.
+- Integrators must run the appropriate `did:ethr` resolver for their Base deployment.
+- Integrators must pass the resolved holder key into `verify_sd_jwt_vp(...)`.
 - Repository examples now use `did:ethr` identifiers for person subjects. See `examples/did-ethr/` for static example DID documents used by `examples/*.json`.
 - Naming policy in examples:
   - All identifiers use UUID-based path segments (no real names or organization names in DID paths).
@@ -114,7 +129,7 @@ Current integration hooks and TODOs:
 
 - `issue_sd_jwt_vp(..., holder_did=...)` allows the wallet DID to be embedded in the consent VP.
 - `verify_sd_jwt_vp(..., holder_public_key=...)` accepts the DID-resolved public key from your resolver stack.
-- TODO: Add optional resolver callback adapters for `did:ethr` so verification can resolve keys in-process.
+- TODO: Add optional resolver callback adapters for `did:ethr` so verification can resolve custom P-256 controller keys in-process.
 
 ## OID4VP Transaction Data
 

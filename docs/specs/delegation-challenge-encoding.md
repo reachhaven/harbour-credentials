@@ -214,7 +214,7 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
         "proofPurpose": "authentication",
         "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
         "domain": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
-        "verificationMethod": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9#key-1",
+        "verificationMethod": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9#controller",
         "created": "2026-02-24T12:00:05Z",
         "proofValue": "z5vgFc..."
       }

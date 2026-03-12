@@ -35,16 +35,18 @@ deployed on **Base** (Coinbase L2 rollup).
 | **Chain ID** | Testnet: 84532 (`0x14a34`), Mainnet: 8453 (`0x2105`) |
 | **Contract** | ERC-1056 EthereumDIDRegistry (standard or custom with P-256 support) |
 | **P-256 keys** | Registered as on-chain attributes via `setAttribute()` |
-| **Controller** | Smart contract manages identity ownership |
+| **Controller** | Resolved signer DIDs expose a local P-256 `#controller` key |
 | **DID format** | `did:ethr:<chainId>:<ethereumAddress>` |
 
 ### DID document structure
 
-The EthereumDIDRegistry resolves DID documents from on-chain events:
+The EthereumDIDRegistry and project-specific resolver derive DID documents from
+on-chain state:
 
-- `DIDOwnerChanged` → `controller` field
-- `DIDDelegateChanged` → `verificationMethod` entries (delegates)
-- `DIDAttributeChanged` → `verificationMethod` entries (attributes like P-256 keys)
+- signer DIDs expose a local P-256 `#controller` method for ES256 signing
+- optional secondary P-256 keys appear as `#delegate-N`
+- non-signing resource DIDs may instead use the root DID Core `controller`
+  property to point at the owning DID
 
 ## Consequences
 
@@ -73,7 +75,7 @@ The EthereumDIDRegistry resolves DID documents from on-chain events:
 ## References
 
 - [ERC-1056: Ethereum Lightweight Identity](https://eips.ethereum.org/EIPS/eip-1056)
-- [did:ethr Method Specification](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md)
+- [did:ethr Method Specification](../specs/references/did-ethr-method-spec.md)
 - [Base Documentation](https://docs.base.org/)
 - [ADR-001: VC Securing Mechanism](001-vc-securing-mechanism.md)
 - [ADR-004: Key Management](004-key-management.md)

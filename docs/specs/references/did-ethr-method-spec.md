@@ -430,21 +430,21 @@ A `DIDAttributeChanged` event for the account `0xf3beac30c498d9e26865f34fcaa57db
 With the exception of `#controller` and `#controllerKey`, the `id` properties that appear throughout the DID document
 MUST be stable across updates. This means that the same key material will be referenced by the same ID after an update.
 
-- Attribute or delegate changes that result in `verificationMethod` entries MUST set the `id`
+* Attribute or delegate changes that result in `verificationMethod` entries MUST set the `id`
   `${did}#delegate-${eventIndex}`.
-- Attributes that result in `service` entries MUST set the `id` to `${did}#service-${eventIndex}`
+* Attributes that result in `service` entries MUST set the `id` to `${did}#service-${eventIndex}`
 
 where `eventIndex` is the index of the event that modifies that section of the DID document.
 
 **Example**
 
-- add key => `#delegate-1` is added
-- add another key => `#delegate-2` is added
-- add delegate => `#delegate-3` is added
-- add service => `#service-1` ia added
-- revoke first key => `#delegate-1` gets removed from the DID document; `#delegate-2` and `#delegte-3` remain.
-- add another delegate => `#delegate-5` is added (earlier revocation is counted as an event)
-- first delegate expires => `delegate-3` is removed, `#delegate-5` remains intact
+* add key => `#delegate-1` is added
+* add another key => `#delegate-2` is added
+* add delegate => `#delegate-3` is added
+* add service => `#service-1` ia added
+* revoke first key => `#delegate-1` gets removed from the DID document; `#delegate-2` and `#delegte-3` remain.
+* add another delegate => `#delegate-5` is added (earlier revocation is counted as an event)
+* first delegate expires => `delegate-3` is removed, `#delegate-5` remains intact
 
 ### Update
 
@@ -501,8 +501,8 @@ The `resolve` method returns an object with the following properties: `didDocume
 
 When resolving a DID document that has had updates, the latest update MUST be listed in the `didDocumentMetadata`.
 
-- `versionId` MUST be the block number of the latest update.
-- `updated` MUST be the ISO date string of the block time of the latest update (without sub-second resolution).
+* `versionId` MUST be the block number of the latest update.
+* `updated` MUST be the ISO date string of the block time of the latest update (without sub-second resolution).
 
 Example:
 
@@ -525,7 +525,7 @@ Example:
 }
 ```
 
-## Resolving DID URIs with query parameters
+## Resolving DID URIs with query parameters.
 
 ### `versionId` query string parameter
 
@@ -539,8 +539,8 @@ Only ERC1056 events prior to or contained in this block number are to be conside
 If there are any events after that block that mutate the DID, the earliest of them SHOULD be used to populate the
 properties of the `didDocumentMetadata`:
 
-- `nextVersionId` MUST be the block number of the next update to the DID document.
-- `nextUpdate` MUST be the ISO date string of the block time of the next update (without sub-second resolution).
+* `nextVersionId` MUST be the block number of the next update to the DID document.
+* `nextUpdate` MUST be the ISO date string of the block time of the next update (without sub-second resolution).
 
 In case the DID has had updates prior to or included in the `versionId` block number, the `updated` and `versionId`
 properties of the `didDocumentMetadata` MUST correspond to the latest block prior to the `versionId` query string param.

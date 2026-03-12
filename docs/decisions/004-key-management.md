@@ -73,7 +73,7 @@ Three mechanisms, serving different ecosystems:
 | Method | Ecosystem | JOSE Header | Example |
 |--------|-----------|-------------|---------|
 | **X.509 chain** | EUDI | `x5c` | Certificate chain in JWT header |
-| **did:ethr** | Gaia-X | `kid` | `did:ethr:0x14a34:<address>#delegate-1` |
+| **did:ethr** | Gaia-X | `kid` | `did:ethr:0x14a34:<address>#controller` |
 | **did:key** | Testing | `kid` | `did:key:zDn...#zDn...` |
 
 **X.509 (EUDI mandatory):**
@@ -85,8 +85,8 @@ Three mechanisms, serving different ecosystems:
 
 **did:ethr (Gaia-X):**
 
-- Resolves to DID Document at well-known URL with KERI key history
-- DID Document contains JWK public key(s)
+- Resolves through the Base contract + resolver stack
+- Signer DID documents expose JWK public key(s), with the primary key at `#controller`
 - Used for all Harbour identities (infrastructure, organizations, users)
 - Gaia-X GXDCH uses X.509 certificates as trust anchors for DIDs
 
