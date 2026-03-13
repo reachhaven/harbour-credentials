@@ -19,26 +19,27 @@ Proves that an authorizing party approved the credential issuance via OID4VP. Th
 
 The Harbour Signing Service is the **sole issuer** of all credentials. Evidence VPs establish the chain of authorization:
 
-**Use case 1 — Trust Anchor authorizes org (LegalPersonCredential)**: The Trust Anchor presents a VP containing its **self-signed LegalPersonCredential** (root of trust, analogous to a root CA certificate). The Signing Service verifies this VP and issues the org's credential with it as evidence.
+**Use case 1 — Trust Anchor authorizes org (LegalPersonCredential)**: The Trust Anchor presents a VP containing its **self-signed LinkedCredentialService credential** (service endpoint proof, root of trust — analogous to a root CA certificate). The Signing Service verifies this VP and issues the org's credential with it as evidence.
 
-**Use case 2 — Org authorizes employee (NaturalPersonCredential)**: The organization presents a VP containing its **LegalPersonCredential** (SD-JWT with sensitive fields redacted — registration number and addresses hidden, name/legalName disclosed). The Signing Service verifies this VP and issues the employee's credential with it as evidence.
+**Use case 2 — Org authorizes employee (NaturalPersonCredential)**: The organization presents a VP containing its **LegalPersonCredential** (SD-JWT with sensitive fields redacted — registration number and addresses hidden, compliance status disclosed). The Signing Service verifies this VP and issues the employee's credential with it as evidence.
 
 ```json
 {
   "type": "harbour:CredentialEvidence",
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
-    "type": ["VerifiablePresentation"],
+    "type": ["VerifiablePresentation", "harbour:VerifiablePresentation"],
     "holder": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
     "verifiableCredential": [
       {
-        "@context": ["https://www.w3.org/ns/credentials/v2", "..."],
-        "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
+        "@context": ["https://www.w3.org/ns/credentials/v2", "https://w3id.org/reachhaven/harbour/core/v1/"],
+        "type": ["VerifiableCredential"],
         "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+        "validFrom": "2024-01-01T00:00:00Z",
         "credentialSubject": {
           "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
-          "type": "harbour:LegalPerson",
-          "name": "ReachHaven GmbH"
+          "type": "harbour:LinkedCredentialService",
+          "didcore:serviceEndpoint": {"id": "https://resolver.harbour.id/credentials/did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3"}
         }
       }
     ]
@@ -46,7 +47,7 @@ The Harbour Signing Service is the **sole issuer** of all credentials. Evidence 
 }
 ```
 
-**What it proves**: The authorizing party (Trust Anchor or org) approved the Signing Service to issue a credential for the target subject. The chain of trust flows: Trust Anchor → org → employee.
+**What it proves**: The authorizing party (Trust Anchor or org) approved the Signing Service to issue a credential for the target subject. The chain of trust flows: Trust Anchor (LinkedCredentialService) → org (LegalPersonCredential) → employee (NaturalPersonCredential).
 
 ### DelegatedSignatureEvidence
 
@@ -60,7 +61,7 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
   "verifiablePresentation": "<SD-JWT VP with redacted PII>",
   "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "transaction_data": {
-    "type": "harbour_delegate:data.purchase",
+    "type": "harbour.delegate:data.purchase",
     "credential_ids": ["harbour_natural_person"],
     "transaction_data_hashes_alg": ["sha-256"],
     "nonce": "da9b1009",
@@ -72,7 +73,7 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
       "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
     }
   },
-  "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52"
+  "challenge": "da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b"
 }
 ```
 

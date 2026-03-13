@@ -29,7 +29,7 @@ flowchart TB
     subgraph infra["Infrastructure"]
         DID["DID Documents<br/>(did:ethr, did:key)"]
         CRSET["CRSet Revocation"]
-        GX["Gaia-X Compliance<br/>(gxParticipant)"]
+        GX["Gaia-X Compliance<br/>(ComplianceCredential)"]
     end
 
     subgraph output["Outputs"]

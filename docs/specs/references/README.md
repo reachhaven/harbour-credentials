@@ -20,6 +20,7 @@ They are copies of specifications published by their respective standards organi
 | `oid4vp-1.0.md` | [OpenID4VP 1.0](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) | OpenID Foundation | [OpenID IPR](https://openid.net/intellectual-property/) |
 | `oid4vp-1.0.txt` | Raw full spec text (3,834 lines) — retained for search | OpenID Foundation | [OpenID IPR](https://openid.net/intellectual-property/) |
 | `gx-architecture-document-25.11.md` | [Gaia-X AD 25.11](https://docs.gaia-x.eu/technical-committee/architecture-document/25.11/) | Gaia-X AISBL | CC BY-NC-ND 4.0 |
+| `gx-compliance-document-25.10.md` | [Gaia-X CD 25.10 (Loire)](https://docs.gaia-x.eu/policy-rules-committee/compliance-document/25.10/) | Gaia-X AISBL | CC BY-NC-ND 4.0 |
 | `csc-data-model.md` | [CSC Data Model v1.0.0](https://cloudsignatureconsortium.org/wp-content/uploads/2025/10/data-model-bindings.pdf) | Cloud Signature Consortium | CSC License |
 | `did-ethr-method-spec.md` | [did:ethr Method Specification](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md) | DIF | Apache-2.0 |
 | `did-webs-spec.md` | [did:webs Specification](https://github.com/trustoverip/tswg-did-method-webs-specification) | Trust Over IP Foundation | [ToIP License](https://github.com/trustoverip/tswg-did-method-webs-specification/blob/main/LICENSE.md) |

@@ -39,8 +39,8 @@ The examples use a **two-tier layout**:
   (registration number, addresses) and reference the
   `https://w3id.org/gaia-x/development#` context.
 
-Credential types in the Gaia-X layer use the `harbour_gx:` namespace prefix
-(e.g. `harbour_gx:LegalPersonCredential`, `harbour_gx:NaturalPerson`) while core
+Credential types in the Gaia-X layer use the `harbour.gx:` namespace prefix
+(e.g. `harbour.gx:LegalPersonCredential`, `harbour.gx:NaturalPerson`) while core
 types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:CredentialEvidence`).
 
 ## Credential Issuance Model
@@ -200,7 +200,7 @@ organizational affiliation without the credential itself leaking PII.
 ```python
 # Python — convert to SD-JWT-VC flat claims
 from credentials.claim_mapping import vc_to_sd_jwt_claims, MAPPINGS
-mapping = MAPPINGS["harbour_gx:NaturalPersonCredential"]
+mapping = MAPPINGS["harbour.gx:NaturalPersonCredential"]
 claims, disclosable = vc_to_sd_jwt_claims(credential, mapping)
 # claims: {"iss": ..., "vct": ..., "givenName": "Alice", "memberOf": "did:ethr:0x14a34:0x..."}
 # disclosable: ["givenName", "familyName", "email", "memberOf"]

@@ -160,7 +160,7 @@ class TestIssueSDJWTVP:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:data.purchase",
+                    "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["harbour_natural_person"],
                     "nonce": tx_nonce,
                     "iat": 1771934400,
@@ -206,7 +206,7 @@ class TestIssueSDJWTVP:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:data.purchase",
+                    "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["default"],
                     "nonce": "snake-nonce",
                     "iat": 1771934400,
@@ -331,7 +331,7 @@ class TestVerifySDJWTVP:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:blockchain.approve",
+                    "type": "harbour.delegate:blockchain.approve",
                     "credential_ids": ["default"],
                     "nonce": "unique-consent-nonce",
                     "iat": 1771934400,
@@ -364,7 +364,7 @@ class TestVerifySDJWTVP:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:data.purchase",
+                    "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["default"],
                     "nonce": nonce,
                     "iat": 1771934400,
@@ -423,7 +423,7 @@ class TestVerifySDJWTVP:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:data.purchase",
+                    "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["default"],
                     "nonce": nonce,
                     "iat": 1771934400,
@@ -547,7 +547,7 @@ class TestDelegatedSigningFlow:
         consent_nonce = secrets.token_urlsafe(32)
 
         transaction_data = {
-            "type": "harbour_delegate:data.purchase",
+            "type": "harbour.delegate:data.purchase",
             "credential_ids": ["harbour_natural_person"],
             "nonce": consent_nonce,
             "iat": 1771934400,
@@ -606,7 +606,7 @@ class TestDelegatedSigningFlow:
         assert len(result["evidence"]) == 1
         ev = result["evidence"][0]
         assert ev["type"] == "DelegatedSignatureEvidence"
-        assert ev["transaction_data"]["type"] == "harbour_delegate:data.purchase"
+        assert ev["transaction_data"]["type"] == "harbour.delegate:data.purchase"
         assert ev["transaction_data"]["nonce"] == consent_nonce
         assert ev["challenge"] == create_delegation_challenge(
             TransactionData.from_dict(transaction_data)
@@ -640,7 +640,7 @@ class TestDelegatedSigningFlow:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:blockchain.transfer",
+                    "type": "harbour.delegate:blockchain.transfer",
                     "credential_ids": ["default"],
                     "nonce": "public-audit-nonce",
                     "iat": 1771934400,
@@ -720,7 +720,7 @@ class TestEdgeCases:
             {
                 "type": "DelegatedSignatureEvidence",
                 "transaction_data": {
-                    "type": "harbour_delegate:data.share",
+                    "type": "harbour.delegate:data.share",
                     "credential_ids": ["default"],
                     "nonce": "multi-evidence-nonce",
                     "iat": 1771934400,

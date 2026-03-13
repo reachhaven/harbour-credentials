@@ -1,0 +1,182 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/gaia-x/development#",
+    "https://w3id.org/reachhaven/harbour/core/v1/",
+    "https://w3id.org/reachhaven/harbour/gx/v1/"
+  ],
+  "type": [
+    "VerifiablePresentation",
+    "harbour:VerifiablePresentation"
+  ],
+  "holder": "did:ethr:0x14a34:0xd1d2d3d4d5d6d7d8d9d0d1d2d3d4d5d6d7d8d9d0",
+  "verifiableCredential": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#",
+        {
+          "vcard": "http://www.w3.org/2006/vcard/ns#",
+          "schema": "http://schema.org/"
+        }
+      ],
+      "type": [
+        "VerifiableCredential"
+      ],
+      "id": "urn:uuid:f1a2b3c4-d5e6-7890-abcd-ef1234567899",
+      "issuer": "did:ethr:0x14a34:0xd1d2d3d4d5d6d7d8d9d0d1d2d3d4d5d6d7d8d9d0",
+      "validFrom": "2024-01-15T00:00:00Z",
+      "validUntil": "2025-01-15T00:00:00Z",
+      "credentialSubject": {
+        "type": "gx:LegalPerson",
+        "id": "urn:uuid:f1a2b3c4-d5e6-7890-abcd-ef1234567899#cs",
+        "schema:name": "Example Corporation GmbH",
+        "gx:registrationNumber": {
+          "id": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789019#cs"
+        },
+        "gx:headquartersAddress": {
+          "type": "gx:Address",
+          "gx:countryCode": "DE",
+          "vcard:street-address": "Musterstra\u00dfe 42",
+          "vcard:locality": "M\u00fcnchen",
+          "vcard:postal-code": "80331"
+        },
+        "gx:legalAddress": {
+          "type": "gx:Address",
+          "gx:countryCode": "DE",
+          "vcard:street-address": "Musterstra\u00dfe 42",
+          "vcard:locality": "M\u00fcnchen",
+          "vcard:postal-code": "80331"
+        }
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#"
+      ],
+      "type": [
+        "VerifiableCredential"
+      ],
+      "id": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789019",
+      "name": "VAT ID",
+      "description": "Value Added Tax Identifier",
+      "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+      "validFrom": "2024-01-15T00:00:00Z",
+      "validUntil": "2024-07-15T00:00:00Z",
+      "credentialSubject": {
+        "type": "gx:VatID",
+        "id": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789019#cs",
+        "gx:vatID": "DE123456789",
+        "gx:countryCode": "DE"
+      },
+      "evidence": {
+        "gx:evidenceOf": "gx:VatID",
+        "gx:evidenceURL": "http://ec.europa.eu/taxation_customs/vies/services/checkVatService",
+        "gx:executionDate": "2024-01-15T00:00:00Z"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#"
+      ],
+      "type": [
+        "VerifiableCredential"
+      ],
+      "id": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678909",
+      "issuer": "did:ethr:0x14a34:0xd1d2d3d4d5d6d7d8d9d0d1d2d3d4d5d6d7d8d9d0",
+      "validFrom": "2024-01-15T00:00:00Z",
+      "validUntil": "2025-01-15T00:00:00Z",
+      "credentialSubject": {
+        "type": "gx:Issuer",
+        "id": "urn:uuid:b2c3d4e5-f6a7-8901-bcde-f12345678909#cs",
+        "gx:gaiaxTermsAndConditions": "4bd7554097444c960292b4726c2efa1373485e8a5565d94d41195214c5e0ceb3"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#",
+        "https://w3id.org/reachhaven/harbour/core/v1/",
+        "https://w3id.org/reachhaven/harbour/gx/v1/"
+      ],
+      "type": [
+        "VerifiableCredential",
+        "harbour.gx:LegalPersonCredential"
+      ],
+      "id": "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+      "validFrom": "2024-01-16T00:00:00Z",
+      "validUntil": "2025-01-16T00:00:00Z",
+      "credentialSubject": {
+        "id": "did:ethr:0x14a34:0xd1d2d3d4d5d6d7d8d9d0d1d2d3d4d5d6d7d8d9d0",
+        "type": "harbour.gx:LegalPerson",
+        "harbour.gx:compliantLegalPersonVC": {
+          "type": "harbour.gx:CompliantCredentialReference",
+          "harbour.gx:credentialType": "gx:LegalPerson",
+          "harbour.gx:digestSRI": "sha256-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
+        },
+        "harbour.gx:compliantRegistrationVC": {
+          "type": "harbour.gx:CompliantCredentialReference",
+          "harbour.gx:credentialType": "gx:VatID",
+          "harbour.gx:digestSRI": "sha256-c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4"
+        },
+        "harbour.gx:compliantTermsVC": {
+          "type": "harbour.gx:CompliantCredentialReference",
+          "harbour.gx:credentialType": "gx:Issuer",
+          "harbour.gx:digestSRI": "sha256-e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6"
+        },
+        "harbour.gx:labelLevel": "SC",
+        "harbour.gx:engineVersion": "2.11.0",
+        "harbour.gx:rulesVersion": "CD25.10",
+        "harbour.gx:validatedCriteria": [
+          "https://docs.gaia-x.eu/policy-rules-committee/compliance-document/25.10/criteria_participant/#PA1.1"
+        ]
+      },
+      "credentialStatus": [
+        {
+          "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697:services:revocation-registry/a1b2c3d4e5f67890",
+          "type": "harbour:CRSetEntry",
+          "statusPurpose": "revocation"
+        }
+      ],
+      "evidence": [
+        {
+          "type": [
+            "harbour:Evidence",
+            "harbour:CredentialEvidence"
+          ],
+          "verifiablePresentation": {
+            "@context": [
+              "https://www.w3.org/ns/credentials/v2"
+            ],
+            "type": [
+              "VerifiablePresentation",
+              "harbour:VerifiablePresentation"
+            ],
+            "holder": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+            "verifiableCredential": [
+              {
+                "@context": [
+                  "https://www.w3.org/ns/credentials/v2",
+                  "https://w3id.org/reachhaven/harbour/core/v1/"
+                ],
+                "type": [
+                  "VerifiableCredential"
+                ],
+                "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+                "validFrom": "2024-01-01T00:00:00Z",
+                "credentialSubject": {
+                  "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+                  "type": "harbour:LinkedCredentialService",
+                  "didcore:serviceEndpoint": {"id": "https://resolver.harbour.id/credentials/did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3"}
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

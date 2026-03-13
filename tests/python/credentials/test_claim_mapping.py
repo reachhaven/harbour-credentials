@@ -35,7 +35,7 @@ def _load_fixture(name: str) -> dict:
 class TestGaiaxLegalPersonMapping:
     def test_vc_to_claims(self):
         vc = _load_fixture("legal-person-credential.json")
-        mapping = MAPPINGS["harbour_gx:LegalPersonCredential"]
+        mapping = MAPPINGS["harbour.gx:LegalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
         assert (
@@ -46,9 +46,9 @@ class TestGaiaxLegalPersonMapping:
             claims["sub"]
             == "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
         )
-        assert claims["legalName"] == "Example Corporation GmbH"
-        assert "registrationNumber" in claims
-        assert "registrationNumber" in disclosable
+        assert claims["labelLevel"] == "SC"
+        assert "engineVersion" in claims
+        assert "engineVersion" in disclosable
 
     def test_has_credential_status(self):
         vc = _load_fixture("legal-person-credential.json")
@@ -58,10 +58,10 @@ class TestGaiaxLegalPersonMapping:
         assert status["statusPurpose"] == "revocation"
 
     def test_subject_is_harbour_gx_legal_person(self):
-        """Verify the subject uses harbour_gx:LegalPerson."""
+        """Verify the subject uses harbour.gx:LegalPerson."""
         vc = _load_fixture("legal-person-credential.json")
         subject_type = vc["credentialSubject"]["type"]
-        assert subject_type == "harbour_gx:LegalPerson"
+        assert subject_type == "harbour.gx:LegalPerson"
 
     def test_has_gaiax_context(self):
         """Gaia-X extension must include the Gaia-X namespace in @context."""
@@ -70,21 +70,21 @@ class TestGaiaxLegalPersonMapping:
 
     def test_roundtrip(self):
         vc = _load_fixture("legal-person-credential.json")
-        mapping = MAPPINGS["harbour_gx:LegalPersonCredential"]
+        mapping = MAPPINGS["harbour.gx:LegalPersonCredential"]
         claims, _ = vc_to_sd_jwt_claims(vc, mapping)
         reconstructed = sd_jwt_claims_to_vc(
-            claims, mapping, "harbour_gx:LegalPersonCredential"
+            claims, mapping, "harbour.gx:LegalPersonCredential"
         )
         assert (
-            reconstructed["credentialSubject"]["name"]
-            == vc["credentialSubject"]["name"]
+            reconstructed["credentialSubject"]["harbour.gx:labelLevel"]
+            == vc["credentialSubject"]["harbour.gx:labelLevel"]
         )
 
 
 class TestGaiaxNaturalPersonMapping:
     def test_vc_to_claims(self):
         vc = _load_fixture("natural-person-credential.json")
-        mapping = MAPPINGS["harbour_gx:NaturalPersonCredential"]
+        mapping = MAPPINGS["harbour.gx:NaturalPersonCredential"]
         claims, disclosable = vc_to_sd_jwt_claims(vc, mapping)
 
         assert claims["givenName"] == "Alice"
@@ -112,10 +112,10 @@ class TestGaiaxNaturalPersonMapping:
             assert ev_type == "harbour:CredentialEvidence"
 
     def test_subject_is_harbour_gx_natural_person(self):
-        """Verify the subject uses harbour_gx:NaturalPerson."""
+        """Verify the subject uses harbour.gx:NaturalPerson."""
         vc = _load_fixture("natural-person-credential.json")
         subject_type = vc["credentialSubject"]["type"]
-        assert subject_type == "harbour_gx:NaturalPerson"
+        assert subject_type == "harbour.gx:NaturalPerson"
 
     def test_has_gaiax_context(self):
         """Gaia-X extension must include the Gaia-X namespace in @context."""
@@ -135,7 +135,7 @@ class TestMappingDiscovery:
         mapping = get_mapping_for_vc(vc)
         assert mapping is not None
         assert "LegalPersonCredential" in mapping["vct"]
-        assert "credentialSubject.name" in mapping["claims"]
+        assert "credentialSubject.harbour\\.gx:labelLevel" in mapping["claims"]
 
     def test_get_mapping_for_gaiax_natural_person(self):
         """Gaia-X natural person should return the flat mapping."""

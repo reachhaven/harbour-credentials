@@ -89,9 +89,10 @@ def _verify_jose(token: str, public_key: PublicKeyType, expected_typ: str) -> di
     key = _import_public_key(public_key)
     alg = _alg_for_key(public_key)
 
-    # Use a larger header limit to accommodate x5c certificate chains
+    # Use larger limits to accommodate x5c certificate chains and embedded credentials
     registry = jws.JWSRegistry(algorithms=[alg])
     registry.max_header_length = 8192
+    registry.max_payload_length = 65536
 
     try:
         result = jws.deserialize_compact(

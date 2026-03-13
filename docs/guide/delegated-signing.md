@@ -137,7 +137,7 @@ The signing service creates an OID4VP-aligned transaction data object (see [Dele
 
 ```json
 {
-  "type": "harbour_delegate:data.purchase",
+  "type": "harbour.delegate:data.purchase",
   "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
@@ -177,7 +177,7 @@ sd_jwt_vc = "eyJ...~disclosure1~disclosure2~..."
 evidence = [{
     "type": "DelegatedSignatureEvidence",
     "transaction_data": {
-        "type": "harbour_delegate:data.purchase",
+        "type": "harbour.delegate:data.purchase",
         "credential_ids": ["harbour_natural_person"],
         "nonce": "da9b1009",
         "iat": 1771934400,
@@ -211,7 +211,7 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
   evidence: [{
     type: 'DelegatedSignatureEvidence',
     transaction_data: {
-      type: 'harbour_delegate:data.purchase',
+      type: 'harbour.delegate:data.purchase',
       credential_ids: ['harbour_natural_person'],
       nonce: 'da9b1009',
       iat: 1771934400,
@@ -247,7 +247,7 @@ result = verify_sd_jwt_vp(
 
 # Check transaction data matches original request
 tx = result["evidence"][0]["transaction_data"]
-assert tx["type"] == "harbour_delegate:data.purchase"
+assert tx["type"] == "harbour.delegate:data.purchase"
 assert tx["txn"]["asset_id"] == "urn:uuid:550e8400-e29b-41d4-a716-446655440000"
 
 # Check credential is still valid (CRSet)
@@ -359,7 +359,7 @@ User purchases dataset through blockchain:
 User signs legal contract:
 
 1. Contract platform prepares document
-2. Creates transaction data: `harbour_delegate:contract.sign`
+2. Creates transaction data: `harbour.delegate:contract.sign`
 3. User creates consent VP
 4. Harbour records signature on blockchain
 5. Receipt VP serves as proof of signing intent
@@ -368,7 +368,7 @@ User signs legal contract:
 
 User grants access to resource:
 
-1. Service creates transaction data: `harbour_delegate:data.access`
+1. Service creates transaction data: `harbour.delegate:data.access`
 2. User creates consent VP
 3. Harbour updates access control on blockchain
 4. Receipt VP serves as access grant evidence

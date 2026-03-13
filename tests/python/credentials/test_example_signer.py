@@ -149,7 +149,7 @@ class TestProcessExample:
         vc_jwt = jwt_path.read_text().strip()
         vc_payload = verify_vc_jose(vc_jwt, public_key)
         assert vc_payload["id"] == "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        assert "harbour_gx:LegalPersonCredential" in vc_payload["type"]
+        assert "harbour.gx:LegalPersonCredential" in vc_payload["type"]
 
         # Evidence should now be a JWT string
         evidence = vc_payload["evidence"][0]
@@ -190,7 +190,7 @@ class TestProcessExample:
         else:
             assert ev_type == "harbour:DelegatedSignatureEvidence"
         assert "transaction_data" in evidence
-        assert evidence["transaction_data"]["type"] == "harbour_delegate:data.purchase"
+        assert evidence["transaction_data"]["type"] == "harbour.delegate:data.purchase"
         assert (
             evidence["delegatedTo"]
             == "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
@@ -242,12 +242,12 @@ class TestProcessGaiaxExample:
         # Verify outer VC JWT
         vc_jwt = jwt_path.read_text().strip()
         vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour_gx:LegalPersonCredential" in vc_payload["type"]
+        assert "harbour.gx:LegalPersonCredential" in vc_payload["type"]
 
-        # Subject should have the LegalPerson data directly
+        # Subject should have compliance data (no entity data)
         subject = vc_payload["credentialSubject"]
-        assert subject["type"] == "harbour_gx:LegalPerson"
-        assert "name" in subject
+        assert subject["type"] == "harbour.gx:LegalPerson"
+        assert "harbour.gx:labelLevel" in subject
 
     def test_process_gaiax_natural_person(self, signing_key, tmp_path):
         """Process the Gaia-X natural person credential through the pipeline."""
@@ -263,11 +263,11 @@ class TestProcessGaiaxExample:
         assert jwt_path.exists()
         vc_jwt = jwt_path.read_text().strip()
         vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour_gx:NaturalPersonCredential" in vc_payload["type"]
+        assert "harbour.gx:NaturalPersonCredential" in vc_payload["type"]
 
         # Subject should have the NaturalPerson data directly
         subject = vc_payload["credentialSubject"]
-        assert subject["type"] == "harbour_gx:NaturalPerson"
+        assert subject["type"] == "harbour.gx:NaturalPerson"
         assert "givenName" in subject
 
     def test_process_all_gaiax_examples(self, signing_key, tmp_path):

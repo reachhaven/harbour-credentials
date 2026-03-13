@@ -47,7 +47,7 @@ describe("TransactionData", () => {
       txn: { asset_id: "urn:uuid:test", price: "100" },
     });
 
-    expect(tx.type).toBe("harbour_delegate:data.purchase");
+    expect(tx.type).toBe("harbour.delegate:data.purchase");
     expect(tx.credential_ids).toEqual(["default"]);
     expect(tx.txn).toEqual({ asset_id: "urn:uuid:test", price: "100" });
     expect(tx.exp).toBeUndefined();
@@ -105,7 +105,7 @@ describe("TransactionData", () => {
 describe("Canonical JSON", () => {
   it("sorts keys recursively", () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -125,7 +125,7 @@ describe("Canonical JSON", () => {
 
   it("produces deterministic hashes", async () => {
     const tx1: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -145,7 +145,7 @@ describe("Canonical JSON", () => {
 
   it("is independent of key insertion order", async () => {
     const tx1: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -154,7 +154,7 @@ describe("Canonical JSON", () => {
     };
 
     const tx2: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -169,7 +169,7 @@ describe("Canonical JSON", () => {
 
   it("changes hash when data changes", async () => {
     const tx1: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -239,7 +239,7 @@ describe("Shared canonicalization vectors", () => {
 describe("createDelegationChallenge", () => {
   it("creates a valid challenge", async () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -311,7 +311,7 @@ describe("parseDelegationChallenge", () => {
 describe("verifyChallenge", () => {
   it("verifies matching challenge", async () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -325,7 +325,7 @@ describe("verifyChallenge", () => {
 
   it("fails for mismatched nonce", async () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -340,7 +340,7 @@ describe("verifyChallenge", () => {
 
   it("fails for mismatched hash", async () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,
@@ -380,7 +380,7 @@ describe("validateTransactionData", () => {
 
   it("throws for short nonce", () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "abc",
       iat: Math.floor(Date.now() / 1000),
@@ -392,7 +392,7 @@ describe("validateTransactionData", () => {
 
   it("throws for old timestamp", () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: Math.floor(Date.now() / 1000) - 600,
@@ -406,7 +406,7 @@ describe("validateTransactionData", () => {
 
   it("throws for future timestamp", () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: Math.floor(Date.now() / 1000) + 300,
@@ -433,7 +433,7 @@ describe("validateTransactionData", () => {
 describe("renderTransactionDisplay", () => {
   it("renders basic display", () => {
     const tx: TransactionData = {
-      type: "harbour_delegate:data.purchase",
+      type: "harbour.delegate:data.purchase",
       credential_ids: ["default"],
       nonce: "da9b1009",
       iat: 1771934400,

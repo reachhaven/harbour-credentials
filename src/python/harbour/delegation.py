@@ -35,7 +35,7 @@ from typing import Any
 ACTION_TYPE = "HARBOUR_DELEGATE"
 
 # Type prefix for transaction data
-TYPE_PREFIX = "harbour_delegate"
+TYPE_PREFIX = "harbour.delegate"
 
 # Human-friendly labels for action types
 ACTION_LABELS = {
@@ -69,7 +69,7 @@ class TransactionData:
     The challenge contains only a hash of this object for compactness.
 
     Attributes:
-        type: Transaction data type identifier (harbour_delegate:<action>)
+        type: Transaction data type identifier (harbour.delegate:<action>)
         credential_ids: References to DCQL Credential Query id fields
         nonce: Unique identifier for replay protection
         iat: Issued-at Unix timestamp (seconds since epoch)
@@ -92,7 +92,7 @@ class TransactionData:
     def action(self) -> str:
         """Extract the action from the type field.
 
-        E.g., "harbour_delegate:data.purchase" -> "data.purchase"
+        E.g., "harbour.delegate:data.purchase" -> "data.purchase"
         """
         if ":" in self.type:
             return self.type.split(":", 1)[1]

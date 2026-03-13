@@ -54,7 +54,7 @@ class TestTransactionData:
             txn={"asset_id": "urn:uuid:test", "price": "100"},
         )
 
-        assert tx.type == "harbour_delegate:data.purchase"
+        assert tx.type == "harbour.delegate:data.purchase"
         assert tx.credential_ids == ["default"]
         assert tx.txn == {"asset_id": "urn:uuid:test", "price": "100"}
         assert tx.exp is None
@@ -109,7 +109,7 @@ class TestTransactionData:
     def test_to_dict_omits_none(self):
         """Test TransactionData.to_dict() omits None values."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -118,7 +118,7 @@ class TestTransactionData:
 
         d = tx.to_dict()
 
-        assert d["type"] == "harbour_delegate:data.purchase"
+        assert d["type"] == "harbour.delegate:data.purchase"
         assert d["credential_ids"] == ["default"]
         assert d["nonce"] == "da9b1009"
         assert d["iat"] == 1771934400
@@ -129,7 +129,7 @@ class TestTransactionData:
     def test_to_dict_includes_optional_when_present(self):
         """Test TransactionData.to_dict() includes optional fields when set."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["harbour_natural_person"],
             nonce="da9b1009",
             iat=1771934400,
@@ -145,7 +145,7 @@ class TestTransactionData:
     def test_to_json_canonical(self):
         """Test canonical JSON output (sorted keys, no whitespace)."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -164,7 +164,7 @@ class TestTransactionData:
     def test_to_json_pretty(self):
         """Test pretty JSON output."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -180,7 +180,7 @@ class TestTransactionData:
     def test_from_dict(self):
         """Test TransactionData.from_dict()."""
         data = {
-            "type": "harbour_delegate:contract.sign",
+            "type": "harbour.delegate:contract.sign",
             "credential_ids": ["org_credential"],
             "nonce": "ab12cd34",
             "iat": 1771934400,
@@ -192,7 +192,7 @@ class TestTransactionData:
 
         tx = TransactionData.from_dict(data)
 
-        assert tx.type == "harbour_delegate:contract.sign"
+        assert tx.type == "harbour.delegate:contract.sign"
         assert tx.credential_ids == ["org_credential"]
         assert tx.nonce == "ab12cd34"
         assert tx.iat == 1771934400
@@ -204,7 +204,7 @@ class TestTransactionData:
         """Test TransactionData.from_json()."""
         json_str = json.dumps(
             {
-                "type": "harbour_delegate:data.purchase",
+                "type": "harbour.delegate:data.purchase",
                 "credential_ids": ["default"],
                 "nonce": "abc12345",
                 "iat": 1771934400,
@@ -245,7 +245,7 @@ class TestHashComputation:
     def test_compute_hash_deterministic(self):
         """Test that hash computation is deterministic."""
         tx1 = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -253,7 +253,7 @@ class TestHashComputation:
         )
 
         tx2 = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -265,7 +265,7 @@ class TestHashComputation:
     def test_compute_hash_key_order_independent(self):
         """Test that hash is independent of transaction dict key order."""
         tx1 = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -273,7 +273,7 @@ class TestHashComputation:
         )
 
         tx2 = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -298,7 +298,7 @@ class TestHashComputation:
     def test_compute_hash_changes_with_data(self):
         """Test that hash changes when data changes."""
         tx1 = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -306,7 +306,7 @@ class TestHashComputation:
         )
 
         tx2 = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -318,7 +318,7 @@ class TestHashComputation:
     def test_compute_hash_sensitive_to_all_fields(self):
         """Test that hash changes for any field change."""
         base = {
-            "type": "harbour_delegate:data.purchase",
+            "type": "harbour.delegate:data.purchase",
             "credential_ids": ["default"],
             "nonce": "da9b1009",
             "iat": 1771934400,
@@ -330,7 +330,7 @@ class TestHashComputation:
 
         # Test each field change produces different hash
         variations = [
-            {"type": "harbour_delegate:data.share"},
+            {"type": "harbour.delegate:data.share"},
             {"credential_ids": ["other"]},
             {"nonce": "different"},
             {"iat": 9999999999},
@@ -421,7 +421,7 @@ class TestCreateDelegationChallenge:
     def test_basic_challenge(self):
         """Test basic challenge creation."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -439,7 +439,7 @@ class TestCreateDelegationChallenge:
     def test_challenge_matches_hash(self):
         """Test that challenge hash matches computed hash."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -530,7 +530,7 @@ class TestVerifyChallenge:
     def test_verify_matching_challenge(self):
         """Test verification of matching challenge."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -544,7 +544,7 @@ class TestVerifyChallenge:
     def test_verify_mismatched_nonce(self):
         """Test verification fails for mismatched nonce."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -559,7 +559,7 @@ class TestVerifyChallenge:
     def test_verify_mismatched_hash(self):
         """Test verification fails for mismatched hash."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -574,7 +574,7 @@ class TestVerifyChallenge:
     def test_verify_tampered_data(self):
         """Test verification fails for tampered transaction data."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -625,7 +625,7 @@ class TestValidateTransactionData:
     def test_validate_short_nonce(self):
         """Test validation fails for short nonce."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="abc",  # Too short (< 8 chars)
             iat=int(time.time()),
@@ -641,7 +641,7 @@ class TestValidateTransactionData:
         """Test validation fails for old timestamp."""
         old_iat = int(time.time()) - 600  # 10 minutes ago
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=old_iat,
@@ -657,7 +657,7 @@ class TestValidateTransactionData:
         """Test validation fails for future timestamp."""
         future_iat = int(time.time()) + 300  # 5 minutes in future
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=future_iat,
@@ -688,7 +688,7 @@ class TestValidateTransactionData:
         # 2 minutes old
         old_iat = int(time.time()) - 120
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=old_iat,
@@ -714,7 +714,7 @@ class TestRenderTransactionDisplay:
     def test_render_basic(self):
         """Test basic display rendering."""
         tx = TransactionData(
-            type="harbour_delegate:data.purchase",
+            type="harbour.delegate:data.purchase",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,
@@ -746,7 +746,7 @@ class TestRenderTransactionDisplay:
     def test_render_unknown_action(self):
         """Test display with unknown action type."""
         tx = TransactionData(
-            type="harbour_delegate:unknown.action",
+            type="harbour.delegate:unknown.action",
             credential_ids=["default"],
             nonce="da9b1009",
             iat=1771934400,

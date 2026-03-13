@@ -68,8 +68,11 @@ endef
 
 # LinkML schema files
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
-DOMAINS := harbour-core-credential harbour-gx-credential
+DOMAINS := harbour-core-credential harbour-gx-credential harbour-core-delegation
 HARBOUR_EXAMPLE_FILES := $(wildcard examples/*.json) $(wildcard examples/gaiax/*.json)
+HARBOUR_VALIDATE_PATH ?=
+HARBOUR_VALIDATE_ALLOW_ONLINE ?= 1
+HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES ?= $(if $(strip $(HARBOUR_VALIDATE_PATH)),0,1)
 GROUPED_COMMANDS := install validate lint format test story build
 PRIMARY_GOAL := $(firstword $(MAKECMDGOALS))
 
@@ -128,6 +131,8 @@ _help_validate:
 	@echo "Validate subcommands:"
 	@echo "  make validate        - Run structural validation tests"
 	@echo "  make validate shacl  - Run SHACL conformance on examples via OMB"
+	@echo "  make validate shacl HARBOUR_VALIDATE_PATH=examples/... - Validate one Harbour .json/.jsonld file or folder"
+	@echo "  make validate shacl HARBOUR_VALIDATE_ALLOW_ONLINE=0 - Disable OMB online fallback for did:web/http(s)"
 
 _help_lint:
 	@echo "Lint subcommands:"
@@ -289,27 +294,60 @@ _validate_shacl:
 	@echo "Running SHACL data conformance check on examples..."
 	@cd $(OMB_SUBMODULE_DIR) && \
 		tmp_output=$$(mktemp) && \
-		$(PYTHON_ABS) -m src.tools.validators.validation_suite \
-			--run check-data-conformance \
-			--data-paths $(addprefix ../../,$(HARBOUR_EXAMPLE_FILES)) ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
-			--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
+		allow_online_flag="" ; \
+		if [ "$(HARBOUR_VALIDATE_ALLOW_ONLINE)" = "0" ]; then \
+			allow_online_flag="--offline" ; \
+		fi ; \
+		if [ -n "$(HARBOUR_VALIDATE_PATH)" ]; then \
+			target_path="../../$(HARBOUR_VALIDATE_PATH)" ; \
+			if [ -d "$$target_path" ]; then \
+				json_count=$$(find "$$target_path" -maxdepth 1 -type f \( -name '*.json' -o -name '*.jsonld' \) | wc -l) ; \
+				if [ "$$json_count" -eq 0 ]; then \
+					echo "ERROR: No .json or .jsonld files found under $$target_path" >&2 ; \
+					rm -f $$tmp_output ; \
+					exit 1 ; \
+				fi ; \
+			elif [ -f "$$target_path" ]; then \
+				case "$$target_path" in \
+					*.json|*.jsonld) ;; \
+					*) echo "ERROR: Harbour SHACL validation only supports .json/.jsonld files or directories: $$target_path" >&2 ; rm -f $$tmp_output ; exit 1 ;; \
+				esac ; \
+			else \
+				echo "ERROR: Validation path not found: $$target_path" >&2 ; \
+				rm -f $$tmp_output ; \
+				exit 1 ; \
+			fi ; \
+			$(PYTHON_ABS) -m src.tools.validators.validation_suite \
+				--run check-data-conformance \
+				$$allow_online_flag \
+				--data-paths "$$target_path" ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
+				--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
+		else \
+			$(PYTHON_ABS) -m src.tools.validators.validation_suite \
+				--run check-data-conformance \
+				$$allow_online_flag \
+				--data-paths $(addprefix ../../,$(HARBOUR_EXAMPLE_FILES)) ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
+				--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
+		fi ; \
 		status=$$? ; \
 		cat $$tmp_output ; \
 		if [ $$status -ne 0 ]; then \
 			rm -f $$tmp_output ; \
 			exit $$status ; \
 		fi ; \
-		for required in \
-			"imports/cs/cs.owl.ttl" \
-			"imports/cred/cred.owl.ttl" \
-			"../../artifacts/harbour-gx-credential/harbour-gx-credential.owl.ttl" \
-			"artifacts/gx/gx.owl.ttl" ; do \
-			if ! grep -q "$$required" $$tmp_output ; then \
-				echo "ERROR: Required ontology not loaded by validation suite: $$required" >&2 ; \
-				rm -f $$tmp_output ; \
-				exit 1 ; \
-			fi ; \
-		done ; \
+		if [ "$(HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES)" = "1" ]; then \
+			for required in \
+				"imports/cs/cs.owl.ttl" \
+				"imports/cred/cred.owl.ttl" \
+				"../../artifacts/harbour-gx-credential/harbour-gx-credential.owl.ttl" \
+				"artifacts/gx/gx.owl.ttl" ; do \
+				if ! grep -q "$$required" $$tmp_output ; then \
+					echo "ERROR: Required ontology not loaded by validation suite: $$required" >&2 ; \
+					rm -f $$tmp_output ; \
+					exit 1 ; \
+				fi ; \
+			done ; \
+		fi ; \
 		rm -f $$tmp_output
 	@echo "OK: SHACL validation complete"
 

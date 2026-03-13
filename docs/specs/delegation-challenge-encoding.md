@@ -49,7 +49,7 @@ Where:
 ### 2.2 Example
 
 ```text
-da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
+da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b
 ```
 
 This format uses a compact, single-line structure designed for QR code presentation while maintaining full auditability via the hash binding.
@@ -89,7 +89,7 @@ This structure aligns with [OID4VP §5.1 `transaction_data`](https://openid.net/
 
 ```json
 {
-  "type": "harbour_delegate:<action>",
+  "type": "harbour.delegate:<action>",
   "credential_ids": ["<credential-query-id>"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "<nonce>",
@@ -105,7 +105,7 @@ This structure aligns with [OID4VP §5.1 `transaction_data`](https://openid.net/
 
 | Field | Type | OID4VP | Description |
 |-------|------|--------|-------------|
-| `type` | string | REQUIRED | Transaction data type identifier. Format: `harbour_delegate:<action>` |
+| `type` | string | REQUIRED | Transaction data type identifier. Format: `harbour.delegate:<action>` |
 | `credential_ids` | string[] | REQUIRED | References to DCQL Credential Query `id` fields that can authorize this transaction |
 | `nonce` | string | Extension | Unique identifier for replay protection (same as in challenge) |
 | `iat` | number | Extension | Issued-at Unix timestamp (seconds since epoch) |
@@ -123,11 +123,11 @@ This structure aligns with [OID4VP §5.1 `transaction_data`](https://openid.net/
 
 | Action Type | `txn` Fields |
 |-------------|--------------|
-| `harbour_delegate:blockchain.transfer` | `chain`, `contract`, `recipient`, `amount`, `token` |
-| `harbour_delegate:blockchain.execute` | `chain`, `contract`, `method`, `params`, `value` |
-| `harbour_delegate:data.purchase` | `asset_id`, `price`, `currency`, `marketplace` |
-| `harbour_delegate:contract.sign` | `document_hash`, `document_uri`, `parties` |
-| `harbour_delegate:credential.issue` | `credential_type`, `subject`, `claims` |
+| `harbour.delegate:blockchain.transfer` | `chain`, `contract`, `recipient`, `amount`, `token` |
+| `harbour.delegate:blockchain.execute` | `chain`, `contract`, `method`, `params`, `value` |
+| `harbour.delegate:data.purchase` | `asset_id`, `price`, `currency`, `marketplace` |
+| `harbour.delegate:contract.sign` | `document_hash`, `document_uri`, `parties` |
+| `harbour.delegate:credential.issue` | `credential_type`, `subject`, `claims` |
 
 #### Naming Conventions and Compatibility Boundary
 
@@ -145,7 +145,7 @@ Important: `txn` keys are part of canonicalization and hashing. Renaming a key (
 
 ```json
 {
-  "type": "harbour_delegate:data.purchase",
+  "type": "harbour.delegate:data.purchase",
   "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
@@ -179,7 +179,7 @@ def compute_transaction_hash(transaction_data: dict) -> str:
 The resulting challenge:
 
 ```text
-da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
+da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b
 ```
 
 ---
@@ -212,7 +212,7 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
         "type": "DataIntegrityProof",
         "cryptosuite": "ecdsa-rdfc-2019",
         "proofPurpose": "authentication",
-        "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
+        "challenge": "da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
         "domain": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
         "verificationMethod": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9#controller",
         "created": "2026-02-24T12:00:05Z",
@@ -280,7 +280,7 @@ This specification is designed for seamless integration with [OpenID for Verifia
 
 ```json
 {
-  "type": "harbour_delegate:data.purchase",
+  "type": "harbour.delegate:data.purchase",
   "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
@@ -503,7 +503,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
 
 ```json
 {
-  "type": "harbour_delegate:data.purchase",
+  "type": "harbour.delegate:data.purchase",
   "credential_ids": ["harbour_natural_person"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "da9b1009",
@@ -520,7 +520,7 @@ These examples use the shared test vectors from `tests/fixtures/canonicalization
 **Challenge:**
 
 ```text
-da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52
+da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b
 ```
 
 ### 10.2 Blockchain Transfer Transaction
@@ -529,7 +529,7 @@ da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba
 
 ```json
 {
-  "type": "harbour_delegate:blockchain.transfer",
+  "type": "harbour.delegate:blockchain.transfer",
   "credential_ids": ["default"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "ef567890",
@@ -546,7 +546,7 @@ da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba
 **Challenge:**
 
 ```text
-ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c422252b845d4c1
+ef567890 HARBOUR_DELEGATE 66d8768b6f6ae9d952f61c85414d22d504341da5d0ff0f65a45398246f1f630a
 ```
 
 ### 10.3 Contract Signature Transaction
@@ -555,7 +555,7 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
 
 ```json
 {
-  "type": "harbour_delegate:contract.sign",
+  "type": "harbour.delegate:contract.sign",
   "credential_ids": ["org_credential"],
   "transaction_data_hashes_alg": ["sha-256"],
   "nonce": "ab12cd34",
@@ -572,7 +572,7 @@ ef567890 HARBOUR_DELEGATE 0736db89c15be412294f96717a3e435f89d095e7e953b1808c4222
 **Challenge:**
 
 ```text
-ab12cd34 HARBOUR_DELEGATE 0863ac13bc5f15c7dfcdee71b8beea1aead4b822d0a7c03154405da4f192af08
+ab12cd34 HARBOUR_DELEGATE 573cc3da4d63242b2d8b950b29507b9b1e414d9330d3bb245ce7fb264b259601
 ```
 
 ---
@@ -603,7 +603,7 @@ This specification aligns with [OID4VP Transaction Data (§8.4)](https://openid.
 | OID4VP Concept | Harbour Delegation Equivalent |
 |----------------|-------------------------------|
 | `transaction_data` request param | Transaction Data Object (§3) |
-| `transaction_data.type` | `"harbour_delegate:<action>"` |
+| `transaction_data.type` | `"harbour.delegate:<action>"` |
 | `transaction_data.txn` | Action-specific transaction details |
 | `transaction_data_hashes` in KB-JWT | OID4VP hash over transaction_data request string |
 | `transaction_data_hashes_alg` | `"sha-256"` |
@@ -618,7 +618,7 @@ OID4VP authorization request:
   "client_id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
   "nonce": "da9b1009",
   "transaction_data": [{
-    "type": "harbour_delegate:data.purchase",
+    "type": "harbour.delegate:data.purchase",
     "credential_ids": ["harbour_natural_person"],
     "transaction_data_hashes_alg": ["sha-256"],
     "nonce": "da9b1009",

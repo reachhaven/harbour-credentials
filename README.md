@@ -120,7 +120,7 @@ Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain exten
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
     "https://w3id.org/gaia-x/development#",
-    "https://w3id.org/reachhaven/harbour/credentials/v1/"
+    "https://w3id.org/reachhaven/harbour/core/v1/"
   ],
   "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
   "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",

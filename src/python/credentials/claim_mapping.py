@@ -23,10 +23,10 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 # Harbour namespace
-HARBOUR_NS = "https://w3id.org/reachhaven/harbour/credentials/v1/"
+HARBOUR_NS = "https://w3id.org/reachhaven/harbour/core/v1/"
 
 # Harbour Gaia-X domain namespace
-HARBOUR_GX_NS = "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
+HARBOUR_GX_NS = "https://w3id.org/reachhaven/harbour/gx/v1/"
 
 # Gaia-X namespace
 GAIAX_NS = "https://w3id.org/gaia-x/development#"
@@ -38,16 +38,14 @@ GAIAX_NS = "https://w3id.org/gaia-x/development#"
 HARBOUR_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_GX_NS}LegalPersonCredential",
     "claims": {
-        "credentialSubject.name": "legalName",
-        "credentialSubject.registrationNumber": "registrationNumber",
-        "credentialSubject.headquartersAddress": "headquartersAddress",
-        "credentialSubject.legalAddress": "legalAddress",
+        r"credentialSubject.harbour\.gx:labelLevel": "labelLevel",
+        r"credentialSubject.harbour\.gx:engineVersion": "engineVersion",
+        r"credentialSubject.harbour\.gx:rulesVersion": "rulesVersion",
     },
-    "always_disclosed": ["iss", "vct", "iat", "exp", "legalName"],
+    "always_disclosed": ["iss", "vct", "iat", "exp", "labelLevel"],
     "selectively_disclosed": [
-        "registrationNumber",
-        "headquartersAddress",
-        "legalAddress",
+        "engineVersion",
+        "rulesVersion",
     ],
 }
 
@@ -64,17 +62,17 @@ HARBOUR_NATURAL_PERSON_MAPPING = {
 }
 
 # ---------------------------------------------------------------------------
-# Gaia-X domain mappings (with gxParticipant inner node)
-# Used when the credential wraps gx data inside a gxParticipant nested object.
+# Gaia-X domain mappings (with participant inner node)
+# Used when the credential wraps gx data inside a participant nested object.
 # ---------------------------------------------------------------------------
 
 GAIAX_LEGAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_GX_NS}LegalPersonCredential",
     "claims": {
-        "credentialSubject.gxParticipant.name": "legalName",
-        "credentialSubject.gxParticipant.gx:registrationNumber": "registrationNumber",
-        "credentialSubject.gxParticipant.gx:headquartersAddress": "headquartersAddress",
-        "credentialSubject.gxParticipant.gx:legalAddress": "legalAddress",
+        "credentialSubject.participant.name": "legalName",
+        "credentialSubject.participant.gx:registrationNumber": "registrationNumber",
+        "credentialSubject.participant.gx:headquartersAddress": "headquartersAddress",
+        "credentialSubject.participant.gx:legalAddress": "legalAddress",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp", "legalName"],
     "selectively_disclosed": [
@@ -87,9 +85,9 @@ GAIAX_LEGAL_PERSON_MAPPING = {
 GAIAX_NATURAL_PERSON_MAPPING = {
     "vct": f"{HARBOUR_GX_NS}NaturalPersonCredential",
     "claims": {
-        "credentialSubject.gxParticipant.givenName": "givenName",
-        "credentialSubject.gxParticipant.familyName": "familyName",
-        "credentialSubject.gxParticipant.email": "email",
+        "credentialSubject.participant.givenName": "givenName",
+        "credentialSubject.participant.familyName": "familyName",
+        "credentialSubject.participant.email": "email",
         "credentialSubject.memberOf": "memberOf",
     },
     "always_disclosed": ["iss", "vct", "iat", "exp"],
@@ -107,14 +105,14 @@ GAIAX_NATURAL_PERSON_MAPPING = {
 
 # Base harbour mappings (skeleton credentials)
 MAPPINGS: dict[str, dict] = {
-    "harbour_gx:LegalPersonCredential": HARBOUR_LEGAL_PERSON_MAPPING,
-    "harbour_gx:NaturalPersonCredential": HARBOUR_NATURAL_PERSON_MAPPING,
+    "harbour.gx:LegalPersonCredential": HARBOUR_LEGAL_PERSON_MAPPING,
+    "harbour.gx:NaturalPersonCredential": HARBOUR_NATURAL_PERSON_MAPPING,
 }
 
-# Gaia-X domain mappings (extended with gxParticipant)
+# Gaia-X domain mappings (extended with participant)
 GAIAX_MAPPINGS: dict[str, dict] = {
-    "harbour_gx:LegalPersonCredential": GAIAX_LEGAL_PERSON_MAPPING,
-    "harbour_gx:NaturalPersonCredential": GAIAX_NATURAL_PERSON_MAPPING,
+    "harbour.gx:LegalPersonCredential": GAIAX_LEGAL_PERSON_MAPPING,
+    "harbour.gx:NaturalPersonCredential": GAIAX_NATURAL_PERSON_MAPPING,
 }
 
 
@@ -256,7 +254,7 @@ def get_mapping_for_vc(vc: dict) -> dict | None:
         elif isinstance(at_type, list):
             vc_types = vc_types + at_type
 
-    # Use primary registry — GAIAX_MAPPINGS is reserved for gxParticipant-nested
+    # Use primary registry — GAIAX_MAPPINGS is reserved for participant-nested
     # patterns (not yet used in current examples).
     for vc_type, mapping in MAPPINGS.items():
         if vc_type in vc_types:
@@ -295,8 +293,13 @@ def create_mapping(
 
 
 def _get_nested(obj: dict, path: str) -> Any:
-    """Get a nested value by dot-separated path."""
-    parts = path.split(".")
+    """Get a nested value by dot-separated path.
+
+    Dots inside keys can be escaped with a backslash (``\\.``).
+    Unescaped dots are path separators; escaped dots are literal.
+    Also falls back to greedy key matching for existing keys with dots.
+    """
+    parts = _split_path(path)
     current: Any = obj
     for part in parts:
         if isinstance(current, dict):
@@ -307,14 +310,28 @@ def _get_nested(obj: dict, path: str) -> Any:
 
 
 def _set_nested(obj: dict, path: str, value: Any) -> None:
-    """Set a nested value by dot-separated path."""
-    parts = path.split(".")
+    """Set a nested value by dot-separated path.
+
+    Dots inside keys can be escaped with a backslash (``\\.``).
+    """
+    parts = _split_path(path)
     current = obj
     for part in parts[:-1]:
         if part not in current:
             current[part] = {}
         current = current[part]
     current[parts[-1]] = value
+
+
+def _split_path(path: str) -> list[str]:
+    r"""Split a dot-delimited path, respecting escaped dots (``\.``).
+
+    ``credentialSubject.harbour\.gx:labelLevel`` → ``["credentialSubject", "harbour.gx:labelLevel"]``
+    """
+    import re
+
+    parts = re.split(r"(?<!\\)\.", path)
+    return [p.replace("\\.", ".") for p in parts]
 
 
 # ---------------------------------------------------------------------------

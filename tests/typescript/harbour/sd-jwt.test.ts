@@ -12,7 +12,7 @@ import {
 
 const FIXTURES_DIR = resolve(__dirname, "../../fixtures");
 const VCT =
-  "https://w3id.org/reachhaven/harbour/credentials/v1/LegalPersonCredential";
+  "https://w3id.org/reachhaven/harbour/core/v1/LegalPersonCredential";
 
 const SAMPLE_CLAIMS = {
   iss: "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",

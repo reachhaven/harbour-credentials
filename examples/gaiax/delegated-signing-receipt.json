@@ -1,8 +1,8 @@
 {
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
-    "https://w3id.org/reachhaven/harbour/credentials/v1/",
-    "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
+    "https://w3id.org/reachhaven/harbour/core/v1/",
+    "https://w3id.org/reachhaven/harbour/gx/v1/"
   ],
   "type": [
     "VerifiableCredential",
@@ -14,7 +14,7 @@
   "credentialSubject": {
     "id": "urn:uuid:receipt-b7c8d9e0-f1a2-3456-789a-bcdef0123456",
     "type": "harbour:TransactionReceipt",
-    "transactionHash": "cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52",
+    "transactionHash": "c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
     "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   },
   "credentialStatus": [
@@ -43,8 +43,8 @@
           {
             "@context": [
               "https://www.w3.org/ns/credentials/v2",
-              "https://w3id.org/reachhaven/harbour/credentials/v1/",
-              "https://w3id.org/reachhaven/harbour/gaiax-domain/v1/"
+              "https://w3id.org/reachhaven/harbour/core/v1/",
+              "https://w3id.org/reachhaven/harbour/gx/v1/"
             ],
             "type": [
               "VerifiableCredential"
@@ -53,7 +53,7 @@
             "validFrom": "2024-01-15T00:00:00Z",
             "credentialSubject": {
               "id": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9",
-              "type": "harbour_gx:NaturalPerson",
+              "type": "harbour.gx:NaturalPerson",
               "memberOf": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
             }
           }
@@ -61,7 +61,7 @@
       },
       "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
       "transaction_data": {
-        "type": "harbour_delegate:data.purchase",
+        "type": "harbour.delegate:data.purchase",
         "credential_ids": [
           "harbour_natural_person"
         ],
@@ -77,7 +77,7 @@
           "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
         }
       },
-      "challenge": "da9b1009 HARBOUR_DELEGATE cb9916944deeb764c7f78b4ade8f8466178824d58bbd0083734eba67818b1a52"
+      "challenge": "da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b"
     }
   ]
 }

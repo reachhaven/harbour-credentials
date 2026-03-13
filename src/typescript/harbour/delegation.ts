@@ -14,7 +14,7 @@
 export const ACTION_TYPE = "HARBOUR_DELEGATE";
 
 /** Type prefix for transaction data. */
-export const TYPE_PREFIX = "harbour_delegate";
+export const TYPE_PREFIX = "harbour.delegate";
 
 /** Human-friendly labels for action types. */
 export const ACTION_LABELS: Record<string, string> = {
@@ -43,7 +43,7 @@ export class ChallengeError extends Error {
 
 /** OID4VP-aligned transaction data object for delegated signing. */
 export interface TransactionData {
-  /** Transaction data type identifier (harbour_delegate:<action>). */
+  /** Transaction data type identifier (harbour.delegate:<action>). */
   type: string;
   /** References to DCQL Credential Query id fields. */
   credential_ids: string[];
@@ -64,7 +64,7 @@ export interface TransactionData {
 /**
  * Extract the action from the type field.
  *
- * E.g., "harbour_delegate:data.purchase" -> "data.purchase"
+ * E.g., "harbour.delegate:data.purchase" -> "data.purchase"
  */
 export function getAction(td: TransactionData): string {
   const idx = td.type.indexOf(":");

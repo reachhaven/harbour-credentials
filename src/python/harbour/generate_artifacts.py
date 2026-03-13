@@ -26,7 +26,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 LINKML_DIR = REPO_ROOT / "linkml"
 ARTIFACTS_DIR = REPO_ROOT / "artifacts"
 
-DOMAINS = ["harbour-core-credential", "harbour-gx-credential"]
+DOMAINS = [
+    "harbour-core-credential",
+    "harbour-gx-credential",
+    "harbour-core-delegation",
+]
+
+# Domains where SHACL shapes should NOT be generated.
+# harbour-core-delegation defines transaction data types used inside
+# DelegatedSignatureEvidence.transaction_data — an opaque canonical JSON
+# payload for OID4VP hash binding [OID4VP §5.1]. SHACL validation of its
+# contents is inappropriate because the data is validated by SHA-256 hash
+# binding (not RDF graph shape), and JSON-LD expansion would interfere
+# with the canonical JSON used for hashing.
+SHACL_SKIP_DOMAINS = {"harbour-core-delegation"}
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
@@ -130,12 +143,13 @@ def main() -> None:
 
         (out_dir / f"{domain}.owl.ttl").write_text(owl_text, encoding="utf-8")
 
-        shacl_gen = HarbourShaclGenerator(
-            schema, importmap=importmap, base_dir=base_dir
-        )
-        (out_dir / f"{domain}.shacl.ttl").write_text(
-            shacl_gen.serialize(), encoding="utf-8"
-        )
+        if domain not in SHACL_SKIP_DOMAINS:
+            shacl_gen = HarbourShaclGenerator(
+                schema, importmap=importmap, base_dir=base_dir
+            )
+            (out_dir / f"{domain}.shacl.ttl").write_text(
+                shacl_gen.serialize(), encoding="utf-8"
+            )
 
         ctx_gen = HarbourContextGenerator(
             schema, mergeimports=False, importmap=importmap, base_dir=base_dir

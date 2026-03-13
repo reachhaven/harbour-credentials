@@ -17,7 +17,7 @@ SAMPLE_CLAIMS = {
     "email": "info@example.com",
 }
 
-VCT = "https://w3id.org/reachhaven/harbour/credentials/v1/LegalPersonCredential"
+VCT = "https://w3id.org/reachhaven/harbour/core/v1/LegalPersonCredential"
 
 
 @pytest.fixture()

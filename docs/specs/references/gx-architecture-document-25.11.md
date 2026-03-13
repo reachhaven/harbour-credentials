@@ -53,31 +53,33 @@ are permitted on `gx:LegalPerson` nodes:
 | `schema:name` | `xsd:string` | OPTIONAL (≤1) | Human-readable name |
 | `schema:description` | `xsd:string` | OPTIONAL (≤1) | Description |
 
-### Closed Shape Constraint — Why Composition
+### Compliance Model — Why Not Extend gx:LegalPerson Directly?
 
 Because `gx:LegalPersonShape` has `sh:closed true`:
 
 - Adding ANY property not in the shape to a `gx:LegalPerson` node
   will **fail** SHACL validation.
 - Harbour cannot extend `gx:LegalPerson` with additional properties.
-- Therefore Harbour uses **composition** (not extension): the harbour outer
-  node carries harbour-specific properties, and a nested gx blank node
-  carries only gx-valid properties.
+- Therefore Harbour uses a **separate compliance attestation type**:
+  `harbour.gx:LegalPerson` carries only compliance enforcement slots
+  (VC references + metadata). Entity data lives in the referenced
+  plain `gx:LegalPerson` input VC.
 
-### Composition Pattern
+### Compliance Pattern
 
 ```
-harbour:LegalPerson                    # harbour outer node
-  ├── schema:name "ACME Corp"          # harbour property
-  └── harbour:gxParticipant            # composition link
-        └── gx:LegalPerson             # gx blank node (closed shape)
-              ├── gx:registrationNumber ...
-              ├── gx:headquartersAddress ...
-              └── gx:legalAddress ...
+harbour.gx:LegalPerson                 # compliance attestation node
+  ├── harbour.gx:compliantLegalPersonVC # → gx:LegalPerson VC ref + digestSRI
+  ├── harbour.gx:compliantRegistrationVC # → gx:VatID VC ref + digestSRI
+  ├── harbour.gx:compliantTermsVC       # → gx:Issuer VC ref + digestSRI
+  ├── harbour.gx:labelLevel "SC"
+  ├── harbour.gx:engineVersion "2.11.0"
+  ├── harbour.gx:rulesVersion "CD25.10"
+  └── harbour.gx:validatedCriteria [...]
 ```
 
-This pattern keeps gx closed shapes intact while allowing harbour to
-carry its own properties on the outer node.
+This pattern keeps gx closed shapes intact — entity data stays on the
+gx nodes, compliance metadata stays on the harbour node.
 
 ### Trust Framework Compliance
 
@@ -100,9 +102,13 @@ carry its own properties on the outer node.
 ## Harbour Usage
 
 - `harbour-gx-credential.yaml` defines `LegalPersonCredential` and
-  `NaturalPersonCredential` with `gxParticipant` composition slot.
-- The `gxParticipant` slot has `range: Any` because the gx blank node
-  content is validated by gx's own SHACL shapes, not harbour's.
+  `NaturalPersonCredential` with compliance enforcement slots.
+- `LegalPersonCredential` IS the compliance credential — holding a valid
+  one means Haven verified the three underlying Gaia-X VCs (LegalPerson,
+  VatID, Issuer/T&C). See [GX-CD 25.10](gx-compliance-document-25.10.md).
+- `harbour.gx:LegalPerson` is a pure compliance attestation type with
+  SHACL-enforced `CompliantCredentialReference` slots.
+- `harbour.gx:NaturalPerson` extends `gx:Participant` directly.
 - Domain SHACL is generated with `exclude_imports=True` to keep
   harbour shapes separate from gx shapes.
 - Version tracking via `artifacts/gx/VERSION` and `verify-version.sh`.

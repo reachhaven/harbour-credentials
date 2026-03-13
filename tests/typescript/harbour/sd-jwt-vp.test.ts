@@ -126,7 +126,7 @@ describe("issueSdJwtVp", () => {
       {
         type: "DelegatedSignatureEvidence",
         transaction_data: {
-          type: "harbour_delegate:data.purchase",
+          type: "harbour.delegate:data.purchase",
           credential_ids: ["harbour_natural_person"],
           nonce: txNonce,
           iat: 1771934400,
@@ -169,7 +169,7 @@ describe("issueSdJwtVp", () => {
       {
         type: "DelegatedSignatureEvidence",
         transaction_data: {
-          type: "harbour_delegate:data.purchase",
+          type: "harbour.delegate:data.purchase",
           credential_ids: ["default"],
           nonce: "snake-nonce",
           iat: 1771934400,
@@ -255,7 +255,7 @@ describe("verifySdJwtVp", () => {
       {
         type: "DelegatedSignatureEvidence",
         transaction_data: {
-          type: "harbour_delegate:blockchain.approve",
+          type: "harbour.delegate:blockchain.approve",
           credential_ids: ["default"],
           nonce: "consent-nonce",
           iat: 1771934400,
@@ -277,7 +277,7 @@ describe("verifySdJwtVp", () => {
       {
         type: "DelegatedSignatureEvidence",
         transaction_data: {
-          type: "harbour_delegate:data.purchase",
+          type: "harbour.delegate:data.purchase",
           credential_ids: ["default"],
           nonce,
           iat: 1771934400,
@@ -332,7 +332,7 @@ describe("verifySdJwtVp", () => {
         {
           type: "DelegatedSignatureEvidence",
           transaction_data: {
-            type: "harbour_delegate:data.purchase",
+            type: "harbour.delegate:data.purchase",
             credential_ids: ["default"],
             nonce,
             iat: 1771934400,

@@ -130,15 +130,20 @@ def test_credential_subject_has_type(credential_file):
     if "type" not in subject:
         return
     subject_type = subject["type"]
+    # Gaia-X compliance credentials (TermsAndConditions, RegistrationNumber,
+    # Compliance) use gx: types directly on credentialSubject because the gx
+    # SHACL shapes are sh:closed true — harbour wrappers would add properties
+    # that violate the closed shape constraint. All other domain credentials
+    # use harbour: or harbour.gx: prefixed types.
+    allowed_prefixes = ("harbour:", "harbour.gx:", "gx:")
     if isinstance(subject_type, str):
-        assert subject_type.startswith("harbour:") or subject_type.startswith(
-            "harbour_gx:"
-        ), f"Subject type should be harbour-prefixed, got: {subject_type}"
+        assert subject_type.startswith(allowed_prefixes), (
+            f"Subject type should be harbour- or gx-prefixed, got: {subject_type}"
+        )
     elif isinstance(subject_type, list):
-        assert any(
-            t.startswith("harbour:") or t.startswith("harbour_gx:")
-            for t in subject_type
-        ), f"Subject type list should include a harbour type: {subject_type}"
+        assert any(t.startswith(allowed_prefixes) for t in subject_type), (
+            f"Subject type list should include a harbour or gx type: {subject_type}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +219,7 @@ class TestDomainContextConsistency:
 
     def test_context_has_composition_slots(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
-        assert "gxParticipant" in ctx, "Missing gxParticipant in domain context"
+        assert "participant" in ctx, "Missing participant in domain context"
 
     def test_domain_class_iris_are_prefixed(self):
         ctx = _load_json(DOMAIN_CONTEXT_PATH).get("@context", {})
@@ -317,10 +322,10 @@ class TestDomainShaclShapes:
     def test_shacl_has_domain_shapes(self):
         content = DOMAIN_SHACL_PATH.read_text()
         expected_shapes = [
-            "harbour_gx:LegalPersonCredential",
-            "harbour_gx:NaturalPersonCredential",
-            "harbour_gx:LegalPerson",
-            "harbour_gx:NaturalPerson",
+            "harbour.gx:LegalPersonCredential",
+            "harbour.gx:NaturalPersonCredential",
+            "harbour.gx:LegalPerson",
+            "harbour.gx:NaturalPerson",
         ]
         for shape in expected_shapes:
             assert f"{shape} a sh:NodeShape" in content, (
@@ -334,7 +339,7 @@ class TestDomainShaclShapes:
             "LegalPersonCredential",
             "NaturalPersonCredential",
         ]:
-            marker = f"harbour_gx:{cred_type} a sh:NodeShape"
+            marker = f"harbour.gx:{cred_type} a sh:NodeShape"
             assert marker in content, f"Missing shape for {cred_type}"
             shape_start = content.index(marker)
             next_shape = content.find("\n\n", shape_start + 1)
@@ -352,7 +357,7 @@ class TestDomainShaclShapes:
         """LegalPersonCredential and NaturalPersonCredential must require evidence."""
         content = DOMAIN_SHACL_PATH.read_text()
         for cred_type in ["LegalPersonCredential", "NaturalPersonCredential"]:
-            marker = f"harbour_gx:{cred_type} a sh:NodeShape"
+            marker = f"harbour.gx:{cred_type} a sh:NodeShape"
             assert marker in content, f"Missing shape for {cred_type}"
             shape_start = content.index(marker)
             next_shape = content.find("\n\n", shape_start + 1)
