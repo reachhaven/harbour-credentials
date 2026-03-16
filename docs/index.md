@@ -2,6 +2,11 @@
 
 **Harbour Credentials** is a cryptographic library for signing and verifying verifiable credentials. It provides dual-runtime support for both Python and TypeScript with feature parity.
 
+!!! tip "New here?"
+    Start with the [Credential Lifecycle](guide/credential-lifecycle.md) guide
+    to see how companies and employees get credentialed, how transactions
+    work, and what ends up in each wallet — with swimlane diagrams.
+
 ## Features
 
 - 🔑 **Key Management** — P-256 and Ed25519 key generation with DID:key encoding
@@ -65,6 +70,7 @@ npm install @reachhaven/harbour-credentials
 
 ## Documentation
 
+- [Credential Lifecycle](guide/credential-lifecycle.md) — **Start here**: onboarding flows, wallet contents, presentation scenarios
 - [Installation](getting-started/installation.md) — Detailed setup instructions
 - [Quick Start](getting-started/quickstart.md) — Get up and running
 - [CLI Reference](cli/index.md) — Command-line tools
