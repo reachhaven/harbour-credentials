@@ -62,7 +62,7 @@ The user needs a Harbour credential (e.g., `NaturalPersonCredential`) issued as 
 ```json
 {
   "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "credentialSubject": {
     "id": "did:ethr:0x14a34:0x26e4...16c9",
     "type": "harbour:NaturalPerson",
@@ -187,7 +187,7 @@ evidence = [{
             "currency": "ENVITED"
         }
     },
-    "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+    "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
 }]
 
 # Create VP with selective disclosure (redact PII)
@@ -197,7 +197,7 @@ sd_jwt_vp = issue_sd_jwt_vp(
     disclosures=["memberOf"],  # Only disclose non-PII claims
     evidence=evidence,
     nonce="da9b1009",
-    audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+    audience="did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
 )
 ```
 
@@ -221,10 +221,10 @@ const sdJwtVp = await issueSdJwtVp(sdJwtVc, holderPrivateKey, {
         currency: 'ENVITED'
       }
     },
-    delegatedTo: 'did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697'
+    delegatedTo: 'did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202'
   }],
   nonce: 'da9b1009',
-  audience: 'did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697'
+  audience: 'did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202'
 });
 ```
 
@@ -242,7 +242,7 @@ result = verify_sd_jwt_vp(
     issuer_public_key,      # From credential issuer's DID
     holder_public_key,      # From user's DID document
     expected_nonce="da9b1009",
-    expected_audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+    expected_audience="did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
 )
 
 # Check transaction data matches original request
@@ -263,11 +263,11 @@ After executing the transaction, the signing service issues a **receipt credenti
 ```json
 {
   "type": ["VerifiableCredential", "harbour:DelegatedSigningReceipt"],
-  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "evidence": [{
     "type": "harbour:DelegatedSignatureEvidence",
     "verifiablePresentation": "<consent VP with PII redacted>",
-    "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+    "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
     "transaction_data": { "..." }
   }],
   "credentialStatus": [{
@@ -311,7 +311,7 @@ The `audience` field ensures the VP was created for a specific verifier:
 verify_sd_jwt_vp(
     vp,
     ...,
-    expected_audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+    expected_audience="did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
 )
 ```
 

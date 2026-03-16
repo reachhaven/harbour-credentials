@@ -9,7 +9,7 @@
     "harbour:DelegatedSigningReceipt"
   ],
   "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
-  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "validFrom": "2025-06-25T10:00:00Z",
   "credentialSubject": {
     "id": "urn:uuid:receipt-b7c8d9e0-f1a2-3456-789a-bcdef0123456",
@@ -19,7 +19,7 @@
   },
   "credentialStatus": [
     {
-      "id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697:services:revocation-registry/f7e8d9c0b1a23456",
+      "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202:services:revocation-registry/f7e8d9c0b1a23456",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }
@@ -49,17 +49,17 @@
             "type": [
               "VerifiableCredential"
             ],
-            "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+            "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
             "validFrom": "2024-01-15T00:00:00Z",
             "credentialSubject": {
-              "id": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9",
+              "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
               "type": "harbour.gx:NaturalPerson",
-              "memberOf": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
+              "memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
             }
           }
         ]
       },
-      "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+      "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
       "transaction_data": {
         "type": "harbour.delegate:data.purchase",
         "credential_ids": [

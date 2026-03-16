@@ -2,16 +2,37 @@
 
 This script validates the ignored ``examples/signed/`` and
 ``examples/gaiax/signed/`` output folders using the real Harbour verification
-functions. It is intended for end-to-end storyline runs driven by ``make``.
+functions.  When multi-role keys are available, each JWT is verified with
+the key that matches its ``kid`` header — proving that different roles
+really did sign different artifacts.
 """
 
 from __future__ import annotations
 
+import base64
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from credentials.example_signer import load_test_p256_keypair
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+
+from credentials.example_signer import (
+    RoleKeyring,
+    load_role_keyring,
+    load_test_p256_keypair,
+)
 from harbour.verifier import verify_vc_jose, verify_vp_jose
+
+
+def _b64url_decode(s: str) -> bytes:
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def _jwt_kid(token: str) -> str | None:
+    """Extract the kid from a JWT header without full verification."""
+    parts = token.split(".")
+    header = json.loads(_b64url_decode(parts[0]))
+    return header.get("kid")
 
 
 @dataclass
@@ -21,6 +42,40 @@ class VerificationCounts:
     credentials: int = 0
     evidence_presentations: int = 0
     nested_credentials: int = 0
+
+
+class KeyResolver:
+    """Resolve a JWT kid to its public key, using keyring or fallback."""
+
+    def __init__(
+        self,
+        keyring: RoleKeyring | None,
+        fallback_public_key: EllipticCurvePublicKey,
+    ):
+        self._keyring = keyring
+        self._fallback = fallback_public_key
+        self._kid_cache: dict[str, EllipticCurvePublicKey] = {}
+
+        if keyring:
+            for role, did in keyring.role_dids.items():
+                kid = f"{did}#controller"
+                pair = keyring.resolve(did)
+                if pair:
+                    priv, _ = pair
+                    self._kid_cache[kid] = priv.public_key()
+
+    def resolve(self, kid: str | None) -> EllipticCurvePublicKey:
+        if kid and kid in self._kid_cache:
+            return self._kid_cache[kid]
+        return self._fallback
+
+    def role_for_kid(self, kid: str | None) -> str:
+        if not kid or not self._keyring:
+            return "fallback"
+        for role, did in self._keyring.role_dids.items():
+            if kid.startswith(did):
+                return role
+        return "fallback"
 
 
 def _find_repo_root() -> Path:
@@ -56,7 +111,7 @@ def _assert_has_type(payload: dict, expected_type: str, source: Path) -> None:
         )
 
 
-def verify_signed_dir(signed_dir: Path, public_key) -> VerificationCounts:
+def verify_signed_dir(signed_dir: Path, resolver: KeyResolver) -> VerificationCounts:
     counts = VerificationCounts()
     signed_credentials = _iter_signed_credentials(signed_dir)
     if not signed_credentials:
@@ -64,18 +119,26 @@ def verify_signed_dir(signed_dir: Path, public_key) -> VerificationCounts:
 
     for jwt_path in signed_credentials:
         vc_jwt = jwt_path.read_text(encoding="utf-8").strip()
-        vc_payload = verify_vc_jose(vc_jwt, public_key)
+        kid = _jwt_kid(vc_jwt)
+        pub = resolver.resolve(kid)
+        role = resolver.role_for_kid(kid)
+        vc_payload = verify_vc_jose(vc_jwt, pub)
         _assert_has_type(vc_payload, "VerifiableCredential", jwt_path)
         counts.credentials += 1
+        print(f"    ✓ {jwt_path.name} (signed by: {role})")
 
         evidence_jwt_path = jwt_path.with_name(f"{jwt_path.stem}.evidence-vp.jwt")
         if not evidence_jwt_path.exists():
             continue
 
         vp_jwt = evidence_jwt_path.read_text(encoding="utf-8").strip()
-        vp_payload = verify_vp_jose(vp_jwt, public_key)
+        vp_kid = _jwt_kid(vp_jwt)
+        vp_pub = resolver.resolve(vp_kid)
+        vp_role = resolver.role_for_kid(vp_kid)
+        vp_payload = verify_vp_jose(vp_jwt, vp_pub)
         _assert_has_type(vp_payload, "VerifiablePresentation", evidence_jwt_path)
         counts.evidence_presentations += 1
+        print(f"    ✓ {evidence_jwt_path.name} (signed by: {vp_role})")
 
         embedded_vps = [
             evidence.get("verifiablePresentation")
@@ -89,18 +152,25 @@ def verify_signed_dir(signed_dir: Path, public_key) -> VerificationCounts:
 
         for inner in vp_payload.get("verifiableCredential", []):
             if isinstance(inner, str) and inner.count(".") == 2:
-                inner_payload = verify_vc_jose(inner, public_key)
+                inner_kid = _jwt_kid(inner)
+                inner_pub = resolver.resolve(inner_kid)
+                inner_role = resolver.role_for_kid(inner_kid)
+                inner_payload = verify_vc_jose(inner, inner_pub)
                 _assert_has_type(
                     inner_payload, "VerifiableCredential", evidence_jwt_path
                 )
                 counts.nested_credentials += 1
+                print(f"      ✓ inner VC (signed by: {inner_role})")
 
     return counts
 
 
 def main() -> None:
     repo_root = _find_repo_root()
-    _, public_key = load_test_p256_keypair()
+    keyring = load_role_keyring()
+    _, fallback_pub = load_test_p256_keypair()
+    resolver = KeyResolver(keyring, fallback_pub)
+
     signed_dirs = _discover_signed_dirs(repo_root)
     if not signed_dirs:
         raise RuntimeError(
@@ -109,18 +179,14 @@ def main() -> None:
 
     total = VerificationCounts()
     for signed_dir in signed_dirs:
-        counts = verify_signed_dir(signed_dir, public_key)
+        print(f"  Verifying {signed_dir}/")
+        counts = verify_signed_dir(signed_dir, resolver)
         total.credentials += counts.credentials
         total.evidence_presentations += counts.evidence_presentations
         total.nested_credentials += counts.nested_credentials
-        print(
-            f"Verified {counts.credentials} credential JWT(s), "
-            f"{counts.evidence_presentations} evidence VP JWT(s), and "
-            f"{counts.nested_credentials} nested VC JWT(s) in {signed_dir}"
-        )
 
     print(
-        "Done: "
+        "\nDone: "
         f"{total.credentials} credential JWT(s), "
         f"{total.evidence_presentations} evidence VP JWT(s), "
         f"{total.nested_credentials} nested VC JWT(s) verified"

@@ -68,6 +68,7 @@ nav:
       - Delegated Signing: guide/delegated-signing.md
       - Evidence Types: guide/evidence.md
   - Specifications:
+      - DID Identity System: did-identity-system.md
       - Delegation Challenge Encoding: specs/delegation-challenge-encoding.md
       - DID Method Evaluation: specs/did-method-evaluation.md
       - Reference Specs: specs/references/README.md

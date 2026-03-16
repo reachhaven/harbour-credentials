@@ -35,6 +35,10 @@ import {
   // KB-JWT
   createKbJwt,
   verifyKbJwt,
+
+  // SD-JWT VP
+  issueSdJwtVp,
+  verifySdJwtVp,
   
   // X.509
   generateSelfSignedCert,
@@ -68,6 +72,13 @@ interface KbJwtOptions {
   nonce: string;
   audience: string;
   issuedAt?: number;
+}
+
+interface SdJwtVpOptions {
+  disclosedClaims?: string[];
+  evidence?: Record<string, unknown>;
+  nonce?: string;
+  audience?: string;
 }
 ```
 

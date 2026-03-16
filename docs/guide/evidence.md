@@ -29,17 +29,17 @@ The Harbour Signing Service is the **sole issuer** of all credentials. Evidence 
   "verifiablePresentation": {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiablePresentation", "harbour:VerifiablePresentation"],
-    "holder": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+    "holder": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
     "verifiableCredential": [
       {
         "@context": ["https://www.w3.org/ns/credentials/v2", "https://w3id.org/reachhaven/harbour/core/v1/"],
         "type": ["VerifiableCredential"],
-        "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+        "issuer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
         "validFrom": "2024-01-01T00:00:00Z",
         "credentialSubject": {
-          "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+          "id": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
           "type": "harbour:LinkedCredentialService",
-          "didcore:serviceEndpoint": {"id": "https://resolver.harbour.id/credentials/did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3"}
+          "didcore:serviceEndpoint": {"id": "https://resolver.harbour.id/credentials/did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"}
         }
       }
     ]
@@ -59,7 +59,7 @@ Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed
 {
   "type": "harbour:DelegatedSignatureEvidence",
   "verifiablePresentation": "<SD-JWT VP with redacted PII>",
-  "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "transaction_data": {
     "type": "harbour.delegate:data.purchase",
     "credential_ids": ["harbour_natural_person"],
@@ -154,7 +154,7 @@ When issuing a credential with evidence:
 credential = {
     "@context": [...],
     "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-    "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+    "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
     "credentialSubject": {...},
     "evidence": [
         {

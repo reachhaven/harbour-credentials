@@ -1,0 +1,8 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "cA5C-HS35A0oj56Udl_HS7nvtAwpWTf3fAGXJFYm3Qo",
+  "y": "Y16LRNZm58cqhsPb0XsWqtixDYDcKUgdGsiiici7NNo",
+  "d": "dm2_eVfXmAwW4sVg16jJ4i_M2XxLcNs0tgtmuslhcXI",
+  "_comment": "TEST ONLY \u2014 Company (Legal Person) \u2014 organization subject, approves employee issuance"
+}

@@ -1,0 +1,8 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "pwkZnCghcLvWGSk5EEk6FVeba744bLuXgooJUhP6evY",
+  "y": "4YaNHSmXnL-aP9kyr5djfMNk5fWvhtv4QHj4YbpbzOI",
+  "d": "uw_jcT2iUexhxDcRPMoIBs51CAiCHeiL6VkkjihXzjI",
+  "_comment": "TEST ONLY \u2014 ASCS Issuer \u2014 issues SimpulseID domain credentials"
+}

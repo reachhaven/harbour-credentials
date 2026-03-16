@@ -40,11 +40,11 @@ class TestGaiaxLegalPersonMapping:
 
         assert (
             claims["iss"]
-            == "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+            == "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
         )
         assert (
             claims["sub"]
-            == "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
+            == "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
         )
         assert claims["labelLevel"] == "SC"
         assert "engineVersion" in claims
@@ -92,7 +92,7 @@ class TestGaiaxNaturalPersonMapping:
         assert "givenName" in disclosable
         assert (
             claims["memberOf"]
-            == "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab"
+            == "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
         )
 
     def test_has_credential_status(self):

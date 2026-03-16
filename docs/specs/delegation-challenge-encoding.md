@@ -194,17 +194,17 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
 {
   "@context": ["https://www.w3.org/ns/credentials/v2"],
   "type": ["VerifiableCredential"],
-  "issuer": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "validFrom": "2026-02-24T12:00:00Z",
   "credentialSubject": {
-    "id": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9"
+    "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129"
   },
   "evidence": [{
     "type": ["CredentialEvidence"],
     "verifiablePresentation": {
       "@context": ["https://www.w3.org/ns/credentials/v2"],
       "type": ["VerifiablePresentation"],
-      "holder": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9",
+      "holder": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
       "verifiableCredential": [
         "<SD-JWT-VC with PII redacted>"
       ],
@@ -213,8 +213,8 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
         "cryptosuite": "ecdsa-rdfc-2019",
         "proofPurpose": "authentication",
         "challenge": "da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
-        "domain": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
-        "verificationMethod": "did:ethr:0x14a34:0x26e47c8d7dd2b2e3406de73446ce3dcbb40916c9#controller",
+        "domain": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+        "verificationMethod": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129#controller",
         "created": "2026-02-24T12:00:05Z",
         "proofValue": "z5vgFc..."
       }
@@ -301,7 +301,7 @@ Per OID4VP Appendix B.3.3, the KB-JWT includes:
 ```json
 {
   "nonce": "n-0S6_WzA2Mj",
-  "aud": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "aud": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "iat": 1709838604,
   "sd_hash": "Dy-RYwZfaaoC3inJbLslgPvMp09bH-clYP_3qbRqtW4",
   "transaction_data_hashes": ["7W0LFUTpMvb6nJK7ngamNNY0zNvxqJ-2jNXTmLzhWQE"],
@@ -615,7 +615,7 @@ OID4VP authorization request:
 ```json
 {
   "response_type": "vp_token",
-  "client_id": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+  "client_id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "nonce": "da9b1009",
   "transaction_data": [{
     "type": "harbour.delegate:data.purchase",

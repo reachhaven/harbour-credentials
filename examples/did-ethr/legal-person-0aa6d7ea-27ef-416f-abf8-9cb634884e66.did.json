@@ -9,24 +9,24 @@
       }
     }
   ],
-  "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+  "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
   "verificationMethod": [
     {
-      "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#controller",
+      "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#controller",
       "type": "JsonWebKey",
-      "controller": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+      "controller": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
       "publicKeyJwk": {
         "kty": "EC",
         "crv": "P-256",
-        "x": "ENro7uf0ePmiK3jdTo2YCdXLqW7z7xoP6qhhBou6gBL",
-        "y": "weN12rGDez3FP0HRkGbMEMN6YPf7rMBMcxmvIRbJboo"
+        "x": "cA5C-HS35A0oj56Udl_HS7nvtAwpWTf3fAGXJFYm3Qo",
+        "y": "Y16LRNZm58cqhsPb0XsWqtixDYDcKUgdGsiiici7NNo"
       }
     }
   ],
   "authentication": [
-    "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#controller"
+    "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#controller"
   ],
   "assertionMethod": [
-    "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab#controller"
+    "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#controller"
   ]
 }

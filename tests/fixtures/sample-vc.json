@@ -5,10 +5,10 @@
   ],
   "type": ["VerifiableCredential"],
   "id": "urn:uuid:576fbefb-35e8-4b71-bb1a-53d1803c86de",
-  "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+  "issuer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
   "validFrom": "2025-08-06T10:15:22Z",
   "credentialSubject": {
-    "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+    "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH"
   }

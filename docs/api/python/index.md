@@ -11,6 +11,8 @@ This section documents the Python API for Harbour Credentials.
 | `harbour.verifier` | JWT verification |
 | `harbour.sd_jwt` | SD-JWT selective disclosure |
 | `harbour.kb_jwt` | Key Binding JWT |
+| `harbour.sd_jwt_vp` | SD-JWT Verifiable Presentations for privacy-preserving consent |
+| `harbour.delegation` | Delegation challenge encoding and transaction data |
 | `harbour.x509` | X.509 certificates |
 
 ## Quick Import Reference
@@ -49,6 +51,20 @@ from harbour.sd_jwt import (
 from harbour.kb_jwt import (
     create_kb_jwt,
     verify_kb_jwt,
+)
+
+# SD-JWT VP
+from harbour.sd_jwt_vp import (
+    issue_sd_jwt_vp,
+    verify_sd_jwt_vp,
+)
+
+# Delegation
+from harbour.delegation import (
+    TransactionData,
+    create_delegation_challenge,
+    parse_delegation_challenge,
+    verify_challenge,
 )
 
 # X.509

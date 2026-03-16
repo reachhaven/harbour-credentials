@@ -74,8 +74,8 @@ resolved DID document.
 
 | Actor | Role | Identity (`did:ethr`) | DID Document |
 |-------|------|-----------------------|--------------|
-| **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3` | [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) |
-| **Harbour Signing Service** | Issues ALL credentials (`#controller`), signs delegated txns (`#delegate-1`) | `did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
+| **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774` | [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) |
+| **Harbour Signing Service** | Issues ALL credentials (`#controller`), signs delegated txns (`#delegate-1`) | `did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
 | **Example Corporation GmbH** | Legal person (organization) | `did:ethr:0x14a34:0xf7ef...dab` | [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
 | **Alice Smith** | Natural person (employee) | `did:ethr:0x14a34:0x26e4...16c9` | [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
 | **ENVITED Marketplace** | Data marketplace (external) | `did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c` | — |
@@ -288,10 +288,10 @@ sd_jwt_vp = issue_sd_jwt_vp(
     evidence=[{
         "type": "DelegatedSignatureEvidence",
         "transaction_data": tx.to_dict(),
-        "delegatedTo": "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+        "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
     }],
     nonce=tx.nonce,
-    audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+    audience="did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
 )
 ```
 
@@ -355,7 +355,7 @@ result = verify_sd_jwt_vp(
     issuer_public_key,
     holder_public_key,
     expected_nonce="da9b1009",
-    expected_audience="did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697",
+    expected_audience="did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
 )
 
 # Python — sign receipt credential

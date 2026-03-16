@@ -59,7 +59,7 @@ class TestEvidenceSigning:
         vp = {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiablePresentation"],
-            "holder": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+            "holder": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
             "verifiableCredential": [
                 {
                     "@context": ["https://www.w3.org/ns/credentials/v2"],
@@ -67,7 +67,7 @@ class TestEvidenceSigning:
                     "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
                     "validFrom": "2024-01-10T00:00:00Z",
                     "credentialSubject": {
-                        "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
+                        "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
                         "type": "gx:LegalPerson",
                     },
                 }
@@ -193,7 +193,7 @@ class TestProcessExample:
         assert evidence["transaction_data"]["type"] == "harbour.delegate:data.purchase"
         assert (
             evidence["delegatedTo"]
-            == "did:ethr:0x14a34:0x9c2f52ea812629d0d35b2786ae26633d03a8c697"
+            == "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
         )
 
         # Evidence VP should be a signed JWT
