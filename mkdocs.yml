@@ -65,6 +65,7 @@ nav:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
   - Guide:
+      - Credential Lifecycle: guide/credential-lifecycle.md
       - Delegated Signing: guide/delegated-signing.md
       - Evidence Types: guide/evidence.md
   - Specifications:
