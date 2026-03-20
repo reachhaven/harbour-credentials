@@ -3,8 +3,9 @@ name: w3c-vc
 description: >
   LinkML projection of W3C Verifiable Credentials Data Model v2.0 vocabulary
   terms. Defines the VC envelope properties (issuer, validFrom, validUntil,
-  evidence, credentialStatus) so they can be imported and constrained by
-  downstream schemas via slot_usage without redefining them.
+  evidence, credentialStatus, credentialSubject, holder, verifiableCredential)
+  so they can be imported and constrained by downstream schemas via slot_usage
+  without redefining them.
   The JSON-LD context for these terms is provided by the W3C VC v2 context
   (https://www.w3.org/ns/credentials/v2), NOT by this schema.
 
@@ -30,6 +31,22 @@ description: >
 # - Downstream schemas (e.g. harbour-core-credential.yaml) refine constraints
 #   via slot_usage to create stricter profiles
 # - default_prefix: cred — schema ID matches the external vocabulary namespace
+#
+# RANGE SELECTION
+# ============================================================================
+# [VC-CTX] maps issuer and holder with @type: @id — they are always IRI
+# nodes in RDF (even the "issuer as object" form resolves to an @id node).
+# LinkML range: uri produces sh:nodeKind sh:IRI in SHACL — correct.
+# The JSON-LD @type: xsd:anyURI that LinkML would generate is irrelevant
+# because HarbourContextGenerator excludes these imported slots; the W3C
+# VC v2 context provides @type: @id at runtime.
+# See https://github.com/linkml/linkml/pull/3292 for the uri/context fix.
+#
+# evidence, credentialStatus, credentialSubject, and verifiableCredential
+# are object-valued in [VC-CTX] (@type: @id for each). Using range: Any
+# (class_uri: linkml:Any) produces @type: @id in context and no SHACL
+# constraint — correct for the loose base spec. Downstream slot_usage
+# narrows to concrete classes (Evidence, CRSetEntry, etc.).
 # ============================================================================
 
 prefixes:
@@ -44,15 +61,20 @@ default_range: string
 imports:
   - linkml:types
 
+classes:
+  # Needed so that downstream schemas can reference linkml:Any via range.
+  Any:
+    class_uri: linkml:Any
+
 slots:
   # [VCDM2] §4.7 — A verifiable credential MUST have an issuer property.
   # The value MUST be either a URL or an object containing an id property
-  # whose value is a URL. Modeled as range: string here because LinkML has
-  # no native IRI type; the SHACL generator is patched downstream to emit
-  # sh:nodeKind sh:IRIOrLiteral (see HarbourShaclGenerator).
+  # whose value is a URL. In both cases the RDF value is an IRI node
+  # ([VC-CTX] maps issuer with @type: @id).
+  # range: uri → SHACL sh:nodeKind sh:IRI (correct).
   issuer:
     slot_uri: cred:issuer
-    range: string
+    range: uri
     description: >
       [VCDM2] §4.7 — issuer MUST exist; value MUST be a URL or object with id.
 
@@ -78,8 +100,12 @@ slots:
   # [VCDM2] §5.6 — The evidence property provides information about the
   # process and/or evidence the issuer used when evaluating the claims
   # made in the credential. Each evidence object MUST specify its type.
+  # [VC-CTX] maps evidence with @type: @id.
+  # range: Any produces @type: @id in context and no SHACL constraint;
+  # downstream slot_usage narrows to Evidence class.
   evidence:
     slot_uri: cred:evidence
+    range: Any
     multivalued: true
     description: >
       [VCDM2] §5.6 — evidence is OPTIONAL (0..*), each object MUST have type.
@@ -88,8 +114,10 @@ slots:
   # to discover information about the current status of a verifiable
   # credential (e.g. whether it is suspended or revoked). Each status
   # entry MUST specify its id and type.
+  # [VC-CTX] maps credentialStatus with @type: @id.
   credentialStatus:
     slot_uri: cred:credentialStatus
+    range: Any
     multivalued: true
     description: >
       [VCDM2] §4.10 — credentialStatus is OPTIONAL (0..*), each MUST have
@@ -99,8 +127,10 @@ slots:
   # credentialSubject property. The value is a set of objects containing
   # claims about the subject(s) of the credential. Each subject MAY
   # have an id property.
+  # [VC-CTX] maps credentialSubject with @type: @id.
   credentialSubject:
     slot_uri: cred:credentialSubject
+    range: Any
     multivalued: true
     description: >
       [VCDM2] §4.6 — credentialSubject is REQUIRED (1..*), each MAY have id.
@@ -108,16 +138,20 @@ slots:
   # [VCDM2] §6.1 — A verifiable presentation MUST have a holder property.
   # The value MUST be a URL (typically a DID) identifying the entity
   # presenting the credentials.
+  # [VC-CTX] maps holder with @type: @id.
+  # range: uri → SHACL sh:nodeKind sh:IRI (correct).
   holder:
     slot_uri: cred:holder
-    range: string
+    range: uri
     description: >
       [VCDM2] §6.1 — holder MUST exist on a VP; value MUST be a URL (DID).
 
   # [VCDM2] §6.1 — verifiableCredential contains the VCs being presented.
   # Each entry is a VerifiableCredential or an enveloped credential.
+  # [VC-CTX] maps verifiableCredential with @type: @id, @container: @graph.
   verifiableCredential:
     slot_uri: cred:verifiableCredential
+    range: Any
     multivalued: true
     description: >
       [VCDM2] §6.1 — verifiableCredential is REQUIRED (1..*) on a VP.

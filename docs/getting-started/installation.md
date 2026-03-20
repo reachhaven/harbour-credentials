@@ -15,7 +15,12 @@ git clone https://github.com/ASCS-eV/harbour-credentials.git
 cd harbour-credentials
 
 # Create virtual environment
-python3 -m venv .venv
+python -m venv .venv
+
+# PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux / Git Bash
 source .venv/bin/activate
 
 # Install with dev dependencies
@@ -43,8 +48,8 @@ npm install @reachhaven/harbour-credentials
 git clone https://github.com/ASCS-eV/harbour-credentials.git
 cd harbour-credentials/src/typescript/harbour
 
-npm install
-npm run build
+corepack yarn install
+corepack yarn build
 ```
 
 ## Verify Installation

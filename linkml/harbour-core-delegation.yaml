@@ -1,5 +1,5 @@
 id: https://w3id.org/reachhaven/harbour/delegate/v1
-name: harbour-delegate
+name: harbour-core-delegation
 description: >
   Delegation transaction types for the Harbour signing flow.
   Defines typed transaction data objects used in OID4VP-aligned delegated

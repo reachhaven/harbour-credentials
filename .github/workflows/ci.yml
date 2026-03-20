@@ -72,7 +72,7 @@ jobs:
         run: make install dev
 
       - name: Install ontology-management-base
-        run: make submodule-setup
+        run: make setup submodules
 
       - name: Generate artifacts
         run: make generate

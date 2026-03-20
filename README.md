@@ -28,12 +28,16 @@ Or for development:
 git clone --recurse-submodules https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 make setup
+# PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux / Git Bash
 source .venv/bin/activate
 ```
 
 > **Note:** The `--recurse-submodules` flag is required to clone the ontology-management-base and w3id.org submodules.
 >
-> `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies (`corepack enable` + `yarn install` in `src/typescript/harbour`).
+> `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies with `corepack yarn install` in `src/typescript/harbour`.
 > Use `make install dev` only if you need to refresh an existing Python environment.
 
 If you already cloned without submodules:
@@ -47,7 +51,7 @@ git submodule update --init --recursive --depth 1
 ```bash
 # If you already ran `make setup`, TypeScript dependencies are already bootstrapped.
 # Otherwise:
-make ts-bootstrap
+make setup ts
 ```
 
 ## Quick Start

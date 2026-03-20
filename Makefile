@@ -1,9 +1,10 @@
 # Harbour Credentials Makefile
 # ============================
 
-.PHONY: setup install submodule-setup ts-bootstrap generate validate lint format test build story all clean help \
-	_help_general _help_install _help_validate _help_lint _help_format _help_test _help_story _help_build \
-	_install_default _install_dev \
+.PHONY: setup install generate validate lint format test build story all clean help \
+	release-artifacts \
+	_help_general _help_setup _help_install _help_validate _help_lint _help_format _help_test _help_story _help_build \
+	_setup_default _setup_submodules _setup_ts _install_default _install_dev \
 	_validate_default _validate_shacl \
 	_lint_default _lint_md _lint_ts \
 	_format_default _format_md \
@@ -14,39 +15,66 @@
 TS_DIR := src/typescript/harbour
 OMB_SUBMODULE_DIR := submodules/ontology-management-base
 
-# In CI, use system Python; locally, prefer parent venv then local .venv
-ifdef CI
-    VENV := $(dir $(shell which python3))..
-    PYTHON := python3
+# Allow callers to override the venv path/tooling.
+VENV ?= .venv
+
+# OS detection for cross-platform support (Windows vs Unix)
+ifeq ($(OS),Windows_NT)
+    ifndef CI
+        ifneq ($(wildcard ../../.venv/Scripts/python.exe),)
+            VENV := ../../.venv
+        endif
+    endif
+    VENV_BIN := $(VENV)/Scripts
+    VENV_PYTHON := $(VENV_BIN)/python.exe
+    ifdef CI
+        PYTHON ?= python
+    else
+        PYTHON ?= $(VENV_PYTHON)
+    endif
+    BOOTSTRAP_PYTHON ?= python
+    ACTIVATE_SCRIPT := $(VENV_BIN)/activate
+    ACTIVATE_HINT := PowerShell: $(subst /,\,$(VENV_BIN))\Activate.ps1; Git Bash: source $(ACTIVATE_SCRIPT)
+    PYTHONPATH_SEP := ;
 else
     ifneq ($(wildcard ../../.venv/bin/python3),)
         VENV := ../../.venv
-    else
-        VENV := .venv
     endif
-    PYTHON := $(VENV)/bin/python3
+    VENV_BIN := $(VENV)/bin
+    VENV_PYTHON := $(VENV_BIN)/python3
+    ifdef CI
+        PYTHON ?= python3
+    else
+        PYTHON ?= $(VENV_PYTHON)
+    endif
+    BOOTSTRAP_PYTHON ?= python3
+    ACTIVATE_SCRIPT := $(VENV_BIN)/activate
+    ACTIVATE_HINT := source $(ACTIVATE_SCRIPT)
+    PYTHONPATH_SEP := :
 endif
-
-# Bootstrap interpreter used only to create the venv
-BOOTSTRAP_PYTHON := python3
 
 # Absolute path to Python (for use after cd into subdirectories).
 # In CI, PYTHON is a bare command ('python3') so resolve via PATH;
 # locally it is a relative venv path so abspath works.
+# When a parent Makefile passes an already-absolute Windows path
+# (containing ':'), $(abspath) would mangle it — skip in that case.
 ifdef CI
-    PYTHON_ABS := $(shell which $(PYTHON))
+    PYTHON_ABS := $(shell command -v $(PYTHON))
+else ifneq ($(findstring :,$(PYTHON)),)
+    PYTHON_ABS := $(PYTHON)
 else
     PYTHON_ABS := $(abspath $(PYTHON))
 endif
 
 # Tooling inside the selected virtual environment
-PIP := $(PYTHON) -m pip
-PRECOMMIT := $(PYTHON) -m pre_commit
-PYTEST := $(PYTHON) -m pytest
+PIP := "$(PYTHON)" -m pip
+PRECOMMIT := "$(PYTHON)" -m pre_commit
+PYTEST := "$(PYTHON)" -m pytest
+YARN := corepack yarn
 
 # Check if dev environment is set up (skipped in CI)
 define check_dev_setup
-	@if [ -z "$$CI" ] && [ ! -x "$(PYTHON)" ]; then \
+	@if [ -z "$$CI" ] && [ ! -f "$(PYTHON)" ]; then \
 		echo ""; \
 		echo "ERROR: Development environment not set up."; \
 		echo ""; \
@@ -55,7 +83,7 @@ define check_dev_setup
 		echo ""; \
 		exit 1; \
 	fi
-	@if ! $(PYTHON) -c "import linkml" 2>/dev/null; then \
+	@if ! "$(PYTHON)" -c "import linkml" 2>/dev/null; then \
 		echo ""; \
 		echo "ERROR: Dev dependencies not installed."; \
 		echo ""; \
@@ -73,19 +101,19 @@ HARBOUR_EXAMPLE_FILES := $(wildcard examples/*.json) $(wildcard examples/gaiax/*
 HARBOUR_VALIDATE_PATH ?=
 HARBOUR_VALIDATE_ALLOW_ONLINE ?= 1
 HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES ?= $(if $(strip $(HARBOUR_VALIDATE_PATH)),0,1)
-GROUPED_COMMANDS := install validate lint format test story build
+GROUPED_COMMANDS := setup install validate lint format test story build
 PRIMARY_GOAL := $(firstword $(MAKECMDGOALS))
+SUBCOMMAND_GOALS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 
 # Grouped command mode: treat trailing goals as subcommands
 ifneq ($(filter $(PRIMARY_GOAL),$(GROUPED_COMMANDS)),)
-help:
-	@:
+.PHONY: $(SUBCOMMAND_GOALS)
 
-%:
+$(SUBCOMMAND_GOALS):
 	@:
 else
 help:
-	@$(MAKE) --no-print-directory _help_general
+	@"$(MAKE)" --no-print-directory _help_general
 endif
 
 # Default target
@@ -94,9 +122,9 @@ _help_general:
 	@echo ""
 	@echo "Installation:"
 	@echo "  make setup        - Create venv, install dev dependencies, setup ontology submodule, and bootstrap TypeScript"
+	@echo "  make setup help   - Show setup subcommands"
 	@echo "  make install      - Install package (user mode)"
 	@echo "  make install help - Show install subcommands"
-	@echo "  make ts-bootstrap - Enable corepack and install TypeScript dependencies"
 	@echo ""
 	@echo "Artifacts:"
 	@echo "  make generate       - Generate OWL/SHACL/context from LinkML"
@@ -121,6 +149,12 @@ _help_general:
 	@echo ""
 	@echo "Cleaning:"
 	@echo "  make clean - Remove build artifacts and caches"
+
+_help_setup:
+	@echo "Setup subcommands:"
+	@echo "  make setup             - Create venv, install dev dependencies, setup ontology submodule, and bootstrap TypeScript"
+	@echo "  make setup submodules  - Setup the ontology-management-base submodule in the active environment"
+	@echo "  make setup ts          - Bootstrap TypeScript dependencies"
 
 _help_install:
 	@echo "Install subcommands:"
@@ -166,30 +200,58 @@ _help_build:
 
 # Create virtual environment and install dependencies
 setup:
+	@set -- $(filter-out $@,$(MAKECMDGOALS)); \
+	subcommand="$${1:-default}"; \
+	if [ "$$#" -gt 1 ]; then \
+		echo "ERROR: Too many subcommands for 'make setup': $(filter-out $@,$(MAKECMDGOALS))"; \
+		echo "Run 'make setup help' for available options."; \
+		exit 1; \
+	fi; \
+	case "$$subcommand" in \
+		default) "$(MAKE)" --no-print-directory _setup_default ;; \
+		submodules) "$(MAKE)" --no-print-directory _setup_submodules ;; \
+		ts) "$(MAKE)" --no-print-directory _setup_ts ;; \
+		help) "$(MAKE)" --no-print-directory _help_setup ;; \
+		*) echo "ERROR: Unknown setup subcommand '$$subcommand'"; echo "Run 'make setup help' for available options."; exit 1 ;; \
+	esac
+
+_setup_default:
 	@echo "Setting up development environment..."
 	@echo "Checking Python virtual environment and dependencies..."
+ifdef CI
 	@set -e; \
-	if [ ! -x "$(PYTHON)" ]; then \
+	if "$(PYTHON)" -c "import pre_commit, linkml" >/dev/null 2>&1; then \
+		echo "OK: Python environment and dependencies are ready via $(PYTHON)"; \
+	else \
+		echo "CI environment missing dependencies; bootstrapping..."; \
+		$(PIP) install -e ".[dev]"; \
+		$(PIP) install linkml; \
+		$(PRECOMMIT) install; \
+	fi
+else
+	@set -e; \
+	if [ ! -f "$(PYTHON)" ]; then \
 		echo "Python virtual environment not found; bootstrapping..."; \
-		$(MAKE) --no-print-directory $(VENV)/bin/activate; \
-	elif $(PYTHON) -c "import pre_commit, linkml" >/dev/null 2>&1; then \
+		"$(MAKE)" --no-print-directory "$(ACTIVATE_SCRIPT)"; \
+	elif "$(PYTHON)" -c "import pre_commit, linkml" >/dev/null 2>&1; then \
 		echo "OK: Python virtual environment and dependencies are ready at $(VENV)"; \
 	else \
 		echo "Python virtual environment found but dependencies are missing; bootstrapping..."; \
-		$(MAKE) --no-print-directory -B $(VENV)/bin/activate; \
+		"$(MAKE)" --no-print-directory -B "$(ACTIVATE_SCRIPT)"; \
 	fi
-	@$(MAKE) --no-print-directory submodule-setup
-	@$(MAKE) --no-print-directory ts-bootstrap
+endif
+	@"$(MAKE)" --no-print-directory setup submodules
+	@"$(MAKE)" --no-print-directory setup ts
 	@echo ""
-	@echo "Setup complete. Activate with: source $(VENV)/bin/activate"
+	@echo "Setup complete. Activate with: $(ACTIVATE_HINT)"
 
-$(VENV)/bin/python3:
+$(VENV_PYTHON):
 	@echo "Creating Python virtual environment at $(VENV)..."
-	@$(BOOTSTRAP_PYTHON) -m venv $(VENV)
+	@"$(BOOTSTRAP_PYTHON)" -m venv "$(VENV)"
 	@$(PIP) install --upgrade pip
 	@echo "OK: Python virtual environment ready"
 
-$(VENV)/bin/activate: $(VENV)/bin/python3
+$(ACTIVATE_SCRIPT): $(VENV_PYTHON)
 	@echo "Installing Python dependencies..."
 	@$(PIP) install -e ".[dev]"
 	@$(PIP) install linkml
@@ -197,28 +259,25 @@ $(VENV)/bin/activate: $(VENV)/bin/python3
 	@echo "OK: Python development environment ready"
 
 # Setup ontology-management-base submodule using the same active venv
-submodule-setup:
+_setup_submodules:
 	@echo "Setting up ontology-management-base submodule..."
 	@set -e; \
 	if [ -f "$(OMB_SUBMODULE_DIR)/setup.py" ] || [ -f "$(OMB_SUBMODULE_DIR)/pyproject.toml" ]; then \
 		$(PIP) install -e "$(OMB_SUBMODULE_DIR)"; \
 		echo "OK: ontology-management-base submodule setup complete"; \
 	elif [ -f "$(OMB_SUBMODULE_DIR)/Makefile" ]; then \
-		$(MAKE) --no-print-directory -C $(OMB_SUBMODULE_DIR) setup \
+		"$(MAKE)" --no-print-directory -C "$(OMB_SUBMODULE_DIR)" setup \
 			VENV="$(abspath $(VENV))" \
-			PYTHON="$(PYTHON_ABS)" \
-			PIP="$(PYTHON_ABS) -m pip" \
-			PRECOMMIT="$(PYTHON_ABS) -m pre_commit" \
-			PYTEST="$(PYTHON_ABS) -m pytest"; \
+			PYTHON="$(PYTHON_ABS)"; \
 		echo "OK: ontology-management-base submodule setup complete"; \
 	else \
 		echo "WARNING: Skipping ontology-management-base submodule setup (not found)"; \
 	fi
 
 # Bootstrap TypeScript toolchain
-ts-bootstrap:
+_setup_ts:
 	@echo "Bootstrapping TypeScript dependencies..."
-	@cd $(TS_DIR) && corepack enable && yarn install
+	@cd "$(TS_DIR)" && $(YARN) install
 	@echo "OK: TypeScript bootstrap complete"
 
 # Install package (user mode)
@@ -231,16 +290,16 @@ install:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default) $(MAKE) --no-print-directory _install_default ;; \
-		dev) $(MAKE) --no-print-directory _install_dev ;; \
-		help) $(MAKE) --no-print-directory _help_install ;; \
+		default) "$(MAKE)" --no-print-directory _install_default ;; \
+		dev) "$(MAKE)" --no-print-directory _install_dev ;; \
+		help) "$(MAKE)" --no-print-directory _help_install ;; \
 		*) echo "ERROR: Unknown install subcommand '$$subcommand'"; echo "Run 'make install help' for available options."; exit 1 ;; \
 	esac
 
 _install_default:
 	@echo "Installing package in editable mode..."
 ifndef CI
-	@$(MAKE) --no-print-directory $(VENV)/bin/python3
+	@"$(MAKE)" --no-print-directory "$(VENV_PYTHON)"
 endif
 	@$(PIP) install -e .
 	@echo "OK: Package installation complete"
@@ -249,7 +308,7 @@ endif
 _install_dev:
 	@echo "Installing development dependencies..."
 ifndef CI
-	@$(MAKE) --no-print-directory $(VENV)/bin/python3
+	@"$(MAKE)" --no-print-directory "$(VENV_PYTHON)"
 endif
 	@$(PIP) install -e ".[dev]"
 	@$(PIP) install linkml
@@ -262,7 +321,7 @@ endif
 generate:
 	$(call check_dev_setup)
 	@echo "Generating artifacts from LinkML schemas..."
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTHON) src/python/harbour/generate_artifacts.py
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" src/python/harbour/generate_artifacts.py
 	@echo ""
 	@echo "OK: Artifacts generated in artifacts/"
 
@@ -276,23 +335,23 @@ validate:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default) $(MAKE) --no-print-directory _validate_default ;; \
-		shacl) $(MAKE) --no-print-directory _validate_shacl ;; \
-		help) $(MAKE) --no-print-directory _help_validate ;; \
+		default) "$(MAKE)" --no-print-directory _validate_default ;; \
+		shacl) "$(MAKE)" --no-print-directory _validate_shacl ;; \
+		help) "$(MAKE)" --no-print-directory _help_validate ;; \
 		*) echo "ERROR: Unknown validate subcommand '$$subcommand'"; echo "Run 'make validate help' for available options."; exit 1 ;; \
 	esac
 
 _validate_default:
 	$(call check_dev_setup)
 	@echo "Validating harbour credentials..."
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTEST) tests/python/credentials/test_validation.py -v
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" $(PYTEST) tests/python/credentials/test_validation.py -v
 	@echo "OK: Validation complete"
 
 # Validate example credentials against SHACL shapes via ontology-management-base
 _validate_shacl:
 	$(call check_dev_setup)
 	@echo "Running SHACL data conformance check on examples..."
-	@cd $(OMB_SUBMODULE_DIR) && \
+	@cd "$(OMB_SUBMODULE_DIR)" && \
 		tmp_output=$$(mktemp) && \
 		allow_online_flag="" ; \
 		if [ "$(HARBOUR_VALIDATE_ALLOW_ONLINE)" = "0" ]; then \
@@ -317,13 +376,13 @@ _validate_shacl:
 				rm -f $$tmp_output ; \
 				exit 1 ; \
 			fi ; \
-			$(PYTHON_ABS) -m src.tools.validators.validation_suite \
+			"$(PYTHON_ABS)" -m src.tools.validators.validation_suite \
 				--run check-data-conformance \
 				$$allow_online_flag \
 				--data-paths "$$target_path" ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
 				--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
 		else \
-			$(PYTHON_ABS) -m src.tools.validators.validation_suite \
+			"$(PYTHON_ABS)" -m src.tools.validators.validation_suite \
 				--run check-data-conformance \
 				$$allow_online_flag \
 				--data-paths $(addprefix ../../,$(HARBOUR_EXAMPLE_FILES)) ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
@@ -361,17 +420,17 @@ lint:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default) $(MAKE) --no-print-directory _lint_default ;; \
-		md) $(MAKE) --no-print-directory _lint_md ;; \
-		ts) $(MAKE) --no-print-directory _lint_ts ;; \
-		help) $(MAKE) --no-print-directory _help_lint ;; \
+		default) "$(MAKE)" --no-print-directory _lint_default ;; \
+		md) "$(MAKE)" --no-print-directory _lint_md ;; \
+		ts) "$(MAKE)" --no-print-directory _lint_ts ;; \
+		help) "$(MAKE)" --no-print-directory _help_lint ;; \
 		*) echo "ERROR: Unknown lint subcommand '$$subcommand'"; echo "Run 'make lint help' for available options."; exit 1 ;; \
 	esac
 
 _lint_default:
 	$(call check_dev_setup)
 	@echo "Running pre-commit checks..."
-	@$(PYTHON) -m pre_commit run --all-files
+	@"$(PYTHON)" -m pre_commit run --all-files
 	@echo "OK: Pre-commit checks complete"
 
 # Lint Markdown files
@@ -390,17 +449,17 @@ format:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default) $(MAKE) --no-print-directory _format_default ;; \
-		md) $(MAKE) --no-print-directory _format_md ;; \
-		help) $(MAKE) --no-print-directory _help_format ;; \
+		default) "$(MAKE)" --no-print-directory _format_default ;; \
+		md) "$(MAKE)" --no-print-directory _format_md ;; \
+		help) "$(MAKE)" --no-print-directory _help_format ;; \
 		*) echo "ERROR: Unknown format subcommand '$$subcommand'"; echo "Run 'make format help' for available options."; exit 1 ;; \
 	esac
 
 _format_default:
 	$(call check_dev_setup)
 	@echo "Formatting Python code..."
-	@$(PYTHON) -m ruff format src/python/ tests/
-	@$(PYTHON) -m ruff check --fix src/python/ tests/
+	@"$(PYTHON)" -m ruff format src/python/ tests/
+	@"$(PYTHON)" -m ruff check --fix src/python/ tests/
 	@echo "OK: Python formatting complete"
 
 # Auto-fix Markdown lint violations
@@ -419,26 +478,26 @@ test:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default) $(MAKE) --no-print-directory _test_default ;; \
-		cov) $(MAKE) --no-print-directory _test_cov ;; \
-		ts) $(MAKE) --no-print-directory _test_ts ;; \
-		interop) $(MAKE) --no-print-directory _test_interop ;; \
-		full) $(MAKE) --no-print-directory _test_all ;; \
-		help) $(MAKE) --no-print-directory _help_test ;; \
+		default) "$(MAKE)" --no-print-directory _test_default ;; \
+		cov) "$(MAKE)" --no-print-directory _test_cov ;; \
+		ts) "$(MAKE)" --no-print-directory _test_ts ;; \
+		interop) "$(MAKE)" --no-print-directory _test_interop ;; \
+		full) "$(MAKE)" --no-print-directory _test_all ;; \
+		help) "$(MAKE)" --no-print-directory _help_test ;; \
 		*) echo "ERROR: Unknown test subcommand '$$subcommand'"; echo "Run 'make test help' for available options."; exit 1 ;; \
 	esac
 
 _test_default:
 	$(call check_dev_setup)
 	@echo "Running Python tests..."
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTEST) tests/ -v
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" $(PYTEST) tests/ -v
 	@echo "OK: Python tests complete"
 
 # Run tests with coverage
 _test_cov:
 	$(call check_dev_setup)
 	@echo "Running Python tests with coverage..."
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTEST) tests/ --cov=src/python/harbour --cov=src/python/credentials --cov-report=html --cov-report=term
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" $(PYTEST) tests/ --cov=src/python/harbour --cov=src/python/credentials --cov-report=html --cov-report=term
 	@echo "OK: Coverage run complete"
 
 # TypeScript targets
@@ -451,31 +510,31 @@ build:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default|ts) $(MAKE) --no-print-directory _build_ts ;; \
-		help) $(MAKE) --no-print-directory _help_build ;; \
+		default|ts) "$(MAKE)" --no-print-directory _build_ts ;; \
+		help) "$(MAKE)" --no-print-directory _help_build ;; \
 		*) echo "ERROR: Unknown build subcommand '$$subcommand'"; echo "Run 'make build help' for available options."; exit 1 ;; \
 	esac
 
 _build_ts:
 	@echo "Building TypeScript..."
-	@cd $(TS_DIR) && corepack enable && yarn install && yarn build
+	@cd "$(TS_DIR)" && $(YARN) install && $(YARN) build
 	@echo "OK: TypeScript build complete"
 
 _test_ts:
 	@echo "Running TypeScript tests..."
-	@cd $(TS_DIR) && corepack enable && yarn install && yarn test
+	@cd "$(TS_DIR)" && $(YARN) install && $(YARN) test
 	@echo "OK: TypeScript tests complete"
 
 _lint_ts:
 	@echo "Linting TypeScript..."
-	@cd $(TS_DIR) && corepack enable && yarn install && yarn lint
+	@cd "$(TS_DIR)" && $(YARN) install && $(YARN) lint
 	@echo "OK: TypeScript lint complete"
 
 # Cross-runtime interop tests (requires both Python + TypeScript)
 _test_interop:
 	$(call check_dev_setup)
 	@echo "Running cross-runtime interop tests..."
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTEST) tests/interop/ -v
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" $(PYTEST) tests/interop/ -v
 	@echo "OK: Interop tests complete"
 
 story:
@@ -487,10 +546,10 @@ story:
 		exit 1; \
 	fi; \
 	case "$$subcommand" in \
-		default) $(MAKE) --no-print-directory _story_default ;; \
-		sign) $(MAKE) --no-print-directory _story_sign ;; \
-		verify) $(MAKE) --no-print-directory _story_verify ;; \
-		help) $(MAKE) --no-print-directory _help_story ;; \
+		default) "$(MAKE)" --no-print-directory _story_default ;; \
+		sign) "$(MAKE)" --no-print-directory _story_sign ;; \
+		verify) "$(MAKE)" --no-print-directory _story_verify ;; \
+		help) "$(MAKE)" --no-print-directory _help_story ;; \
 		*) echo "ERROR: Unknown story subcommand '$$subcommand'"; echo "Run 'make story help' for available options."; exit 1 ;; \
 	esac
 
@@ -498,37 +557,56 @@ _story_sign:
 	$(call check_dev_setup)
 	@echo "Signing Harbour example storylines..."
 	@rm -rf examples/signed examples/gaiax/signed
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTHON) -m credentials.example_signer examples/
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.example_signer examples/
 	@echo "OK: Signed example artifacts written to ignored signed/ directories"
 
 _story_verify:
 	$(call check_dev_setup)
 	@echo "Verifying Harbour signed example storylines..."
-	@PYTHONPATH=src/python:$$PYTHONPATH $(PYTHON) -m credentials.verify_signed_examples
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.verify_signed_examples
 	@echo "OK: Signed Harbour example artifacts verified"
 
 _story_default:
 	@echo "Running Harbour storyline (generate + sign + verify + SHACL validate)..."
-	@$(MAKE) --no-print-directory generate
-	@$(MAKE) --no-print-directory _story_sign
-	@$(MAKE) --no-print-directory _story_verify
-	@$(MAKE) --no-print-directory _validate_shacl
+	@"$(MAKE)" --no-print-directory generate
+	@"$(MAKE)" --no-print-directory _story_sign
+	@"$(MAKE)" --no-print-directory _story_verify
+	@"$(MAKE)" --no-print-directory _validate_shacl
 	@echo "OK: Harbour storyline complete"
+
+# ---------- Release Artifacts ----------
+
+RELEASE_DIR ?= site/w3id/reachhaven/harbour
+
+release-artifacts: ## Copy artifacts to w3id directory structure for GitHub Pages publishing
+	@echo "Preparing w3id artifact structure..."
+	@mkdir -p "$(RELEASE_DIR)/core/v1"
+	@mkdir -p "$(RELEASE_DIR)/gx/v1"
+	@mkdir -p "$(RELEASE_DIR)/delegate/v1"
+	@cp artifacts/harbour-core-credential/harbour-core-credential.owl.ttl "$(RELEASE_DIR)/core/v1/ontology.ttl"
+	@cp artifacts/harbour-core-credential/harbour-core-credential.shacl.ttl "$(RELEASE_DIR)/core/v1/shapes.ttl"
+	@cp artifacts/harbour-core-credential/harbour-core-credential.context.jsonld "$(RELEASE_DIR)/core/v1/context.jsonld"
+	@cp artifacts/harbour-gx-credential/harbour-gx-credential.owl.ttl "$(RELEASE_DIR)/gx/v1/ontology.ttl"
+	@cp artifacts/harbour-gx-credential/harbour-gx-credential.shacl.ttl "$(RELEASE_DIR)/gx/v1/shapes.ttl"
+	@cp artifacts/harbour-gx-credential/harbour-gx-credential.context.jsonld "$(RELEASE_DIR)/gx/v1/context.jsonld"
+	@cp artifacts/harbour-core-delegation/harbour-core-delegation.owl.ttl "$(RELEASE_DIR)/delegate/v1/ontology.ttl"
+	@cp artifacts/harbour-core-delegation/harbour-core-delegation.context.jsonld "$(RELEASE_DIR)/delegate/v1/context.jsonld"
+	@echo "OK: Artifacts prepared in $(RELEASE_DIR)/"
 
 # Compound targets
 all:
 	@echo "Running default quality pipeline (lint + test)..."
-	@$(MAKE) --no-print-directory lint
-	@$(MAKE) --no-print-directory test
+	@"$(MAKE)" --no-print-directory lint
+	@"$(MAKE)" --no-print-directory test
 	@echo "OK: Default quality pipeline complete"
 
 # Run all tests (Python + TypeScript)
 _test_all:
 	@echo "Running all tests (Python + SHACL + TypeScript)..."
-	@$(MAKE) --no-print-directory _build_ts
-	@$(MAKE) --no-print-directory _test_default
-	@$(MAKE) --no-print-directory _validate_shacl
-	@$(MAKE) --no-print-directory _test_ts
+	@"$(MAKE)" --no-print-directory _build_ts
+	@"$(MAKE)" --no-print-directory _test_default
+	@"$(MAKE)" --no-print-directory _validate_shacl
+	@"$(MAKE)" --no-print-directory _test_ts
 	@echo "OK: All tests complete"
 
 # Clean generated files

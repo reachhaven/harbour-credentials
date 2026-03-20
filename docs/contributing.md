@@ -15,6 +15,11 @@ Thank you for your interest in contributing to Harbour Credentials!
 
    ```bash
    make setup
+
+   # PowerShell
+   .\.venv\Scripts\Activate.ps1
+
+   # macOS / Linux / Git Bash
    source .venv/bin/activate
    ```
 

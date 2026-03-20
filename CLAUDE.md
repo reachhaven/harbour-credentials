@@ -83,7 +83,7 @@ Tests live in `tests/` with shared fixtures:
 
 ### TypeScript Toolchain
 
-- Package manager: **Yarn 4** via corepack (`corepack enable`)
+- Package manager: **Yarn 4** via corepack (`corepack yarn ...`)
 - Test runner: **vitest** (config in `src/typescript/harbour/vitest.config.ts`)
 - Build: `tsc` (strict mode, ES2022 target)
 - Package: `@reachhaven/harbour-credentials`

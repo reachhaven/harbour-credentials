@@ -2,25 +2,24 @@
 """Generate downstream artifacts (OWL ontology, SHACL shapes, JSON-LD context)
 from Harbour LinkML schemas.
 
-The custom HarbourShaclGenerator fixes the ``cred:issuer`` property shape:
-LinkML maps ``range: string`` to ``sh:nodeKind sh:Literal``, but the W3C VC v2
-context defines ``issuer`` with ``@type: @id``, so the RDF value is an IRI.
-The generator patches the property shape to ``sh:nodeKind sh:IRIOrLiteral``
-(accepting both IRIs from JSON-LD and literal strings from plain JSON).
+Uses upstream ``ShaclGenerator`` (with ``uses_schemaloader=False`` and importmap
+passthrough, linkml/linkml#2913 fixed in ASCS-eV/linkml PR #3293) and
+``ContextGenerator`` (with ``mergeimports=False`` to skip external vocabulary
+terms, ASCS-eV/linkml PR #3279) so harbour's JSON-LD context does not redefine
+``@protected`` terms already provided by the W3C VC v2 context.
 
-The custom HarbourContextGenerator excludes terms imported from external
-vocabularies (e.g. W3C VC v2) so the generated JSON-LD context does not
-redefine ``@protected`` terms already provided by the W3C VC v2 context.
+The ``xsd_anyuri_as_iri=True`` flag (ASCS-eV/linkml PR #3292) ensures
+``range: uri`` slots produce ``@type: @id`` in the context, matching the SHACL
+``sh:nodeKind sh:IRI`` constraint.
 """
 
 import json
 from pathlib import Path
 
-from linkml.generators.jsonldcontextgen import ContextGenerator as _BaseContextGenerator
+from linkml.generators.jsonldcontextgen import ContextGenerator
 from linkml.generators.owlgen import OwlSchemaGenerator
-from linkml.generators.shaclgen import ShaclGenerator as _BaseShaclGenerator
-from linkml_runtime.linkml_model.meta import SlotDefinition
-from rdflib import OWL, Namespace, URIRef
+from linkml.generators.shaclgen import ShaclGenerator
+from rdflib import RDFS, OWL, URIRef
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 LINKML_DIR = REPO_ROOT / "linkml"
@@ -40,71 +39,6 @@ DOMAINS = [
 # binding (not RDF graph shape), and JSON-LD expansion would interfere
 # with the canonical JSON used for hashing.
 SHACL_SKIP_DOMAINS = {"harbour-core-delegation"}
-
-SH = Namespace("http://www.w3.org/ns/shacl#")
-XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
-CRED = Namespace("https://www.w3.org/2018/credentials#")
-LINKML = Namespace("https://w3id.org/linkml/")
-
-
-class HarbourShaclGenerator(_BaseShaclGenerator):
-    """SHACL generator with importmap-aware initialisation and IRI fixes.
-
-    Bypasses ``ShaclGenerator.__post_init__``'s ``SchemaView`` construction
-    which ignores ``importmap`` / ``base_dir``, causing cross-directory
-    imports to fail.
-    See https://github.com/linkml/linkml/issues/2913
-
-    Also corrects ``cred:issuer`` property shape (IRI, not Literal) and
-    removes ``sh:class linkml:Any`` constraints.
-    See https://github.com/linkml/linkml/issues/2914
-    """
-
-    uses_schemaloader = False
-
-    def __post_init__(self) -> None:
-        from linkml.utils.generator import Generator
-
-        Generator.__post_init__(self)
-        self.generate_header()
-
-    def as_graph(self):
-        g = super().as_graph()
-        # Fix cred:issuer nodeKind (IRI, not Literal)
-        for ps in g.subjects(SH.path, CRED.issuer):
-            g.remove((ps, SH.nodeKind, SH.Literal))
-            g.add((ps, SH.nodeKind, SH.IRIOrLiteral))
-            for dt in list(g.objects(ps, SH.datatype)):
-                g.remove((ps, SH.datatype, dt))
-        # Fix cred:holder nodeKind (IRI, not Literal) — DIDs are IRIs
-        for ps in g.subjects(SH.path, CRED.holder):
-            g.remove((ps, SH.nodeKind, SH.Literal))
-            g.add((ps, SH.nodeKind, SH.IRIOrLiteral))
-            for dt in list(g.objects(ps, SH.datatype)):
-                g.remove((ps, SH.datatype, dt))
-        # Remove sh:class linkml:Any — meta-type not present in instance data
-        for s, p, o in list(g.triples((None, SH["class"], LINKML.Any))):
-            g.remove((s, p, o))
-        return g
-
-
-class HarbourContextGenerator(_BaseContextGenerator):
-    """Context generator that excludes imported vocabulary terms.
-
-    W3C VC v2 envelope terms (issuer, validFrom, validUntil, evidence,
-    credentialStatus) are defined in ``w3c-vc.yaml`` and imported into
-    harbour schemas. With ``mergeimports=False`` these slots are marked
-    with ``imported_from``. This generator skips them so the harbour
-    JSON-LD context does not redefine ``@protected`` terms already
-    provided by ``https://www.w3.org/ns/credentials/v2``.
-    """
-
-    def visit_slot(self, aliased_slot_name: str, slot: SlotDefinition) -> None:
-        if getattr(slot, "imported_from", None) and not str(
-            slot.imported_from
-        ).startswith("linkml"):
-            return
-        super().visit_slot(aliased_slot_name, slot)
 
 
 def main() -> None:
@@ -144,15 +78,19 @@ def main() -> None:
         (out_dir / f"{domain}.owl.ttl").write_text(owl_text, encoding="utf-8")
 
         if domain not in SHACL_SKIP_DOMAINS:
-            shacl_gen = HarbourShaclGenerator(
-                schema, importmap=importmap, base_dir=base_dir
+            shacl_gen = ShaclGenerator(
+                schema, importmap=importmap, base_dir=base_dir,
             )
             (out_dir / f"{domain}.shacl.ttl").write_text(
                 shacl_gen.serialize(), encoding="utf-8"
             )
 
-        ctx_gen = HarbourContextGenerator(
-            schema, mergeimports=False, importmap=importmap, base_dir=base_dir
+        ctx_gen = ContextGenerator(
+            schema,
+            mergeimports=False,
+            xsd_anyuri_as_iri=True,
+            importmap=importmap,
+            base_dir=base_dir,
         )
         ctx_text = ctx_gen.serialize()
 
@@ -163,7 +101,8 @@ def main() -> None:
         if isinstance(ctx_obj, dict) and "type" not in ctx_obj:
             ctx_obj["type"] = "@type"
             ctx_data["@context"] = ctx_obj
-            ctx_text = json.dumps(ctx_data, indent=3, ensure_ascii=False)
+
+        ctx_text = json.dumps(ctx_data, indent=3, ensure_ascii=False)
 
         (out_dir / f"{domain}.context.jsonld").write_text(ctx_text, encoding="utf-8")
 
@@ -184,7 +123,7 @@ def _patch_owl_equivalences(owl_gen: OwlSchemaGenerator, owl_text: str) -> str:
     inference (which doesn't understand owl:equivalentClass) can resolve
     the type hierarchy via class_uri URIs used in instance data.
     """
-    from rdflib import RDFS, Graph
+    from rdflib import Graph
 
     sv = owl_gen.schemaview
     schema = sv.schema
