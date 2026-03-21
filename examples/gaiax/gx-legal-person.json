@@ -4,7 +4,7 @@
     "https://w3id.org/gaia-x/development#",
     {
       "vcard": "http://www.w3.org/2006/vcard/ns#",
-      "schema": "http://schema.org/"
+      "schema": "https://schema.org/"
     }
   ],
   "type": [
