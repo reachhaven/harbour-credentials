@@ -63,7 +63,8 @@ def main() -> None:
         print(f"  Processing {domain}...")
 
         owl_gen = OwlSchemaGenerator(
-            schema, mergeimports=False, importmap=importmap, base_dir=base_dir
+            schema, mergeimports=False, deterministic=True,
+            importmap=importmap, base_dir=base_dir
         )
         owl_text = owl_gen.serialize()
 
@@ -79,7 +80,8 @@ def main() -> None:
 
         if domain not in SHACL_SKIP_DOMAINS:
             shacl_gen = ShaclGenerator(
-                schema, importmap=importmap, base_dir=base_dir,
+                schema, deterministic=True,
+                importmap=importmap, base_dir=base_dir,
             )
             (out_dir / f"{domain}.shacl.ttl").write_text(
                 shacl_gen.serialize(), encoding="utf-8"
@@ -88,7 +90,9 @@ def main() -> None:
         ctx_gen = ContextGenerator(
             schema,
             mergeimports=False,
+            exclude_external_imports=True,
             xsd_anyuri_as_iri=True,
+            deterministic=True,
             importmap=importmap,
             base_dir=base_dir,
         )

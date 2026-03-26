@@ -61,7 +61,7 @@ def sample_sd_jwt_vc(issuer_keypair, holder_keypair):
     holder_private, holder_public = holder_keypair
     holder_did = p256_public_key_to_did_key(holder_public)
 
-    # SD-JWT-VC uses flat claims (not nested credentialSubject)
+    # SD-JWT-VC claims (flat or nested per RFC 9901 §6)
     claims = {
         "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
         "sub": holder_did,
@@ -523,7 +523,7 @@ class TestDelegatedSigningFlow:
         holder_private, holder_public = holder_keypair
         holder_did = p256_public_key_to_did_key(holder_public)
 
-        # Step 1: Issue credential to holder (SD-JWT-VC uses flat claims)
+        # Step 1: Issue credential to holder
         claims = {
             "iss": "did:ethr:0x14a34:0xb0771a9447399cd33e0cad1228a33ac914715105",
             "sub": holder_did,
@@ -619,7 +619,7 @@ class TestDelegatedSigningFlow:
         holder_private, holder_public = holder_keypair
         holder_did = p256_public_key_to_did_key(holder_public)
 
-        # Issue credential with PII (SD-JWT-VC uses flat claims)
+        # Issue credential with PII
         claims = {
             "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
             "sub": holder_did,

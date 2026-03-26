@@ -198,12 +198,17 @@ organizational affiliation without the credential itself leaking PII.
 ### Code
 
 ```python
-# Python — convert to SD-JWT-VC flat claims
-from credentials.claim_mapping import vc_to_sd_jwt_claims, MAPPINGS
-mapping = MAPPINGS["harbour.gx:NaturalPersonCredential"]
-claims, disclosable = vc_to_sd_jwt_claims(credential, mapping)
-# claims: {"iss": ..., "vct": ..., "givenName": "Alice", "memberOf": "did:ethr:0x14a34:0x..."}
-# disclosable: ["givenName", "familyName", "email", "memberOf"]
+# Python — issue SD-JWT-VC with structured selective disclosure (RFC 9901 §6.2)
+from harbour.sd_jwt import issue_sd_jwt_vc
+
+sd_jwt = issue_sd_jwt_vc(
+    credential,
+    private_key,
+    vct="https://w3id.org/reachhaven/harbour/gx/v1/NaturalPersonCredential",
+    disclosable=["credentialSubject.givenName", "credentialSubject.familyName",
+                 "credentialSubject.email", "credentialSubject.memberOf"],
+)
+# Nested structure preserved — sensitive values hidden behind _sd digests
 ```
 
 ---

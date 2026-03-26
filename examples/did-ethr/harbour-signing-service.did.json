@@ -49,7 +49,7 @@
       "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#service-1",
       "type": "harbour:TrustAnchorService",
       "didcore:serviceEndpoint": {
-        "type": "sdo:Organization",
+        "type": "schema:Organization",
         "name": "Haven Trust Anchor",
         "url": "https://resolver.harbour.id/trust-anchors/did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"
       }

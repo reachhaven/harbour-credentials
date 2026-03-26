@@ -214,7 +214,6 @@ src/
 │   │   ├── kb_jwt.py      # Key Binding JWT
 │   │   └── x509.py        # X.509 certificates
 │   └── credentials/       # Credential processing pipeline
-│       ├── claim_mapping.py
 │       └── example_signer.py
 └── typescript/
     └── harbour/           # Crypto library (feature parity)

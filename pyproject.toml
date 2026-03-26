@@ -26,7 +26,6 @@ dependencies = [
     "joserfc>=1.0.0",
     "cryptography>=44.0.0",
     "base58>=2.1.0",
-    "sd-jwt>=0.10.0",
 ]
 
 [project.optional-dependencies]

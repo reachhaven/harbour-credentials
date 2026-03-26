@@ -130,7 +130,7 @@ import {
 
 ## CLI Entry Points
 
-All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python -m harbour.signer --help`, etc. Also: `python -m credentials.claim_mapping --help`, `python -m credentials.example_signer --help`.
+All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python -m harbour.signer --help`, etc. Also: `python -m credentials.example_signer --help`.
 
 ## Coding Conventions
 

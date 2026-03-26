@@ -17,6 +17,8 @@ They are copies of specifications published by their respective standards organi
 | `vc-jose-cose.md` | [VC-JOSE-COSE](https://www.w3.org/TR/vc-jose-cose/) | W3C | [W3C Document License](https://www.w3.org/copyright/document-license-2023/) |
 | `sd-jwt-rfc9901.md` | [RFC 9901: SD-JWT](https://www.rfc-editor.org/rfc/rfc9901) | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
 | `sd-jwt-vc.md` | [SD-JWT-VC draft-15](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/) | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
+| `token-status-list.md` | [Token Status List draft-19](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
+| `token-status-list-draft-19.txt` | Raw full spec text (78 pages) — retained for search | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
 | `oid4vp-1.0.md` | [OpenID4VP 1.0](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html) | OpenID Foundation | [OpenID IPR](https://openid.net/intellectual-property/) |
 | `oid4vp-1.0.txt` | Raw full spec text (3,834 lines) — retained for search | OpenID Foundation | [OpenID IPR](https://openid.net/intellectual-property/) |
 | `gx-architecture-document-25.11.md` | [Gaia-X AD 25.11](https://docs.gaia-x.eu/technical-committee/architecture-document/25.11/) | Gaia-X AISBL | CC BY-NC-ND 4.0 |
@@ -31,6 +33,7 @@ They are copies of specifications published by their respective standards organi
 - `oid4vp-1.0.txt`, `did-webs-spec.md`, `keri-draft.md`: **2026-02-24**
 - `vc-jose-cose.md`, `sd-jwt-vc.md`, `csc-data-model.md`: **2026-02-25**
 - `oid4vp-1.0.md`, `vc-data-model-2.0.md`, `did-core.md`, `sd-jwt-rfc9901.md`, `gx-architecture-document-25.11.md`: **2026-03-10**
+- `token-status-list.md`, `token-status-list-draft-19.txt`: **2026-03-20**
 
 ## Usage
 
@@ -66,6 +69,7 @@ Always refer to the original sources for the most up-to-date and legally binding
 - **W3C VC-JOSE-COSE**: https://www.w3.org/TR/vc-jose-cose/
 - **SD-JWT (RFC 9901)**: https://www.rfc-editor.org/rfc/rfc9901
 - **SD-JWT-VC**: https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/
+- **Token Status List**: https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/
 - **OpenID4VP**: https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
 - **Gaia-X Architecture**: https://docs.gaia-x.eu/technical-committee/architecture-document/25.11/
 - **did:ethr**: https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md
