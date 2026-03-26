@@ -23,14 +23,17 @@ TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
 def _can_run_node_jose() -> bool:
     """Check whether yarn-managed Node can import jose in the TS workspace."""
-    result = subprocess.run(
-        ["yarn", "node", "--input-type=module", "-e", 'import "jose";'],
-        capture_output=True,
-        text=True,
-        cwd=str(TS_DIR),
-        timeout=30,
-    )
-    return result.returncode == 0
+    try:
+        result = subprocess.run(
+            ["yarn", "node", "--input-type=module", "-e", 'import "jose";'],
+            capture_output=True,
+            text=True,
+            cwd=str(TS_DIR),
+            timeout=30,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
 
 
 # Skip if TypeScript runtime dependencies are unavailable

@@ -11,6 +11,11 @@ terms, ASCS-eV/linkml PR #3279) so harbour's JSON-LD context does not redefine
 The ``xsd_anyuri_as_iri=True`` flag (ASCS-eV/linkml PR #3292) ensures
 ``range: uri`` slots produce ``@type: @id`` in the context, matching the SHACL
 ``sh:nodeKind sh:IRI`` constraint.
+
+The ``normalize_prefixes=True`` flag (ASCS-eV/linkml PR #3308) maps
+non-standard prefix aliases (e.g. ``sdo`` → ``schema``, ``dce`` → ``dc``)
+to their canonical well-known names, producing cleaner and more portable
+artifacts.
 """
 
 import json
@@ -64,6 +69,7 @@ def main() -> None:
 
         owl_gen = OwlSchemaGenerator(
             schema, mergeimports=False, deterministic=True,
+            normalize_prefixes=True,
             importmap=importmap, base_dir=base_dir
         )
         owl_text = owl_gen.serialize()
@@ -81,6 +87,7 @@ def main() -> None:
         if domain not in SHACL_SKIP_DOMAINS:
             shacl_gen = ShaclGenerator(
                 schema, deterministic=True,
+                normalize_prefixes=True,
                 importmap=importmap, base_dir=base_dir,
             )
             (out_dir / f"{domain}.shacl.ttl").write_text(
@@ -92,6 +99,7 @@ def main() -> None:
             mergeimports=False,
             exclude_external_imports=True,
             xsd_anyuri_as_iri=True,
+            normalize_prefixes=True,
             deterministic=True,
             importmap=importmap,
             base_dir=base_dir,

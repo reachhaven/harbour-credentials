@@ -101,7 +101,8 @@ from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 sd_jwt = issue_sd_jwt_vc(
     credential,
     private_key,
-    disclosable_claims=["name", "email"]
+    vct="https://example.com/credential/v1",
+    disclosable=["name", "email"],
 )
 
 # Verify
@@ -111,13 +112,14 @@ result = verify_sd_jwt_vc(sd_jwt, public_key)
 **TypeScript:**
 
 ```typescript
-import { issueSdJwt, verifySdJwt } from '@reachhaven/harbour-credentials';
+import { issueSdJwtVc, verifySdJwtVc } from '@reachhaven/harbour-credentials';
 
-const sdJwt = await issueSdJwt(credential, privateKey, {
-    disclosableClaims: ['name', 'email']
+const sdJwt = await issueSdJwtVc(credential, privateKey, {
+    vct: 'https://example.com/credential/v1',
+    disclosable: ['name', 'email'],
 });
 
-const result = await verifySdJwt(sdJwt, publicKey);
+const result = await verifySdJwtVc(sdJwt, publicKey);
 ```
 
 ## Next Steps

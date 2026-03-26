@@ -26,6 +26,7 @@ dependencies = [
     "joserfc>=1.0.0",
     "cryptography>=44.0.0",
     "base58>=2.1.0",
+    "pycryptodome>=3.20",
 ]
 
 [project.optional-dependencies]

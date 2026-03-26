@@ -2,7 +2,8 @@
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
     "https://w3id.org/reachhaven/harbour/core/v1/",
-    "https://w3id.org/reachhaven/harbour/gx/v1/"
+    "https://w3id.org/reachhaven/harbour/gx/v1/",
+    "https://w3id.org/reachhaven/harbour/delegate/v1/"
   ],
   "type": [
     "VerifiableCredential",
@@ -13,22 +14,22 @@
   "validFrom": "2025-06-25T10:00:00Z",
   "credentialSubject": {
     "id": "urn:uuid:receipt-b7c8d9e0-f1a2-3456-789a-bcdef0123456",
-    "type": "harbour:TransactionReceipt",
+    "type": "TransactionReceipt",
     "transactionHash": "c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
     "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
   },
   "credentialStatus": [
     {
       "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202:services:revocation-registry/f7e8d9c0b1a23456",
-      "type": "harbour:CRSetEntry",
+      "type": "CRSetEntry",
       "statusPurpose": "revocation"
     }
   ],
   "evidence": [
     {
       "type": [
-        "harbour:Evidence",
-        "harbour:DelegatedSignatureEvidence"
+        "Evidence",
+        "DelegatedSignatureEvidence"
       ],
       "verifiablePresentation": {
         "@context": [
@@ -36,7 +37,7 @@
         ],
         "type": [
           "VerifiablePresentation",
-          "harbour:VerifiablePresentation"
+          "HarbourVerifiablePresentation"
         ],
         "holder": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6IjZka1U2Wk1GSzc5V3dpY3dKNXJieEUxM3pTdWtCWTJPb0VpVlVFanFNRWMiLCJ5IjoiUm5Iem55VmxyUFNNVDdpckRzMTVEOXd4Z01vamlTREFRcGZGaHFUa0xSWSJ9",
         "verifiableCredential": [

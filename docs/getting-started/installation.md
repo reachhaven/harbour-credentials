@@ -11,7 +11,7 @@ pip install harbour-credentials
 ### From Source
 
 ```bash
-git clone https://github.com/ASCS-eV/harbour-credentials.git
+git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 
 # Create virtual environment
@@ -45,7 +45,7 @@ npm install @reachhaven/harbour-credentials
 ### From Source
 
 ```bash
-git clone https://github.com/ASCS-eV/harbour-credentials.git
+git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials/src/typescript/harbour
 
 corepack yarn install
