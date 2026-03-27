@@ -186,9 +186,9 @@ class TestProcessExample:
         evidence = vc_payload["evidence"][0]
         ev_type = evidence["type"]
         if isinstance(ev_type, list):
-            assert "harbour:DelegatedSignatureEvidence" in ev_type
+            assert "DelegatedSignatureEvidence" in ev_type
         else:
-            assert ev_type == "harbour:DelegatedSignatureEvidence"
+            assert ev_type == "DelegatedSignatureEvidence"
         assert "transaction_data" in evidence
         assert evidence["transaction_data"]["type"] == "harbour.delegate:data.purchase"
         assert (

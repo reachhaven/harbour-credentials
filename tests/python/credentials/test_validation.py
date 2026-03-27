@@ -117,7 +117,7 @@ def test_has_credential_status(credential_file):
         f"Missing credentialStatus in {credential_file.name}"
     )
     for entry in status:
-        assert entry.get("type") == "harbour:CRSetEntry"
+        assert entry.get("type") == "CRSetEntry"
         assert "statusPurpose" in entry
 
 
@@ -133,15 +133,20 @@ def test_credential_subject_has_type(credential_file):
     # Gaia-X compliance credentials (TermsAndConditions, RegistrationNumber,
     # Compliance) use gx: types directly on credentialSubject because the gx
     # SHACL shapes are sh:closed true — harbour wrappers would add properties
-    # that violate the closed shape constraint. All other domain credentials
-    # use harbour: or harbour.gx: prefixed types.
+    # that violate the closed shape constraint. Other domain credentials use
+    # bare terms from the harbour context (e.g. TransactionReceipt,
+    # LinkedCredentialService) or harbour:/gx: prefixed types.
     allowed_prefixes = ("harbour:", "harbour.gx:", "gx:")
+
+    def _is_valid_type(t: str) -> bool:
+        return t.startswith(allowed_prefixes) or ":" not in t
+
     if isinstance(subject_type, str):
-        assert subject_type.startswith(allowed_prefixes), (
-            f"Subject type should be harbour- or gx-prefixed, got: {subject_type}"
+        assert _is_valid_type(subject_type), (
+            f"Subject type should be a harbour/gx type, got: {subject_type}"
         )
     elif isinstance(subject_type, list):
-        assert any(t.startswith(allowed_prefixes) for t in subject_type), (
+        assert any(_is_valid_type(t) for t in subject_type), (
             f"Subject type list should include a harbour or gx type: {subject_type}"
         )
 
