@@ -117,8 +117,8 @@ def main() -> None:
         ctx_obj = ctx_data.get("@context", {})
         if isinstance(ctx_obj, dict) and "type" not in ctx_obj:
             ctx_obj["type"] = "@type"
-            ctx_data["@context"] = ctx_obj
 
+        ctx_data["@context"] = ctx_obj
         ctx_text = json.dumps(ctx_data, indent=3, ensure_ascii=False)
 
         (out_dir / f"{domain}.context.jsonld").write_text(ctx_text, encoding="utf-8")
