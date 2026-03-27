@@ -300,11 +300,15 @@ class TestStructuredDisclosure:
         # All non-disclosable claims preserved
         cs = result["credentialSubject"]
         assert cs["id"] == "did:ethr:0x14a34:0x9d273DCaC2f6367968d61caf69A7E3177fd81048"
-        assert cs["harbourCredential"] == "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        assert (
+            cs["harbourCredential"] == "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        )
         assert cs["legalForm"] == "AG"
         assert cs["duns"] == "313995269"
         assert cs["url"] == "https://www.bmwgroup.com/"
-        assert cs["gxParticipant"]["name"] == "Bayerische Motoren Werke Aktiengesellschaft"
+        assert (
+            cs["gxParticipant"]["name"] == "Bayerische Motoren Werke Aktiengesellschaft"
+        )
         # Email should NOT be present (disclosure was removed)
         assert "email" not in cs
 

@@ -177,7 +177,9 @@ def _collect_sd_digests(obj: Any) -> set[str]:
     return digests
 
 
-def _insert_disclosure_recursive(obj: dict, claim_name: str, claim_value: Any, digest: str) -> bool:
+def _insert_disclosure_recursive(
+    obj: dict, claim_name: str, claim_value: Any, digest: str
+) -> bool:
     """Recursively find the _sd array containing this digest and insert the claim.
 
     Returns True if the digest was found and the claim was inserted.
@@ -292,7 +294,9 @@ def verify_sd_jwt_vc(
         _, claim_name, claim_value = disc_array
 
         # Insert the claim at the correct nesting level
-        if not _insert_disclosure_recursive(payload, claim_name, claim_value, disc_hash):
+        if not _insert_disclosure_recursive(
+            payload, claim_name, claim_value, disc_hash
+        ):
             raise VerificationError(
                 f"Could not locate _sd digest for claim {claim_name!r}"
             )

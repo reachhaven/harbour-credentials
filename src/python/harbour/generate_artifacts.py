@@ -24,7 +24,7 @@ from pathlib import Path
 from linkml.generators.jsonldcontextgen import ContextGenerator
 from linkml.generators.owlgen import OwlSchemaGenerator
 from linkml.generators.shaclgen import ShaclGenerator
-from rdflib import RDFS, OWL, URIRef
+from rdflib import OWL, RDFS, URIRef
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 LINKML_DIR = REPO_ROOT / "linkml"
@@ -68,9 +68,12 @@ def main() -> None:
         print(f"  Processing {domain}...")
 
         owl_gen = OwlSchemaGenerator(
-            schema, mergeimports=False, deterministic=True,
+            schema,
+            mergeimports=False,
+            deterministic=True,
             normalize_prefixes=True,
-            importmap=importmap, base_dir=base_dir
+            importmap=importmap,
+            base_dir=base_dir,
         )
         owl_text = owl_gen.serialize()
 
@@ -86,9 +89,11 @@ def main() -> None:
 
         if domain not in SHACL_SKIP_DOMAINS:
             shacl_gen = ShaclGenerator(
-                schema, deterministic=True,
+                schema,
+                deterministic=True,
                 normalize_prefixes=True,
-                importmap=importmap, base_dir=base_dir,
+                importmap=importmap,
+                base_dir=base_dir,
             )
             (out_dir / f"{domain}.shacl.ttl").write_text(
                 shacl_gen.serialize(), encoding="utf-8"
