@@ -48,7 +48,8 @@
               "https://w3id.org/reachhaven/harbour/gx/v1/"
             ],
             "type": [
-              "VerifiableCredential"
+              "VerifiableCredential",
+              "HarbourVerifiableCredential"
             ],
             "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
             "validFrom": "2024-01-15T00:00:00Z",
@@ -56,7 +57,14 @@
               "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
               "type": "harbour.gx:NaturalPerson",
               "memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
-            }
+            },
+            "credentialStatus": [
+              {
+                "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202:services:revocation-registry/np00000001",
+                "type": "CRSetEntry",
+                "statusPurpose": "revocation"
+              }
+            ]
           }
         ]
       },
