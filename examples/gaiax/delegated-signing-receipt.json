@@ -7,6 +7,7 @@
   ],
   "type": [
     "VerifiableCredential",
+    "HarbourVerifiableCredential",
     "harbour:DelegatedSigningReceipt"
   ],
   "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
