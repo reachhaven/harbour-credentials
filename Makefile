@@ -14,6 +14,7 @@
 
 TS_DIR := src/typescript/harbour
 OMB_SUBMODULE_DIR := submodules/ontology-management-base
+LINKML_SUBMODULE_DIR := $(OMB_SUBMODULE_DIR)/submodules/linkml/packages/linkml
 
 # Allow callers to override the venv path/tooling.
 VENV ?= .venv
@@ -220,12 +221,11 @@ _setup_default:
 	@echo "Checking Python virtual environment and dependencies..."
 ifdef CI
 	@set -e; \
-	if "$(PYTHON)" -c "import pre_commit, linkml" >/dev/null 2>&1; then \
+	if "$(PYTHON)" -c "import pre_commit" >/dev/null 2>&1; then \
 		echo "OK: Python environment and dependencies are ready via $(PYTHON)"; \
 	else \
 		echo "CI environment missing dependencies; bootstrapping..."; \
 		$(PIP) install -e ".[dev]"; \
-		$(PIP) install linkml; \
 		$(PRECOMMIT) install; \
 	fi
 else
@@ -233,7 +233,7 @@ else
 	if [ ! -f "$(PYTHON)" ]; then \
 		echo "Python virtual environment not found; bootstrapping..."; \
 		"$(MAKE)" --no-print-directory "$(ACTIVATE_SCRIPT)"; \
-	elif "$(PYTHON)" -c "import pre_commit, linkml" >/dev/null 2>&1; then \
+	elif "$(PYTHON)" -c "import pre_commit" >/dev/null 2>&1; then \
 		echo "OK: Python virtual environment and dependencies are ready at $(VENV)"; \
 	else \
 		echo "Python virtual environment found but dependencies are missing; bootstrapping..."; \
@@ -254,14 +254,21 @@ $(VENV_PYTHON):
 $(ACTIVATE_SCRIPT): $(VENV_PYTHON)
 	@echo "Installing Python dependencies..."
 	@$(PIP) install -e ".[dev]"
-	@$(PIP) install linkml
 	@$(PRECOMMIT) install
 	@echo "OK: Python development environment ready"
 
-# Setup ontology-management-base submodule using the same active venv
+# Setup ontology-management-base submodule and LinkML fork
 _setup_submodules:
 	@echo "Setting up ontology-management-base submodule..."
 	@set -e; \
+	if [ -f "$(LINKML_SUBMODULE_DIR)/pyproject.toml" ]; then \
+		$(PIP) install -e "$(LINKML_SUBMODULE_DIR)"; \
+		echo "OK: LinkML (ASCS-eV fork) installed from submodule"; \
+	else \
+		echo "WARNING: LinkML submodule not found at $(LINKML_SUBMODULE_DIR)"; \
+		echo "         Run: git submodule update --init --recursive"; \
+		exit 1; \
+	fi; \
 	if [ -f "$(OMB_SUBMODULE_DIR)/setup.py" ] || [ -f "$(OMB_SUBMODULE_DIR)/pyproject.toml" ]; then \
 		$(PIP) install -e "$(OMB_SUBMODULE_DIR)"; \
 		echo "OK: ontology-management-base submodule setup complete"; \
@@ -311,7 +318,6 @@ ifndef CI
 	@"$(MAKE)" --no-print-directory "$(VENV_PYTHON)"
 endif
 	@$(PIP) install -e ".[dev]"
-	@$(PIP) install linkml
 ifndef CI
 	@$(PRECOMMIT) install
 endif

@@ -68,11 +68,10 @@ jobs:
           python-version: "3.12"
           cache: 'pip'
 
-      - name: Install dependencies
-        run: make install dev
-
-      - name: Install ontology-management-base
-        run: make setup submodules
+      - name: Install dependencies and submodules
+        run: |
+          make install dev
+          make setup submodules
 
       - name: Generate artifacts
         run: make generate
