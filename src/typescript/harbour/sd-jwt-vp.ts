@@ -22,6 +22,8 @@ const SD_JWT_SEPARATOR = "~";
 const DELEGATED_EVIDENCE_TYPES = new Set([
   "DelegatedSignatureEvidence",
   "harbour:DelegatedSignatureEvidence",
+  "harbour:SignatureEvidence",
+  "harbour.delegate:SignatureEvidence",
 ]);
 
 export interface IssueSdJwtVpOptions {

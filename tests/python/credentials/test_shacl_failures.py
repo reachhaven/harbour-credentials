@@ -3,7 +3,10 @@
 This test suite programmatically mutates valid credential examples and
 asserts that SHACL validation catches each specific error. Every test
 starts from a known-good credential, applies a single mutation, and
-checks that pyshacl reports the expected violation.
+checks that the OMB validation suite reports the expected violation.
+
+Validation uses the ``ShaclValidator`` from the ontology-management-base
+submodule — the same pipeline used in production (RDFS inference enabled).
 
 The test output is designed for debuggability:
 - Each test ID clearly describes the mutation (e.g., "LegalPerson-missing-issuer")
@@ -18,13 +21,13 @@ To debug a single test::
 
     pytest tests/python/credentials/test_shacl_failures.py -v -k "missing_issuer"
 
-Requires generated artifacts (``make generate``) and pyshacl.
+Requires generated artifacts (``make generate``) and the OMB submodule.
 """
 
 import copy
 import json
 import sys
-import xml.etree.ElementTree as ET
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -49,6 +52,7 @@ _CORE_SHACL = (
 _GX_SHACL = (
     _REPO_ROOT / "artifacts/harbour-gx-credential/harbour-gx-credential.shacl.ttl"
 )
+_ARTIFACTS_DIR = _REPO_ROOT / "artifacts"
 _EXAMPLES = _REPO_ROOT / "examples"
 
 # SHACL namespace for result graph queries
@@ -67,7 +71,7 @@ _skip_no_artifacts = pytest.mark.skipif(
 )
 
 _skip_no_omb = pytest.mark.skipif(
-    not (_OMB / "src" / "tools" / "utils" / "context_resolver.py").exists(),
+    not (_OMB / "src" / "tools" / "validators" / "shacl" / "validator.py").exists(),
     reason="ontology-management-base submodule not initialised",
 )
 
@@ -124,37 +128,29 @@ def _format_violations(violations: list[ShaclViolation]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# JSON-LD → RDF parsing with local context resolution
+# OMB validation suite bootstrap
 # ---------------------------------------------------------------------------
 
 
-def _build_context_url_map() -> dict[str, Path]:
-    """Build URL → local file mapping for offline JSON-LD parsing."""
+def _make_validator():
+    """Create a ShaclValidator using the OMB validation suite.
+
+    Registers harbour artifact directories so the resolver can discover
+    OWL ontologies, SHACL shapes, and JSON-LD contexts.  Uses the default
+    ``rdfs`` inference mode — the same pipeline as production validation.
+    """
     sys.path.insert(0, str(_OMB))
-    from src.tools.utils.context_resolver import discover_context_files
+    from src.tools.utils.registry_resolver import RegistryResolver
+    from src.tools.validators.shacl.validator import ShaclValidator
 
-    artifact_dirs = [
-        _REPO_ROOT / "artifacts/harbour-core-credential",
-        _REPO_ROOT / "artifacts/harbour-gx-credential",
-        _REPO_ROOT / "artifacts/harbour-core-delegation",
-        _OMB / "artifacts/gx",
-    ]
-    url_map = discover_context_files(artifact_dirs)
-
-    # Add OMB import contexts (W3C credentials/v2, status, did, schema.org)
-    catalog_path = _OMB / "imports" / "catalog-v001.xml"
-    if catalog_path.exists():
-        tree = ET.parse(catalog_path)
-        cat_ns = {"c": "urn:oasis:names:tc:entity:xmlns:xml:catalog"}
-        for uri_elem in tree.getroot().findall(".//c:uri", cat_ns):
-            name = uri_elem.get("name", "")
-            val = uri_elem.get("uri", "")
-            if val.endswith(".context.jsonld"):
-                abs_path = (_OMB / "imports" / val).resolve()
-                if abs_path.exists():
-                    url_map[name] = abs_path
-
-    return url_map
+    resolver = RegistryResolver(_OMB)
+    resolver.register_artifact_directory(_ARTIFACTS_DIR)
+    return ShaclValidator(
+        root_dir=_OMB,
+        inference_mode="rdfs",
+        verbose=False,
+        resolver=resolver,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -163,17 +159,9 @@ def _build_context_url_map() -> dict[str, Path]:
 
 
 @pytest.fixture(scope="session")
-def context_url_map():
-    """URL → local file map for offline JSON-LD context resolution."""
-    return _build_context_url_map()
-
-
-@pytest.fixture(scope="session")
-def shacl_graph():
-    """Combined SHACL shapes graph (core + gx)."""
-    g = rdflib.Graph()
-    g.parse(str(_GX_SHACL), format="turtle")
-    return g
+def shacl_validator():
+    """OMB ShaclValidator with harbour artifacts registered."""
+    return _make_validator()
 
 
 # ---------------------------------------------------------------------------
@@ -183,32 +171,33 @@ def shacl_graph():
 
 def _validate(
     credential: dict,
-    url_map: dict[str, Path],
-    shapes: rdflib.Graph,
+    validator,
 ) -> tuple[bool, list[ShaclViolation], str]:
-    """Validate a credential dict against SHACL shapes.
+    """Validate a credential dict via the OMB validation suite.
+
+    Writes the credential to a temp file and runs the full ShaclValidator
+    pipeline (context inlining, schema discovery, RDFS inference, SHACL
+    validation) — identical to production ``make validate``.
 
     Returns:
         (conforms, violations, results_text)
-
-    The results_text is the full pyshacl report — useful for debugging
-    when a test fails unexpectedly.
     """
-    sys.path.insert(0, str(_OMB))
-    import pyshacl
-    from src.tools.utils.context_resolver import inline_jsonld_with_local_contexts
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
+    ) as f:
+        json.dump(credential, f, ensure_ascii=False)
+        temp_path = Path(f.name)
 
-    inlined_json = inline_jsonld_with_local_contexts(credential, url_map)
-    dg = rdflib.Graph()
-    dg.parse(data=inlined_json, format="json-ld")
-
-    conforms, results_graph, results_text = pyshacl.validate(
-        data_graph=dg,
-        shacl_graph=shapes,
-        inference="none",
-    )
-    violations = _extract_violations(results_graph)
-    return conforms, violations, results_text
+    try:
+        result = validator.validate([temp_path])
+        violations = (
+            _extract_violations(result.report_graph)
+            if result.report_graph is not None
+            else []
+        )
+        return result.conforms, violations, result.report_text
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -282,12 +271,10 @@ class TestPositiveBaseline:
             "TrustAnchorCredential-valid",
         ],
     )
-    def test_valid_credential_conforms(
-        self, example_file, context_url_map, shacl_graph
-    ):
+    def test_valid_credential_conforms(self, example_file, shacl_validator):
         """A valid credential must pass SHACL validation with zero violations."""
         cred = _load_example(example_file)
-        conforms, violations, text = _validate(cred, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(cred, shacl_validator)
         assert conforms, (
             f"Valid {example_file} should conform but got {len(violations)} "
             f"violation(s):\n{_format_violations(violations)}\n\n"
@@ -421,13 +408,12 @@ class TestMissingMandatoryFields:
         field_path,
         expected_path,
         test_id,
-        context_url_map,
-        shacl_graph,
+        shacl_validator,
     ):
         cred = _load_example(example_file)
         mutated = _remove_field(cred, *field_path)
 
-        conforms, violations, text = _validate(mutated, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(mutated, shacl_validator)
 
         # Must not conform
         assert not conforms, (
@@ -524,13 +510,12 @@ class TestWrongTypes:
         mutate_fn,
         expected_constraint,
         test_id,
-        context_url_map,
-        shacl_graph,
+        shacl_validator,
     ):
         cred = _load_example(example_file)
         mutated = mutate_fn(cred)
 
-        conforms, violations, text = _validate(mutated, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(mutated, shacl_validator)
 
         assert not conforms, (
             f"[{test_id}] Credential with wrong type should FAIL "
@@ -596,8 +581,7 @@ class TestClosedShapeViolations:
         field_name,
         field_value,
         test_id,
-        context_url_map,
-        shacl_graph,
+        shacl_validator,
     ):
         cred = _load_example(example_file)
 
@@ -608,7 +592,7 @@ class TestClosedShapeViolations:
         else:
             mutated = _add_field(cred, field_name, field_value)
 
-        conforms, violations, text = _validate(mutated, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(mutated, shacl_validator)
 
         assert not conforms, (
             f"[{test_id}] Credential with unexpected property should FAIL "
@@ -641,7 +625,7 @@ class TestCardinalityViolations:
     values must trigger a MaxCountConstraintComponent.
     """
 
-    def test_multiple_issuers(self, context_url_map, shacl_graph):
+    def test_multiple_issuers(self, shacl_validator):
         """Two issuers should violate sh:maxCount 1."""
         cred = _load_example("legal-person-credential.json")
         # JSON-LD doesn't naturally support duplicate keys, but we can
@@ -651,13 +635,13 @@ class TestCardinalityViolations:
             ["did:ethr:0x14a34:0xaaaa", "did:ethr:0x14a34:0xbbbb"],
             "issuer",
         )
-        conforms, violations, text = _validate(mutated, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(mutated, shacl_validator)
         assert not conforms, (
             "Two issuers should violate maxCount but SHACL said it conforms.\n"
             f"Full report:\n{text}"
         )
 
-    def test_multiple_valid_from(self, context_url_map, shacl_graph):
+    def test_multiple_valid_from(self, shacl_validator):
         """Two validFrom dates should violate sh:maxCount 1."""
         cred = _load_example("natural-person-credential.json")
         mutated = _set_field(
@@ -665,13 +649,13 @@ class TestCardinalityViolations:
             ["2025-01-15T00:00:00Z", "2025-06-01T00:00:00Z"],
             "validFrom",
         )
-        conforms, violations, text = _validate(mutated, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(mutated, shacl_validator)
         assert not conforms, (
             "Two validFrom values should violate maxCount but SHACL said it conforms.\n"
             f"Full report:\n{text}"
         )
 
-    def test_multiple_label_levels(self, context_url_map, shacl_graph):
+    def test_multiple_label_levels(self, shacl_validator):
         """Two labelLevel values should violate sh:maxCount 1."""
         cred = _load_example("legal-person-credential.json")
         mutated = _set_field(
@@ -680,7 +664,7 @@ class TestCardinalityViolations:
             "credentialSubject",
             "harbour.gx:labelLevel",
         )
-        conforms, violations, text = _validate(mutated, context_url_map, shacl_graph)
+        conforms, violations, text = _validate(mutated, shacl_validator)
         assert not conforms, (
             "Two labelLevel values should violate maxCount "
             f"but SHACL said it conforms.\nFull report:\n{text}"

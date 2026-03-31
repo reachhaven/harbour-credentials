@@ -7,7 +7,6 @@
   ],
   "type": [
     "VerifiableCredential",
-    "harbour:VerifiableCredential",
     "harbour.delegate:SigningReceipt"
   ],
   "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
@@ -29,7 +28,6 @@
   "evidence": [
     {
       "type": [
-        "harbour:Evidence",
         "harbour:SignatureEvidence"
       ],
       "verifiablePresentation": {
