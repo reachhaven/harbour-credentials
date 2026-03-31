@@ -51,6 +51,8 @@ SD_JWT_SEPARATOR = "~"
 DELEGATED_EVIDENCE_TYPES = {
     "DelegatedSignatureEvidence",
     "harbour:DelegatedSignatureEvidence",
+    "harbour:SignatureEvidence",
+    "harbour.delegate:SignatureEvidence",
 }
 
 

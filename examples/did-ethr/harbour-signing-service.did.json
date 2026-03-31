@@ -47,7 +47,7 @@
   "service": [
     {
       "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#service-1",
-      "type": "TrustAnchorService",
+      "type": "harbour:TrustAnchorService",
       "didcore:serviceEndpoint": {
         "type": "schema:Organization",
         "name": "Haven Trust Anchor",
@@ -56,9 +56,9 @@
     },
     {
       "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#service-2",
-      "type": "CRSetRevocationRegistryService",
+      "type": "harbour:CRSetRevocationRegistryService",
       "didcore:serviceEndpoint": {
-        "type": "CRSetServiceEndpoint",
+        "type": "harbour:CRSetServiceEndpoint",
         "registryEndpoint": "https://resolver.harbour.id/crset/"
       }
     }

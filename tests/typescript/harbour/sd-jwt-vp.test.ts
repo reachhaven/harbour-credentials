@@ -124,7 +124,7 @@ describe("issueSdJwtVp", () => {
     const audience = "did:ethr:0x14a34:0xab645824d16971b89a2243f21881864ad57b9166";
     const evidence = [
       {
-        type: "DelegatedSignatureEvidence",
+        type: "harbour:SignatureEvidence",
         transaction_data: {
           type: "harbour.delegate:data.purchase",
           credential_ids: ["harbour_natural_person"],
@@ -155,7 +155,7 @@ describe("issueSdJwtVp", () => {
 
     expect(vpPayload.vp.evidence).toHaveLength(1);
     expect(vpPayload.vp.evidence[0].type).toBe(
-      "DelegatedSignatureEvidence"
+      "harbour:SignatureEvidence"
     );
     expect(vpPayload.vp.evidence[0].challenge).toBe(expectedChallenge);
     expect(vpPayload.nonce).toBe(txNonce);
@@ -167,7 +167,7 @@ describe("issueSdJwtVp", () => {
   it("keeps delegated evidence transaction_data unchanged", async () => {
     const evidence = [
       {
-        type: "DelegatedSignatureEvidence",
+        type: "harbour:SignatureEvidence",
         transaction_data: {
           type: "harbour.delegate:data.purchase",
           credential_ids: ["default"],
@@ -253,7 +253,7 @@ describe("verifySdJwtVp", () => {
   it("returns evidence", async () => {
     const evidence = [
       {
-        type: "DelegatedSignatureEvidence",
+        type: "harbour:SignatureEvidence",
         transaction_data: {
           type: "harbour.delegate:blockchain.approve",
           credential_ids: ["default"],
@@ -268,14 +268,14 @@ describe("verifySdJwtVp", () => {
     const result = await verifySdJwtVp(vp, issuerPublic, holderPublic);
 
     expect(result.evidence).toHaveLength(1);
-    expect(result.evidence![0].type).toBe("DelegatedSignatureEvidence");
+    expect(result.evidence![0].type).toBe("harbour:SignatureEvidence");
   });
 
   it("fails when transaction_data_hashes is tampered", async () => {
     const nonce = "tx-hash-nonce";
     const evidence = [
       {
-        type: "DelegatedSignatureEvidence",
+        type: "harbour:SignatureEvidence",
         transaction_data: {
           type: "harbour.delegate:data.purchase",
           credential_ids: ["default"],
@@ -330,7 +330,7 @@ describe("verifySdJwtVp", () => {
     const vp = await issueSdJwtVp(sampleSdJwtVc, holderPrivate, {
       evidence: [
         {
-          type: "DelegatedSignatureEvidence",
+          type: "harbour:SignatureEvidence",
           transaction_data: {
             type: "harbour.delegate:data.purchase",
             credential_ids: ["default"],

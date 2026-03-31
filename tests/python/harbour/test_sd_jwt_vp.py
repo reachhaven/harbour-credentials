@@ -158,7 +158,7 @@ class TestIssueSDJWTVP:
 
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["harbour_natural_person"],
@@ -192,7 +192,7 @@ class TestIssueSDJWTVP:
         assert "vp" in vp_payload
         assert "evidence" in vp_payload["vp"]
         assert len(vp_payload["vp"]["evidence"]) == 1
-        assert vp_payload["vp"]["evidence"][0]["type"] == "DelegatedSignatureEvidence"
+        assert vp_payload["vp"]["evidence"][0]["type"] == "harbour:SignatureEvidence"
         assert vp_payload["vp"]["evidence"][0]["challenge"] == expected_challenge
         assert vp_payload["nonce"] == tx_nonce
         assert vp_payload["aud"] == audience
@@ -204,7 +204,7 @@ class TestIssueSDJWTVP:
         holder_private, _ = holder_keypair
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["default"],
@@ -329,7 +329,7 @@ class TestVerifySDJWTVP:
 
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:blockchain.approve",
                     "credential_ids": ["default"],
@@ -350,7 +350,7 @@ class TestVerifySDJWTVP:
 
         assert "evidence" in result
         assert len(result["evidence"]) == 1
-        assert result["evidence"][0]["type"] == "DelegatedSignatureEvidence"
+        assert result["evidence"][0]["type"] == "harbour:SignatureEvidence"
 
     def test_verify_fails_transaction_hash_mismatch(
         self, sample_sd_jwt_vc, issuer_keypair, holder_keypair
@@ -362,7 +362,7 @@ class TestVerifySDJWTVP:
 
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["default"],
@@ -421,7 +421,7 @@ class TestVerifySDJWTVP:
 
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:data.purchase",
                     "credential_ids": ["default"],
@@ -561,7 +561,7 @@ class TestDelegatedSigningFlow:
 
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": transaction_data,
                 "delegatedTo": signing_service_did,
             }
@@ -605,7 +605,7 @@ class TestDelegatedSigningFlow:
         # Evidence should contain transaction data
         assert len(result["evidence"]) == 1
         ev = result["evidence"][0]
-        assert ev["type"] == "DelegatedSignatureEvidence"
+        assert ev["type"] == "harbour:SignatureEvidence"
         assert ev["transaction_data"]["type"] == "harbour.delegate:data.purchase"
         assert ev["transaction_data"]["nonce"] == consent_nonce
         assert ev["challenge"] == create_delegation_challenge(
@@ -638,7 +638,7 @@ class TestDelegatedSigningFlow:
         # Create VP with no PII disclosed
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:blockchain.transfer",
                     "credential_ids": ["default"],
@@ -661,7 +661,7 @@ class TestDelegatedSigningFlow:
         result = verify_sd_jwt_vp(vp, issuer_public, holder_public)
 
         # Can verify consent happened
-        assert result["evidence"][0]["type"] == "DelegatedSignatureEvidence"
+        assert result["evidence"][0]["type"] == "harbour:SignatureEvidence"
 
         # Can see authorized role
         assert result["credential"]["publicRole"] == "Authorized Purchaser"
@@ -718,7 +718,7 @@ class TestEdgeCases:
 
         evidence = [
             {
-                "type": "DelegatedSignatureEvidence",
+                "type": "harbour:SignatureEvidence",
                 "transaction_data": {
                     "type": "harbour.delegate:data.share",
                     "credential_ids": ["default"],
@@ -727,7 +727,7 @@ class TestEdgeCases:
                     "txn": {"resource_id": "asset:xyz"},
                 },
             },
-            {"type": "CredentialEvidence", "verifiablePresentation": "eyJ..."},
+            {"type": "harbour:CredentialEvidence", "verifiablePresentation": "eyJ..."},
         ]
 
         vp = issue_sd_jwt_vp(

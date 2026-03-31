@@ -180,15 +180,15 @@ class TestProcessExample:
         # Verify outer VC JWT
         vc_jwt = jwt_path.read_text().strip()
         vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour:DelegatedSigningReceipt" in vc_payload["type"]
+        assert "harbour.delegate:SigningReceipt" in vc_payload["type"]
 
         # Evidence should contain DelegatedSignatureEvidence with transaction_data
         evidence = vc_payload["evidence"][0]
         ev_type = evidence["type"]
         if isinstance(ev_type, list):
-            assert "DelegatedSignatureEvidence" in ev_type
+            assert "harbour:SignatureEvidence" in ev_type
         else:
-            assert ev_type == "DelegatedSignatureEvidence"
+            assert ev_type == "harbour:SignatureEvidence"
         assert "transaction_data" in evidence
         assert evidence["transaction_data"]["type"] == "harbour.delegate:data.purchase"
         assert (

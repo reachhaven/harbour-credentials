@@ -117,7 +117,7 @@ def test_has_credential_status(credential_file):
         f"Missing credentialStatus in {credential_file.name}"
     )
     for entry in status:
-        assert entry.get("type") == "CRSetEntry"
+        assert entry.get("type") == "harbour:CRSetEntry"
         assert "statusPurpose" in entry
 
 
@@ -266,10 +266,10 @@ class TestHarbourShaclShapes:
     def test_shacl_has_base_shapes(self):
         content = HARBOUR_SHACL_PATH.read_text()
         expected_shapes = [
-            "harbour:HarbourCredential",
+            "harbour:Credential",
             "harbour:CRSetEntry",
             "harbour:CredentialEvidence",
-            "harbour:DelegatedSignatureEvidence",
+            "harbour:SignatureEvidence",
         ]
         for shape in expected_shapes:
             assert f"{shape} a sh:NodeShape" in content, (
@@ -277,10 +277,10 @@ class TestHarbourShaclShapes:
             )
 
     def test_harbour_credential_shape_has_issuer(self):
-        """HarbourCredential shape must include cred:issuer as required."""
+        """Credential shape must include cred:issuer as required."""
         content = HARBOUR_SHACL_PATH.read_text()
-        marker = "harbour:HarbourCredential a sh:NodeShape"
-        assert marker in content, "Missing shape for HarbourCredential"
+        marker = "harbour:Credential a sh:NodeShape"
+        assert marker in content, "Missing shape for harbour:Credential"
         shape_start = content.index(marker)
         next_shape = content.find("\n\n", shape_start + 1)
         if next_shape == -1:
@@ -293,8 +293,11 @@ class TestHarbourShaclShapes:
     def test_evidence_shapes_require_verifiable_presentation(self):
         """Evidence shapes must require verifiablePresentation."""
         content = HARBOUR_SHACL_PATH.read_text()
-        for ev_type in ["CredentialEvidence", "DelegatedSignatureEvidence"]:
-            marker = f"harbour:{ev_type} a sh:NodeShape"
+        for ev_ns, ev_type in [
+            ("harbour", "CredentialEvidence"),
+            ("harbour", "SignatureEvidence"),
+        ]:
+            marker = f"{ev_ns}:{ev_type} a sh:NodeShape"
             shape_start = content.index(marker)
             next_shape = content.find("\n\n", shape_start + 1)
             if next_shape == -1:
