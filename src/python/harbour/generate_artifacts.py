@@ -116,6 +116,16 @@ def main() -> None:
         if isinstance(ctx_obj, dict) and "type" not in ctx_obj:
             ctx_obj["type"] = "@type"
 
+        # Fix rdf:JSON → @json in context entries.
+        # LinkML generates "@type": "rdf:JSON" for JsonLiteral ranges, but
+        # JSON-LD processors require the "@json" keyword to parse values as
+        # JSON literals. Without this fix, rdflib expands the value as a
+        # blank node instead of an rdf:JSON literal.
+        if isinstance(ctx_obj, dict):
+            for key, val in ctx_obj.items():
+                if isinstance(val, dict) and val.get("@type") == "rdf:JSON":
+                    val["@type"] = "@json"
+
         ctx_data["@context"] = ctx_obj
         ctx_text = json.dumps(ctx_data, indent=3, ensure_ascii=False)
 
