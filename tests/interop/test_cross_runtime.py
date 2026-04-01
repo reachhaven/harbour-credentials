@@ -1,7 +1,9 @@
 """Cross-runtime interop tests: Python signs → Node.js verifies (and vice versa)."""
 
 import json
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -21,40 +23,44 @@ KEYS_DIR = FIXTURES_DIR / "keys"
 TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
 
-def _can_run_node_jose() -> bool:
-    """Check whether yarn-managed Node can import jose in the TS workspace."""
+_YARN = shutil.which("yarn") or "yarn"
+
+
+def _run_node(script: str) -> str:
+    """Run a Node.js ESM script via a temp file (avoids cmd.exe arg mangling on Windows)."""
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".mjs", dir=str(TS_DIR), delete=False,
+    ) as f:
+        f.write(script)
+        tmp = Path(f.name)
     try:
         result = subprocess.run(
-            ["yarn", "node", "--input-type=module", "-e", 'import "jose";'],
+            [_YARN, "node", str(tmp)],
             capture_output=True,
             text=True,
             cwd=str(TS_DIR),
             timeout=30,
         )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        if result.returncode != 0:
+            raise RuntimeError(f"Node.js error:\n{result.stderr}")
+        return result.stdout.strip()
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _can_run_node_jose() -> bool:
+    """Check whether yarn-managed Node can import jose in the TS workspace."""
+    try:
+        return _run_node('import "jose"; console.log("OK");') == "OK"
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError, RuntimeError):
         return False
 
 
 # Skip if TypeScript runtime dependencies are unavailable
 pytestmark = pytest.mark.skipif(
     not _can_run_node_jose(),
-    reason="TypeScript runtime dependencies unavailable (run 'make ts-bootstrap').",
+    reason="TypeScript runtime dependencies unavailable (run 'make setup ts').",
 )
-
-
-def _run_node(script: str) -> str:
-    """Run a Node.js script and return its stdout."""
-    result = subprocess.run(
-        ["yarn", "node", "--input-type=module", "-e", script],
-        capture_output=True,
-        text=True,
-        cwd=str(TS_DIR),
-        timeout=30,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Node.js error:\n{result.stderr}")
-    return result.stdout.strip()
 
 
 class TestPythonSignNodeVerify:
