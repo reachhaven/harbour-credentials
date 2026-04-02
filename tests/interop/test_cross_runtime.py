@@ -29,7 +29,10 @@ _YARN = shutil.which("yarn") or "yarn"
 def _run_node(script: str) -> str:
     """Run a Node.js ESM script via a temp file (avoids cmd.exe arg mangling on Windows)."""
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".mjs", dir=str(TS_DIR), delete=False,
+        mode="w",
+        suffix=".mjs",
+        dir=str(TS_DIR),
+        delete=False,
     ) as f:
         f.write(script)
         tmp = Path(f.name)
