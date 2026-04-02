@@ -563,13 +563,13 @@ _story_sign:
 	$(call check_dev_setup)
 	@echo "Signing Harbour example storylines..."
 	@rm -rf examples/signed examples/gaiax/signed
-	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.example_signer examples/
+	@PYTHONIOENCODING=utf-8 PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.example_signer examples/
 	@echo "OK: Signed example artifacts written to ignored signed/ directories"
 
 _story_verify:
 	$(call check_dev_setup)
 	@echo "Verifying Harbour signed example storylines..."
-	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.verify_signed_examples
+	@PYTHONIOENCODING=utf-8 PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.verify_signed_examples
 	@echo "OK: Signed Harbour example artifacts verified"
 
 _story_default:
