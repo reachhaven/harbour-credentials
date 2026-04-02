@@ -16,6 +16,20 @@ repos:
         types: [python]
         pass_filenames: true
 
+      - id: jsonld-lint
+        name: JSON-LD Parser
+        entry: python -c "import json, sys; [json.load(open(f)) for f in sys.argv[1:]]"
+        language: system
+        files: \.(json|jsonld)$
+        pass_filenames: true
+
+      - id: turtle-lint
+        name: Turtle Parser
+        entry: python -c "import sys; from rdflib import Graph; [Graph().parse(f, format='turtle') for f in sys.argv[1:]]"
+        language: system
+        files: \.ttl$
+        pass_filenames: true
+
   - repo: https://github.com/DavidAnson/markdownlint-cli2
     rev: v0.17.2
     hooks:

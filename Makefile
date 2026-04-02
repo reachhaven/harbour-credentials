@@ -1,7 +1,7 @@
 # Harbour Credentials Makefile
 # ============================
 
-.PHONY: setup install generate validate lint format test build story all clean help \
+.PHONY: setup install generate validate lint format test build story check all clean help \
 	release-artifacts \
 	_help_general _help_setup _help_install _help_validate _help_lint _help_format _help_test _help_story _help_build \
 	_setup_default _setup_submodules _setup_ts _install_default _install_dev \
@@ -84,7 +84,7 @@ define check_dev_setup
 		echo ""; \
 		exit 1; \
 	fi
-	@if ! "$(PYTHON)" -c "import linkml" 2>/dev/null; then \
+	@if ! "$(PYTHON)" -c "import linkml, harbour" 2>/dev/null; then \
 		echo ""; \
 		echo "ERROR: Dev dependencies not installed."; \
 		echo ""; \
@@ -495,8 +495,8 @@ test:
 
 _test_default:
 	$(call check_dev_setup)
-	@echo "Running Python tests..."
-	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" $(PYTEST) tests/ -v
+	@echo "Running Python tests (excluding interop — use 'make test full' for all)..."
+	@PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" $(PYTEST) tests/ -v --ignore=tests/interop
 	@echo "OK: Python tests complete"
 
 # Run tests with coverage
@@ -600,11 +600,18 @@ release-artifacts: ## Copy artifacts to w3id directory structure for GitHub Page
 	@echo "OK: Artifacts prepared in $(RELEASE_DIR)/"
 
 # Compound targets
+check:
+	@echo "Running check pipeline (generate + validate)..."
+	@"$(MAKE)" --no-print-directory generate
+	@"$(MAKE)" --no-print-directory validate
+	@echo "OK: Check pipeline complete"
+
 all:
-	@echo "Running default quality pipeline (lint + test)..."
+	@echo "Running full quality pipeline (lint + check + test)..."
 	@"$(MAKE)" --no-print-directory lint
+	@"$(MAKE)" --no-print-directory check
 	@"$(MAKE)" --no-print-directory test
-	@echo "OK: Default quality pipeline complete"
+	@echo "OK: Full quality pipeline complete"
 
 # Run all tests (Python + TypeScript)
 _test_all:
