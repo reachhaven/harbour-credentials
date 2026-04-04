@@ -111,6 +111,16 @@ jobs:
           make setup
           python3 -m pip install -e ".[docs]"
 
+      - name: Generate artifacts
+        env:
+          CI: "1"
+        run: make generate
+
+      - name: Validate artifacts
+        env:
+          CI: "1"
+        run: make validate shacl
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
