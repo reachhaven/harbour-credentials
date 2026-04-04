@@ -32,6 +32,10 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
+exclude_docs: |
+  specs/references/did-webs-spec.md
+  specs/references/keri-draft.md
+
 plugins:
   - search
   - mkdocstrings:
