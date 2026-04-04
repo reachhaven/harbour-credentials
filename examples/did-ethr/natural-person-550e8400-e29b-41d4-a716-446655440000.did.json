@@ -1,0 +1,32 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "JsonWebKey": "https://w3id.org/security#JsonWebKey",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129#controller",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "tKjHMweiTEmNdgXye76UgmVSMA7mg5lsdZeav2alTyY",
+        "y": "lI83pcZ5BeUmOdrmLgx0KJ0DTbpcTC320WoryselneU"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129#controller"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129#controller"
+  ]
+}

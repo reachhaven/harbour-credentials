@@ -26,17 +26,16 @@ dependencies = [
     "joserfc>=1.0.0",
     "cryptography>=44.0.0",
     "base58>=2.1.0",
-    "sd-jwt>=0.10.0",
+    "pycryptodome>=3.20",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "black==25.12.0",
-    "flake8==7.1.2",
-    "isort==7.0.0",
+    "ruff>=0.15.0",
     "pre-commit==4.5.1",
     "pytest>=8.0.0",
     "pytest-cov>=6.0",
+    "rdflib>=7.0.0",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -54,23 +53,17 @@ Issues = "https://github.com/reachhaven/harbour-credentials/issues"
 where = ["src/python"]
 include = ["harbour*", "credentials*"]
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ["py312"]
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | build
-  | dist
-  | node_modules
-)/
-'''
+target-version = "py312"
+exclude = [".git", ".venv", "build", "dist", "node_modules"]
 
-[tool.isort]
-profile = "black"
-line_length = 88
-skip = [".git", ".venv", "build", "dist", "node_modules"]
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E203", "E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["harbour", "credentials"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

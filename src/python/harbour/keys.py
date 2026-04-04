@@ -134,6 +134,36 @@ def p256_public_key_to_did_key(public_key: EllipticCurvePublicKey) -> str:
     return f"did:key:{mb}"
 
 
+def p256_public_key_to_eth_address(public_key: EllipticCurvePublicKey) -> str:
+    """Derive an Ethereum-style address from a P-256 public key.
+
+    Uses keccak256(uncompressed_point[1:])[-20:], mirroring how Ethereum
+    derives addresses from secp256k1 keys.  In production, did:ethr
+    addresses are keyless (IdentityController + CREATE2), but this
+    deterministic derivation is useful for self-contained test fixtures.
+    """
+    from Crypto.Hash import keccak
+
+    uncompressed = public_key.public_bytes(
+        Encoding.X962, PublicFormat.UncompressedPoint
+    )
+    digest = keccak.new(digest_bits=256, data=uncompressed[1:]).digest()
+    return "0x" + digest[-20:].hex()
+
+
+def p256_public_key_to_did_ethr(
+    public_key: EllipticCurvePublicKey,
+    chain_id: str = "0x14a34",
+) -> str:
+    """Derive a did:ethr identifier from a P-256 public key.
+
+    Combines ``p256_public_key_to_eth_address`` with the did:ethr format.
+    Default chain_id ``0x14a34`` is Base testnet (84532).
+    """
+    addr = p256_public_key_to_eth_address(public_key)
+    return f"did:ethr:{chain_id}:{addr}"
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

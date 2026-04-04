@@ -1,0 +1,40 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/reachhaven/harbour/core/v1/",
+    {
+      "JsonWebKey": "https://w3id.org/security#JsonWebKey",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774#controller",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "XHiins22glZnQ_fFRbt1biH1-0IUj2gpl0jbaUxe1Cc",
+        "y": "jW9z3Tz4x1ontNTdV3apbP3e8odM3ln9BHyu0zndRM8"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774#controller"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774#controller"
+  ],
+  "service": [
+    {
+      "id": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774#service-1",
+      "type": "harbour:LinkedCredentialService",
+      "serviceEndpoint": "https://reachhaven.com/.well-known/credentials/trust-anchor.jwt"
+    }
+  ]
+}

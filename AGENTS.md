@@ -8,11 +8,11 @@ Read these before making changes; they are authoritative for repo workflows.
 | ------------------ | ------------------------------------------------------------------ |
 | Agent instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
 | Documentation      | [README.md](README.md)                                             |
-| Docs               | [docs/README.md](docs/README.md)                                   |
+| Architecture       | [docs/architecture.md](docs/architecture.md)                       |
 
 ## Project Structure
 
-```
+```text
 src/
 ├── python/
 │   ├── harbour/        # Crypto library (sign, verify, keys, sd-jwt, kb-jwt, x509)
@@ -34,23 +34,23 @@ tests/
 ```bash
 # Install dev dependencies
 make setup
-make install-dev
+make install dev
 
 # Run all tests (Python + TypeScript)
-make test-all
+make test full
 
 # Run Python tests only
 make test
 
 # Run TypeScript tests only
-make test-ts
+make test ts
 
 # Lint and format
 make lint
 make format
 
 # Build TypeScript
-make build-ts
+make build
 ```
 
 ## Git Commit & Pull Request Policy
@@ -70,7 +70,10 @@ git commit -s -S -m "feat(harbour): add KB-JWT verification"
 
 ### Preparing Commits and Pull Requests
 
-When instructed to prepare a commit or PR, **do not commit directly**. Instead:
+When instructed to prepare a commit or PR, default to preparing the `.playground`
+files first. After **explicit human confirmation in the current session**, the
+agent may directly create the signed commit, push the branch, and open the PR
+using the prepared `.playground` content. Otherwise:
 
 1. Create the `.playground/` directory (already in `.gitignore`)
 2. Generate two markdown files:
@@ -78,7 +81,9 @@ When instructed to prepare a commit or PR, **do not commit directly**. Instead:
    - `.playground/pr-description.md` — PR description following the repository's PR template
 
 The human operator will review these files and either:
-- Use them to manually commit/push and create a PR, or
+
+- Use them to manually commit/push and create a PR,
+- Ask the agent to perform the signed commit/push/PR flow directly after explicit confirmation, or
 - Use automated tooling with signed commits (`git commit -s -S`)
 
 ### Commit Message Format
@@ -114,17 +119,45 @@ Brief description of the changes.
 ## Testing
 
 - [ ] Python tests pass (`make test`)
-- [ ] TypeScript tests pass (`make test-ts`)
-- [ ] All tests pass (`make test-all`)
+- [ ] TypeScript tests pass (`make test ts`)
+- [ ] All tests pass (`make test full`)
 
 ## Related Issues
 
 Closes #42
 ```
 
+## Standards Compliance
+
+**STRICT REQUIREMENT — all schemas, examples, and models must align with the
+relevant W3C, IETF, and industry specifications.**
+
+When defining or modifying LinkML schemas, JSON-LD examples, or DID documents:
+
+1. **Cross-reference the spec copy in `docs/`.**  The LinkML schema files use
+   bracketed tags (e.g. `[VCDM2]`, `[DID Core]`, `[OID4VP]`, `[SD-JWT]`) that
+   cite specific spec sections.  Before changing a slot range, class hierarchy,
+   or property definition, locate the corresponding spec document in `docs/`
+   and verify the modeling choice against the normative text.
+2. **Document the rationale in the schema.**  Every non-trivial modeling
+   decision must have a YAML comment citing the spec section and briefly
+   explaining *why* the chosen type/range/constraint is correct.
+3. **Use standard vocabulary** (DID Core, VC Data Model 2.0, OID4VP, schema.org,
+   Gaia-X Trust Framework) rather than inventing new terms.
+4. **Never use `range: Any`** in LinkML slot definitions.  `linkml:Any` produces
+   `rdfs:range linkml:Any` in OWL, which triggers closed-shape SHACL violations
+   during RDFS inference.  Always choose a spec-aligned range:
+   - `uri` for properties whose values are network addresses or identifiers
+     (e.g. DID Core `serviceEndpoint`)
+   - A named class for structured objects with a defined schema
+     (e.g. OID4VP `TransactionData`)
+5. **Validate examples against SHACL** (`make validate`) to catch inference
+   issues before they reach CI.
+
 ## Coding Style
 
 ### Python
+
 - Python 3.12+ with type hints on public APIs
 - Use `pathlib.Path` (not `os.path`)
 - 4-space indentation
@@ -132,10 +165,11 @@ Closes #42
 - Run `make lint` before committing
 
 ### TypeScript
+
 - TypeScript 5.x with strict mode
 - Use async/await for crypto operations
 - Export types alongside functions
-- Run `make lint-ts` before committing
+- Run `make lint ts` before committing
 
 ## Module CLI Requirements
 

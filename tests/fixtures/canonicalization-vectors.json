@@ -1,0 +1,122 @@
+{
+  "description": "Shared test vectors for cross-runtime canonicalization. Python json.dumps(sort_keys=True, separators=(',',':')) sorts ALL keys recursively. TypeScript must match this exactly.",
+  "vectors": [
+    {
+      "name": "data.purchase \u2014 minimal required fields",
+      "input": {
+        "type": "harbour.delegate:data.purchase",
+        "credential_ids": [
+          "harbour_natural_person"
+        ],
+        "transaction_data_hashes_alg": [
+          "sha-256"
+        ],
+        "nonce": "da9b1009",
+        "iat": 1771934400,
+        "txn": {
+          "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+          "price": "100",
+          "currency": "ENVITED",
+          "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"harbour_natural_person\"],\"iat\":1771934400,\"nonce\":\"da9b1009\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"asset_id\":\"urn:uuid:550e8400-e29b-41d4-a716-446655440000\",\"currency\":\"ENVITED\",\"marketplace\":\"did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c\",\"price\":\"100\"},\"type\":\"harbour.delegate:data.purchase\"}",
+      "sha256_hash": "c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
+      "challenge": "da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
+      "transaction_data_param": "eyJjcmVkZW50aWFsX2lkcyI6WyJoYXJib3VyX25hdHVyYWxfcGVyc29uIl0sImlhdCI6MTc3MTkzNDQwMCwibm9uY2UiOiJkYTliMTAwOSIsInRyYW5zYWN0aW9uX2RhdGFfaGFzaGVzX2FsZyI6WyJzaGEtMjU2Il0sInR4biI6eyJhc3NldF9pZCI6InVybjp1dWlkOjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCIsImN1cnJlbmN5IjoiRU5WSVRFRCIsIm1hcmtldHBsYWNlIjoiZGlkOmV0aHI6MHgxNGEzNDoweDg5ZmU1ZTdmNTA2ZDk5MmY3NmJjYmEzMDk3NzNjMGVlM2VlNjAzOWMiLCJwcmljZSI6IjEwMCJ9LCJ0eXBlIjoiaGFyYm91ci5kZWxlZ2F0ZTpkYXRhLnB1cmNoYXNlIn0",
+      "transaction_data_param_hash": "iLNAGDcp7egLLCTrab_aLdRTUuGVqd1rhHnL8hXU5KI"
+    },
+    {
+      "name": "contract.sign \u2014 with optional exp and description",
+      "input": {
+        "type": "harbour.delegate:contract.sign",
+        "credential_ids": [
+          "org_credential"
+        ],
+        "transaction_data_hashes_alg": [
+          "sha-256"
+        ],
+        "nonce": "ab12cd34",
+        "iat": 1771934400,
+        "exp": 1771935300,
+        "description": "Sign partnership agreement",
+        "txn": {
+          "document_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "parties": [
+            "did:ethr:0x14a34:0x9b280b503a94d1e43ebd8ee2549236c00748dace",
+            "did:ethr:0x14a34:0x87fdc0cc3b127f964d7651b0d55362663104b892"
+          ]
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"org_credential\"],\"description\":\"Sign partnership agreement\",\"exp\":1771935300,\"iat\":1771934400,\"nonce\":\"ab12cd34\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"document_hash\":\"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"parties\":[\"did:ethr:0x14a34:0x9b280b503a94d1e43ebd8ee2549236c00748dace\",\"did:ethr:0x14a34:0x87fdc0cc3b127f964d7651b0d55362663104b892\"]},\"type\":\"harbour.delegate:contract.sign\"}",
+      "sha256_hash": "573cc3da4d63242b2d8b950b29507b9b1e414d9330d3bb245ce7fb264b259601",
+      "challenge": "ab12cd34 HARBOUR_DELEGATE 573cc3da4d63242b2d8b950b29507b9b1e414d9330d3bb245ce7fb264b259601",
+      "transaction_data_param": "eyJjcmVkZW50aWFsX2lkcyI6WyJvcmdfY3JlZGVudGlhbCJdLCJkZXNjcmlwdGlvbiI6IlNpZ24gcGFydG5lcnNoaXAgYWdyZWVtZW50IiwiZXhwIjoxNzcxOTM1MzAwLCJpYXQiOjE3NzE5MzQ0MDAsIm5vbmNlIjoiYWIxMmNkMzQiLCJ0cmFuc2FjdGlvbl9kYXRhX2hhc2hlc19hbGciOlsic2hhLTI1NiJdLCJ0eG4iOnsiZG9jdW1lbnRfaGFzaCI6InNoYTI1NjplM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1IiwicGFydGllcyI6WyJkaWQ6ZXRocjoweDE0YTM0OjB4OWIyODBiNTAzYTk0ZDFlNDNlYmQ4ZWUyNTQ5MjM2YzAwNzQ4ZGFjZSIsImRpZDpldGhyOjB4MTRhMzQ6MHg4N2ZkYzBjYzNiMTI3Zjk2NGQ3NjUxYjBkNTUzNjI2NjMxMDRiODkyIl19LCJ0eXBlIjoiaGFyYm91ci5kZWxlZ2F0ZTpjb250cmFjdC5zaWduIn0",
+      "transaction_data_param_hash": "OYAKkGIz-uN1FqyqSz9BtJjiqJcYnRZFwl9NhqLVSFE"
+    },
+    {
+      "name": "blockchain.transfer \u2014 nested txn verifies recursive sort",
+      "input": {
+        "type": "harbour.delegate:blockchain.transfer",
+        "credential_ids": [
+          "default"
+        ],
+        "nonce": "ef567890",
+        "iat": 1771934400,
+        "transaction_data_hashes_alg": [
+          "sha-256"
+        ],
+        "txn": {
+          "chain": "eip155:42793",
+          "amount": "1000000000000000000",
+          "recipient": "0xabcdef1234567890",
+          "contract": "0x1234567890abcdef"
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"default\"],\"iat\":1771934400,\"nonce\":\"ef567890\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"amount\":\"1000000000000000000\",\"chain\":\"eip155:42793\",\"contract\":\"0x1234567890abcdef\",\"recipient\":\"0xabcdef1234567890\"},\"type\":\"harbour.delegate:blockchain.transfer\"}",
+      "sha256_hash": "66d8768b6f6ae9d952f61c85414d22d504341da5d0ff0f65a45398246f1f630a",
+      "challenge": "ef567890 HARBOUR_DELEGATE 66d8768b6f6ae9d952f61c85414d22d504341da5d0ff0f65a45398246f1f630a",
+      "transaction_data_param": "eyJjcmVkZW50aWFsX2lkcyI6WyJkZWZhdWx0Il0sImlhdCI6MTc3MTkzNDQwMCwibm9uY2UiOiJlZjU2Nzg5MCIsInRyYW5zYWN0aW9uX2RhdGFfaGFzaGVzX2FsZyI6WyJzaGEtMjU2Il0sInR4biI6eyJhbW91bnQiOiIxMDAwMDAwMDAwMDAwMDAwMDAwIiwiY2hhaW4iOiJlaXAxNTU6NDI3OTMiLCJjb250cmFjdCI6IjB4MTIzNDU2Nzg5MGFiY2RlZiIsInJlY2lwaWVudCI6IjB4YWJjZGVmMTIzNDU2Nzg5MCJ9LCJ0eXBlIjoiaGFyYm91ci5kZWxlZ2F0ZTpibG9ja2NoYWluLnRyYW5zZmVyIn0",
+      "transaction_data_param_hash": "ttsN0Ul4X-87rncQAUoPJDixbyC6vNYEM67usPjv0Fg"
+    },
+    {
+      "name": "blockchain.execute \u2014 deeply nested params and booleans",
+      "input": {
+        "type": "harbour.delegate:blockchain.execute",
+        "credential_ids": [
+          "wallet_cred",
+          "org_cred"
+        ],
+        "transaction_data_hashes_alg": [
+          "sha-256"
+        ],
+        "nonce": "91af4c2e",
+        "iat": 1771934400,
+        "description": "Execute settlement",
+        "txn": {
+          "chain": "eip155:1",
+          "contract": "0x1234567890abcdef1234567890abcdef12345678",
+          "method": "settle",
+          "params": {
+            "recipient": "0xAbCdEf1234567890aBCDef1234567890abCDef12",
+            "amount": "4200000000000000000",
+            "flags": {
+              "urgent": true,
+              "gasless": false
+            },
+            "approvers": [
+              "did:ethr:0x14a34:0x081d85aa2de20b04cf2e2114b56d7a3c025f69c1",
+              "did:ethr:0x14a34:0x59404f9182101ca5c3e4b3c5dab9fb25bfa0b9ba"
+            ]
+          },
+          "value": "0"
+        }
+      },
+      "canonical_json": "{\"credential_ids\":[\"wallet_cred\",\"org_cred\"],\"description\":\"Execute settlement\",\"iat\":1771934400,\"nonce\":\"91af4c2e\",\"transaction_data_hashes_alg\":[\"sha-256\"],\"txn\":{\"chain\":\"eip155:1\",\"contract\":\"0x1234567890abcdef1234567890abcdef12345678\",\"method\":\"settle\",\"params\":{\"amount\":\"4200000000000000000\",\"approvers\":[\"did:ethr:0x14a34:0x081d85aa2de20b04cf2e2114b56d7a3c025f69c1\",\"did:ethr:0x14a34:0x59404f9182101ca5c3e4b3c5dab9fb25bfa0b9ba\"],\"flags\":{\"gasless\":false,\"urgent\":true},\"recipient\":\"0xAbCdEf1234567890aBCDef1234567890abCDef12\"},\"value\":\"0\"},\"type\":\"harbour.delegate:blockchain.execute\"}",
+      "sha256_hash": "fbe4104979d0dd72cccad71a0ebd4ea32dfeb667d096588e5d6604a23b5319ce",
+      "challenge": "91af4c2e HARBOUR_DELEGATE fbe4104979d0dd72cccad71a0ebd4ea32dfeb667d096588e5d6604a23b5319ce",
+      "transaction_data_param": "eyJjcmVkZW50aWFsX2lkcyI6WyJ3YWxsZXRfY3JlZCIsIm9yZ19jcmVkIl0sImRlc2NyaXB0aW9uIjoiRXhlY3V0ZSBzZXR0bGVtZW50IiwiaWF0IjoxNzcxOTM0NDAwLCJub25jZSI6IjkxYWY0YzJlIiwidHJhbnNhY3Rpb25fZGF0YV9oYXNoZXNfYWxnIjpbInNoYS0yNTYiXSwidHhuIjp7ImNoYWluIjoiZWlwMTU1OjEiLCJjb250cmFjdCI6IjB4MTIzNDU2Nzg5MGFiY2RlZjEyMzQ1Njc4OTBhYmNkZWYxMjM0NTY3OCIsIm1ldGhvZCI6InNldHRsZSIsInBhcmFtcyI6eyJhbW91bnQiOiI0MjAwMDAwMDAwMDAwMDAwMDAwIiwiYXBwcm92ZXJzIjpbImRpZDpldGhyOjB4MTRhMzQ6MHgwODFkODVhYTJkZTIwYjA0Y2YyZTIxMTRiNTZkN2EzYzAyNWY2OWMxIiwiZGlkOmV0aHI6MHgxNGEzNDoweDU5NDA0ZjkxODIxMDFjYTVjM2U0YjNjNWRhYjlmYjI1YmZhMGI5YmEiXSwiZmxhZ3MiOnsiZ2FzbGVzcyI6ZmFsc2UsInVyZ2VudCI6dHJ1ZX0sInJlY2lwaWVudCI6IjB4QWJDZEVmMTIzNDU2Nzg5MGFCQ0RlZjEyMzQ1Njc4OTBhYkNEZWYxMiJ9LCJ2YWx1ZSI6IjAifSwidHlwZSI6ImhhcmJvdXIuZGVsZWdhdGU6YmxvY2tjaGFpbi5leGVjdXRlIn0",
+      "transaction_data_param_hash": "fuKDy_Za4yH8EJUleXCG5WG0A-dAkY5SHqQoIQbH1-E"
+    }
+  ]
+}

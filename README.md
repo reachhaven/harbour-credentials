@@ -9,7 +9,7 @@ JOSE signing and verification library for W3C Verifiable Credentials, supporting
 - **ES256 (P-256)**: EUDI HAIP compliant algorithm
 - **EdDSA (Ed25519)**: Supported (deprecated per RFC 9864, use ES256 for production)
 - **X.509 Support**: Certificate chains via `x5c` header
-- **DID Support**: `did:key` and `did:web` resolution
+- **DID Support**: `did:key` key identifiers plus `did:ethr` subject identifiers (resolution handled by integrators)
 - **Selective Disclosure**: Native SD-JWT-VC with disclosable claims
 - **Key Binding**: KB-JWT for holder binding in presentations
 - **Harbour Credential Types**: Base credential framework with composition slots for Gaia-X compliance
@@ -28,13 +28,17 @@ Or for development:
 git clone --recurse-submodules https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 make setup
+# PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux / Git Bash
 source .venv/bin/activate
 ```
 
 > **Note:** The `--recurse-submodules` flag is required to clone the ontology-management-base and w3id.org submodules.
 >
-> `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies (`corepack enable` + `yarn install` in `src/typescript/harbour`).
-> Use `make install-dev` only if you need to refresh an existing Python environment.
+> `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies with `corepack yarn install` in `src/typescript/harbour`.
+> Use `make install dev` only if you need to refresh an existing Python environment.
 
 If you already cloned without submodules:
 
@@ -47,7 +51,7 @@ git submodule update --init --recursive --depth 1
 ```bash
 # If you already ran `make setup`, TypeScript dependencies are already bootstrapped.
 # Otherwise:
-make ts-bootstrap
+make setup ts
 ```
 
 ## Quick Start
@@ -64,7 +68,7 @@ private_key, public_key = generate_p256_keypair()
 vc = {
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiableCredential"],
-    "issuer": "did:web:example.com",
+    "issuer": "did:ethr:0x14a34:0x4ff70ba2fe8c4724a11da529381cbc391e5d8423",
     "credentialSubject": {"id": "did:example:holder", "name": "Alice"}
 }
 jwt = sign_vc_jose(vc, private_key)
@@ -89,7 +93,7 @@ const { privateKey, publicKey } = await generateP256Keypair();
 const vc = {
   "@context": ["https://www.w3.org/ns/credentials/v2"],
   type: ["VerifiableCredential"],
-  issuer: "did:web:example.com",
+  issuer: "did:ethr:0x14a34:0x4ff70ba2fe8c4724a11da529381cbc391e5d8423",
   credentialSubject: { id: "did:example:holder", name: "Alice" },
 };
 const jwt = await signVcJose(vc, privateKey);
@@ -100,13 +104,12 @@ const payload = await verifyVcJose(jwt, publicKey);
 
 ## Harbour Credential Types
 
-Harbour provides a base credential framework (`harbour.yaml`) and a Gaia-X domain layer (`gaiax-domain.yaml`) that adds participant and service offering types using a **composition pattern**:
+Harbour provides a base credential framework (`harbour-core-credential.yaml`) with **skeleton credentials** that define the minimum required structure. A Gaia-X domain layer (`harbour-gx-credential.yaml`) extends the skeletons with participant types using a **composition pattern**:
 
 | Credential Type                     | Subject Type              | Composition Slot      | Gaia-X Inner Type     |
 | ----------------------------------- | ------------------------- | --------------------- | --------------------- |
 | `harbour:LegalPersonCredential`     | `harbour:LegalPerson`     | `gxParticipant`       | `gx:LegalPerson`     |
 | `harbour:NaturalPersonCredential`   | `harbour:NaturalPerson`   | `gxParticipant`       | `gx:Participant`     |
-| `harbour:ServiceOfferingCredential` | `harbour:ServiceOffering` | `gxServiceOffering`   | `gx:ServiceOffering` |
 
 All harbour credentials require:
 
@@ -114,20 +117,20 @@ All harbour credentials require:
 - `validFrom` - Mandatory datetime
 - `credentialStatus` - At least one `harbour:CRSetEntry` for revocation support
 
-The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
+Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain extensions with `gxParticipant` live in `examples/gaiax/`. The composition pattern keeps harbour properties on the harbour-typed outer node and Gaia-X properties on a gx-typed inner blank node, so both harbour and Gaia-X SHACL shapes validate independently:
 
 ```json
 {
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
     "https://w3id.org/gaia-x/development#",
-    "https://w3id.org/reachhaven/harbour/credentials/v1/"
+    "https://w3id.org/reachhaven/harbour/core/v1/"
   ],
   "type": ["VerifiableCredential", "harbour:LegalPersonCredential"],
-  "issuer": "did:web:trust-anchor.example.com",
+  "issuer": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSubject": {
-    "id": "did:web:participant.example.com",
+    "id": "did:ethr:0x14a34:0xf7ef72f0ad8256df1a731ca0cb26230683518dab",
     "type": "harbour:LegalPerson",
     "name": "Example Corporation GmbH",
     "gxParticipant": {
@@ -146,7 +149,7 @@ The composition pattern keeps harbour properties on the harbour-typed outer node
   },
   "credentialStatus": [
     {
-      "id": "did:web:issuer.example.com:revocation#abc123",
+      "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3:services:revocation-registry#abc123",
       "type": "harbour:CRSetEntry",
       "statusPurpose": "revocation"
     }
@@ -165,17 +168,13 @@ Validate harbour credentials against SHACL shapes using the ontology-management-
 make generate
 
 # Validate examples against SHACL shapes (harbour + gx)
-make validate-shacl
+make validate shacl
 
 # Run structural validation tests
 make validate
-```
 
-### Run Tests
-
-```bash
-# Run all fixture validations via pytest
-make test
+# See validation subcommands
+make validate help
 ```
 
 ## CLI Usage
@@ -204,7 +203,7 @@ python -m harbour.x509 generate --key key.jwk --subject "Test Issuer" --output c
 
 ## Package Structure
 
-```
+```text
 src/
 ├── python/
 │   ├── harbour/           # Crypto library
@@ -215,7 +214,6 @@ src/
 │   │   ├── kb_jwt.py      # Key Binding JWT
 │   │   └── x509.py        # X.509 certificates
 │   └── credentials/       # Credential processing pipeline
-│       ├── claim_mapping.py
 │       └── example_signer.py
 └── typescript/
     └── harbour/           # Crypto library (feature parity)
@@ -230,9 +228,10 @@ submodules/
 └── w3id.org/                  # W3ID context resolution
 
 examples/
-├── legal-person-credential.json       # Harbour credential examples
+├── legal-person-credential.json       # Harbour skeleton credentials
 ├── natural-person-credential.json     # (canonical unsigned JSON-LD)
-└── service-offering-credential.json
+├── gaiax/                             # Gaia-X domain extensions
+└── did-ethr/                          # Example did:ethr DID documents used by examples
 
 tests/
 ├── fixtures/                      # Shared test fixtures
@@ -246,14 +245,12 @@ tests/
 └── typescript/harbour/            # TypeScript tests
 
 linkml/
-├── core.yaml              # Core types (id, type)
-├── harbour.yaml           # Harbour base credential framework
-└── gaiax-domain.yaml      # Gaia-X domain layer (participant/service types)
+├── harbour-core-credential.yaml   # Harbour base credential framework
+└── harbour-gx-credential.yaml    # Gaia-X domain layer (participant/service types)
 
-artifacts/                 # Generated per domain (make generate)
-├── harbour/               # Base OWL/SHACL/context
-├── gaiax-domain/          # Domain OWL/SHACL/context
-└── core/
+artifacts/                         # Generated per domain (make generate)
+├── harbour-core-credential/       # Base OWL/SHACL/context
+└── harbour-gx-credential/        # Domain OWL/SHACL/context
 ```
 
 ## Testing
@@ -262,17 +259,25 @@ artifacts/                 # Generated per domain (make generate)
 # Python tests
 make test
 
-# TypeScript tests
-cd src/typescript/harbour && yarn test
+# TypeScript tests (requires make build first)
+make build
+make test ts
 
-# Cross-runtime interop tests
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
+# Cross-runtime interop tests (requires make build first)
+make test interop
 
-# All tests with coverage
-make test-cov
+# Full pipeline: Python + SHACL conformance + TypeScript (builds TS automatically)
+make test full
+
+# Python tests with coverage
+make test cov
 
 # Lint
 make lint
+
+# See grouped subcommands
+make test help
+make story help
 ```
 
 ## Documentation

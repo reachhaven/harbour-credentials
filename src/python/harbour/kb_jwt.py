@@ -17,13 +17,14 @@ import sys
 import time
 from pathlib import Path
 
+from joserfc import jws
+
 from harbour._crypto import import_private_key as _import_private_key
 from harbour._crypto import import_public_key as _import_public_key
 from harbour._crypto import resolve_private_key_alg as _resolve_alg
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PrivateKey, PublicKeyType
 from harbour.verifier import VerificationError
-from joserfc import jws
 
 SD_JWT_SEPARATOR = "~"
 
@@ -52,10 +53,15 @@ def create_kb_jwt(
     """
     alg = _resolve_alg(holder_private_key, None)
 
-    # Compute sd_hash (SHA-256 of the issuer-jwt part)
-    issuer_jwt = sd_jwt.split(SD_JWT_SEPARATOR)[0]
+    # Compute sd_hash per RFC 9901 §4.3.1 — hash over the entire SD-JWT
+    # string before the KB-JWT: <issuer-jwt>~<disc1>~...~<discN>~
+    sd_jwt_for_hash = (
+        sd_jwt if sd_jwt.endswith(SD_JWT_SEPARATOR) else sd_jwt + SD_JWT_SEPARATOR
+    )
     sd_hash = (
-        base64.urlsafe_b64encode(hashlib.sha256(issuer_jwt.encode("ascii")).digest())
+        base64.urlsafe_b64encode(
+            hashlib.sha256(sd_jwt_for_hash.encode("ascii")).digest()
+        )
         .rstrip(b"=")
         .decode()
     )
@@ -143,8 +149,7 @@ def verify_kb_jwt(
     # Verify nonce
     if payload.get("nonce") != expected_nonce:
         raise VerificationError(
-            f"Nonce mismatch: expected {expected_nonce!r}, "
-            f"got {payload.get('nonce')!r}"
+            f"Nonce mismatch: expected {expected_nonce!r}, got {payload.get('nonce')!r}"
         )
 
     # Verify audience
@@ -154,10 +159,11 @@ def verify_kb_jwt(
             f"got {payload.get('aud')!r}"
         )
 
-    # Verify sd_hash
-    issuer_jwt = parts[0]
+    # Verify sd_hash per RFC 9901 §4.3.1 — hash over everything before KB-JWT:
+    # <issuer-jwt>~<disc1>~...~<discN>~
+    sd_jwt_part = SD_JWT_SEPARATOR.join(parts[:-1]) + SD_JWT_SEPARATOR
     expected_sd_hash = (
-        base64.urlsafe_b64encode(hashlib.sha256(issuer_jwt.encode("ascii")).digest())
+        base64.urlsafe_b64encode(hashlib.sha256(sd_jwt_part.encode("ascii")).digest())
         .rstrip(b"=")
         .decode()
     )
@@ -194,8 +200,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m harbour.kb_jwt create --sd-jwt token.txt --key key.jwk --nonce abc --audience did:web:verifier
-  python -m harbour.kb_jwt verify --sd-jwt token.txt --public-key key.jwk --nonce abc --audience did:web:verifier
+  python -m harbour.kb_jwt create --sd-jwt token.txt --key key.jwk --nonce abc --audience did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0
+  python -m harbour.kb_jwt verify --sd-jwt token.txt --public-key key.jwk --nonce abc --audience did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0
         """,
     )
 

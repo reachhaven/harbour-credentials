@@ -34,7 +34,7 @@ W3C spec for embedding cryptographic proofs inside credential JSON.
 
 W3C spec for wrapping VC Data Model 2.0 credentials in JWT/JWS or COSE.
 
-- **Format:** Standard JWT with `typ: vc+ld+jwt`, payload is the full VC JSON-LD
+- **Format:** Standard JWT with `typ: vc+jwt`, payload is the full VC JSON-LD
 - **Data model:** W3C VC Data Model 2.0 (`@context`, `type` array, `credentialSubject`)
 - **Selective disclosure:** Supported via SD-JWT extension within VC-JOSE-COSE
 - **Libraries:** Any JOSE library (npm `jose`, Python `joserfc`)
@@ -70,18 +70,18 @@ CBOR-based credential format for mobile documents.
 
 ## Comparison Matrix
 
-| Aspect | Data Integrity | VC-JOSE-COSE | SD-JWT-VC | mdoc |
-|--------|---------------|--------------|-----------|------|
-| **EUDI mandatory** | No | No | **Yes** | Yes |
-| **Gaia-X current** | No | **Yes** | Roadmap | No |
-| **HAIP profile** | No | No | **Yes** | Yes |
-| **OIDC4VP support** | Partial | Yes | **Yes** | Yes |
-| **Selective disclosure** | Complex | Via SD-JWT | **Native** | Yes |
-| **W3C VCDM 2.0** | Yes | Yes | **No** | No |
-| **JSON-LD / SHACL** | Yes | Yes | No | No |
-| **Standard JWT libs** | No | Yes | Specialized | No |
-| **JS library** | @digitalbazaar | npm `jose` | `@sd-jwt/sd-jwt-vc` | — |
-| **Python library** | None mature | `joserfc` | `sd-jwt-python` | — |
+| Aspect                   | Data Integrity | VC-JOSE-COSE | SD-JWT-VC           | mdoc |
+| ------------------------ | -------------- | ------------ | ------------------- | ---- |
+| **EUDI mandatory**       | No             | No           | **Yes**             | Yes  |
+| **Gaia-X current**       | No             | **Yes**      | Roadmap             | No   |
+| **HAIP profile**         | No             | No           | **Yes**             | Yes  |
+| **OIDC4VP support**      | Partial        | Yes          | **Yes**             | Yes  |
+| **Selective disclosure** | Complex        | Via SD-JWT   | **Native**          | Yes  |
+| **W3C VCDM 2.0**         | Yes            | Yes          | **No**              | No   |
+| **JSON-LD / SHACL**      | Yes            | Yes          | No                  | No   |
+| **Standard JWT libs**    | No             | Yes          | Specialized         | No   |
+| **JS library**           | @digitalbazaar | npm `jose`   | `@sd-jwt/sd-jwt-vc` | —    |
+| **Python library**       | None mature    | `joserfc`    | `sd-jwt-python`     | —    |
 
 ## Critical Findings
 
@@ -101,7 +101,7 @@ HAIP requires:
 
 > "The public key used to validate the signature MUST be included in the x5c JOSE header parameter"
 
-Gaia-X uses DIDs (primarily `did:web`) plus X.509 via GXDCH. We need to support **both** `x5c` (for EUDI) and DID resolution (for Gaia-X).
+Gaia-X uses DIDs (primarily `did:ethr`) plus X.509 via GXDCH. We need to support **both** `x5c` (for EUDI) and DID resolution (for Gaia-X). Harbour uses `did:ethr` for all identities.
 
 ### 3. SD-JWT-VC ≠ W3C VC Data Model
 
@@ -133,60 +133,60 @@ Support **two complementary formats**, serving different purposes:
 
 ### Primary: SD-JWT-VC (IETF) — for EUDI / OIDC4VP
 
-| Aspect | Choice |
-|--------|--------|
-| Format | SD-JWT-VC (compact serialization) |
-| Algorithm | **ES256** (ECDSA P-256) — HAIP mandatory minimum |
-| Key resolution | X.509 via `x5c` header (EUDI) + `did:web` (Gaia-X) |
-| Selective disclosure | Native SD-JWT |
-| Holder binding | `cnf` claim with proof-of-possession |
-| Status | `status_list` (Token Status List) |
-| JS library | `@sd-jwt/sd-jwt-vc` |
-| Python library | `sd-jwt-python` (OpenWallet Foundation) |
-| Media type | `application/dc+sd-jwt` |
+| Aspect               | Choice                                              |
+| -------------------- | --------------------------------------------------- |
+| Format               | SD-JWT-VC (compact serialization)                   |
+| Algorithm            | **ES256** (ECDSA P-256) — HAIP mandatory minimum    |
+| Key resolution       | X.509 via `x5c` header (EUDI) + `did:ethr` (Gaia-X) |
+| Selective disclosure | Native SD-JWT                                       |
+| Holder binding       | `cnf` claim with proof-of-possession                |
+| Status               | `status_list` (Token Status List)                   |
+| JS library           | `@sd-jwt/sd-jwt-vc`                                 |
+| Python library       | `sd-jwt-python` (OpenWallet Foundation)             |
+| Media type           | `application/dc+sd-jwt`                             |
 
 ### Secondary: W3C VC-JOSE-COSE — for Gaia-X current + schema validation
 
-| Aspect | Choice |
-|--------|--------|
-| Format | Compact JWS (`header.payload.signature`) |
-| Algorithm | **ES256** (consistent with SD-JWT-VC) |
-| JWT header | `{"alg": "ES256", "typ": "vc+ld+jwt"}` |
-| Payload | Full W3C VCDM 2.0 JSON-LD |
-| Key resolution | `did:web` (Gaia-X) + `x5c` (EUDI alignment) |
-| JS library | npm `jose` |
-| Python library | `joserfc` |
+| Aspect         | Choice                                       |
+| -------------- | -------------------------------------------- |
+| Format         | Compact JWS (`header.payload.signature`)     |
+| Algorithm      | **ES256** (consistent with SD-JWT-VC)        |
+| JWT header     | `{"alg": "ES256", "typ": "vc+jwt"}`          |
+| Payload        | Full W3C VCDM 2.0 JSON-LD                    |
+| Key resolution | `did:ethr` (Gaia-X) + `x5c` (EUDI alignment) |
+| JS library     | npm `jose`                                   |
+| Python library | `joserfc`                                    |
 
 ### Key Management Migration: Ed25519 → P-256
 
-| Aspect | Current | Target |
-|--------|---------|--------|
-| Algorithm | Ed25519 (EdDSA) | **P-256 (ES256)** |
-| Key format | JWK OKP/Ed25519 | **JWK EC/P-256** |
-| DID method | `did:key:z6Mk...` | `did:key:zDn...` (P-256) + `did:web` |
-| Certificates | None | X.509 chains via `x5c` |
+| Aspect       | Current           | Target                                |
+| ------------ | ----------------- | ------------------------------------- |
+| Algorithm    | Ed25519 (EdDSA)   | **P-256 (ES256)**                     |
+| Key format   | JWK OKP/Ed25519   | **JWK EC/P-256**                      |
+| DID method   | `did:key:z6Mk...` | `did:key:zDn...` (P-256) + `did:ethr` |
+| Certificates | None              | X.509 chains via `x5c`                |
 
-Ed25519 keys SHOULD still be supported for backwards compatibility and testing, but **ES256 MUST be the default** for EUDI compliance.
+Ed25519 is also supported for testing, but **ES256 MUST be the default** for EUDI compliance.
 
 ## Relationship Between Formats
 
-```
-                    ┌─────────────────────────────┐
-                    │   LinkML Schema Definition   │
-                    │   (harbour.yaml, etc.)       │
-                    └──────────┬──────────────────┘
+```text
+              ┌────────────────────────────────────────┐
+              │   LinkML Schema Definition             │
+              │   (harbour-core-credential.yaml, etc.) │
+              └────────────────┬───────────────────────┘
                                │ generates
                     ┌──────────▼──────────────────┐
-                    │  JSON-LD Context + SHACL     │
-                    │  (schema validation layer)   │
+                    │  JSON-LD Context + SHACL    │
+                    │  (schema validation layer)  │
                     └──────────┬──────────────────┘
                                │ validates
               ┌────────────────┼────────────────┐
               ▼                ▼                 ▼
     ┌─────────────────┐  ┌──────────┐  ┌──────────────┐
-    │ Example VCs      │  │ Signed   │  │ SD-JWT-VC    │
-    │ (JSON-LD)        │  │ VC-JWT   │  │ (EUDI)       │
-    │ development/test │  │ (Gaia-X) │  │ production   │
+    │ Example VCs     │  │ Signed   │  │ SD-JWT-VC    │
+    │ (JSON-LD)       │  │ VC-JWT   │  │ (EUDI)       │
+    │ development/test│  │ (Gaia-X) │  │ production   │
     └─────────────────┘  └──────────┘  └──────────────┘
 ```
 
@@ -199,19 +199,22 @@ A credential can exist in multiple formats simultaneously. The mapping from SHAC
 ## Consequences
 
 ### Positive
+
 - EUDI wallet compatible (SD-JWT-VC + ES256 + x5c)
-- Gaia-X compatible (VC-JWT + did:web)
+- Gaia-X compatible (VC-JWT + did:ethr)
 - Selective disclosure for privacy-sensitive fields
 - Both Python and JS implementations exist for SD-JWT-VC
 - Future-proof (SD-JWT-VC is the regulatory direction)
 
 ### Negative
+
 - Two signing formats to maintain (SD-JWT-VC + VC-JOSE-COSE)
 - ES256 is slower than Ed25519 (negligible for credential operations)
 - X.509 certificate management adds operational complexity
 - SD-JWT-VC mapping from JSON-LD needs explicit definition
 
 ### Migration Path (completed)
+
 1. ~~Add ES256 (P-256) key generation alongside Ed25519~~
 2. ~~Implement VC-JOSE-COSE signer/verifier (standard JWT with ES256)~~
 3. ~~Implement SD-JWT-VC signer/verifier using OpenWallet Foundation libraries~~
@@ -223,11 +226,13 @@ A credential can exist in multiple formats simultaneously. The mapping from SHAC
 ## References
 
 ### W3C
+
 - [W3C VC Data Model v2](https://www.w3.org/TR/vc-data-model-2.0/)
 - [W3C VC-JOSE-COSE](https://www.w3.org/TR/vc-jose-cose/)
 - [W3C VC Data Integrity](https://www.w3.org/TR/vc-data-integrity/)
 
 ### IETF
+
 - [SD-JWT-VC (draft-14)](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/)
 - [SD-JWT (RFC 9901)](https://datatracker.ietf.org/doc/rfc9901/)
 - [RFC 7515 — JWS](https://www.rfc-editor.org/rfc/rfc7515)
@@ -235,21 +240,25 @@ A credential can exist in multiple formats simultaneously. The mapping from SHAC
 - [RFC 9864 — EdDSA deprecation](https://www.rfc-editor.org/rfc/rfc9864)
 
 ### EUDI / eIDAS 2.0
+
 - [EUDI Architecture Reference Framework](https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework)
 - [EUDI ARF latest](https://eudi.dev/latest/architecture-and-reference-framework-main/)
 - [PID Rulebook](https://github.com/eu-digital-identity-wallet/eudi-doc-attestation-rulebooks-catalog)
 - [EUDI Standards Catalog](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications)
 
 ### OpenID
+
 - [OIDC4VP 1.0](https://github.com/openid/OpenID4VP)
 - [OpenID4VC HAIP](https://openid.github.io/OpenID4VC-HAIP/openid4vc-high-assurance-interoperability-profile-wg-draft.html)
 - [OIDC4VCI](https://openid.github.io/OpenID4VCI/openid-4-verifiable-credential-issuance-1_0.html)
 
 ### Gaia-X
+
 - [Gaia-X ICAM Credential Format (24.07)](https://docs.gaia-x.eu/technical-committee/identity-credential-access-management/24.07/credential_format/)
 - [Gaia-X Architecture — Credential Formats](https://gaia-x.gitlab.io/technical-committee/architecture-working-group/architecture-document/credential_formats_protocols/)
 
 ### Libraries
+
 - [npm jose](https://www.npmjs.com/package/jose) — JavaScript JOSE
 - [joserfc](https://pypi.org/project/joserfc/) — Python JOSE
 - [@sd-jwt/sd-jwt-vc](https://www.npmjs.com/package/@sd-jwt/sd-jwt-vc) — JavaScript SD-JWT-VC (OpenWallet Foundation)

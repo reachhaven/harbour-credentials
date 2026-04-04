@@ -11,11 +11,12 @@ import json
 import sys
 from pathlib import Path
 
+from joserfc import jws
+
 from harbour._crypto import import_public_key as _import_public_key
 from harbour._crypto import load_public_key as _load_public_key
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PublicKeyType
-from joserfc import jws
 
 
 class VerificationError(Exception):
@@ -35,7 +36,7 @@ def verify_vc_jose(token: str, public_key: PublicKeyType) -> dict:
     Raises:
         VerificationError: If the signature is invalid or the token is malformed.
     """
-    return _verify_jose(token, public_key, expected_typ="vc+ld+jwt")
+    return _verify_jose(token, public_key, expected_typ="vc+jwt")
 
 
 def verify_vp_jose(
@@ -59,7 +60,7 @@ def verify_vp_jose(
     Raises:
         VerificationError: If the signature, nonce, or audience is invalid.
     """
-    payload = _verify_jose(token, public_key, expected_typ="vp+ld+jwt")
+    payload = _verify_jose(token, public_key, expected_typ="vp+jwt")
 
     if expected_nonce is not None:
         actual_nonce = payload.get("nonce")
@@ -72,8 +73,7 @@ def verify_vp_jose(
         actual_aud = payload.get("aud")
         if actual_aud != expected_audience:
             raise VerificationError(
-                f"Audience mismatch: expected {expected_audience!r}, "
-                f"got {actual_aud!r}"
+                f"Audience mismatch: expected {expected_audience!r}, got {actual_aud!r}"
             )
 
     return payload
@@ -89,9 +89,10 @@ def _verify_jose(token: str, public_key: PublicKeyType, expected_typ: str) -> di
     key = _import_public_key(public_key)
     alg = _alg_for_key(public_key)
 
-    # Use a larger header limit to accommodate x5c certificate chains
+    # Use larger limits to accommodate x5c certificate chains and embedded credentials
     registry = jws.JWSRegistry(algorithms=[alg])
     registry.max_header_length = 8192
+    registry.max_payload_length = 65536
 
     try:
         result = jws.deserialize_compact(

@@ -8,6 +8,7 @@
 ## Context
 
 Verifiable Credentials require:
+
 1. A **signing algorithm** — determines the cryptographic primitives
 2. A **key format** — how keys are serialized and exchanged
 3. A **key resolution method** — how a verifier discovers the public key from the credential
@@ -19,12 +20,14 @@ Verifiable Credentials require:
 The original choice of Ed25519 must be revised based on regulatory requirements:
 
 **Why ES256 must be the primary algorithm:**
+
 - **EUDI HAIP mandatory:** "Issuers, Verifiers, and Wallets MUST, at a minimum, support ECDSA with P-256 and SHA-256 (ES256)"
 - **EdDSA deprecated:** RFC 9864 deprecates the `EdDSA` algorithm identifier in JOSE. The `joserfc` library already emits security warnings.
 - **Gaia-X compatible:** Gaia-X requires RFC 7518 compliant algorithms; ES256 qualifies
 - **X.509 ecosystem:** P-256 has universal support in certificate authorities and HSMs
 
 **Why Ed25519 should still be supported:**
+
 - Existing test fixtures use Ed25519
 - `did:key:z6Mk...` identifiers are Ed25519-based
 - Some Gaia-X implementations still use EdDSA
@@ -38,11 +41,12 @@ The original choice of Ed25519 must be revised based on regulatory requirements:
 | Key size | 64 bytes public | 32 bytes public |
 | X.509 support | Universal | Limited |
 | did:key prefix | `zDn...` | `z6Mk...` |
-| Role in harbour | **Default** | Testing/legacy |
+| Role in harbour | **Default** | Testing |
 
 ### Key Format: JWK (RFC 7517)
 
 **ES256 key:**
+
 ```json
 {
   "kty": "EC",
@@ -52,7 +56,8 @@ The original choice of Ed25519 must be revised based on regulatory requirements:
 }
 ```
 
-**Ed25519 key (legacy):**
+**Ed25519 key:**
+
 ```json
 {
   "kty": "OKP",
@@ -61,29 +66,32 @@ The original choice of Ed25519 must be revised based on regulatory requirements:
 }
 ```
 
-### Key Resolution: X.509 (EUDI) + DID (Gaia-X)
+### Key Resolution: X.509 (EUDI) + DID (Gaia-X / Harbour)
 
 Three mechanisms, serving different ecosystems:
 
 | Method | Ecosystem | JOSE Header | Example |
 |--------|-----------|-------------|---------|
 | **X.509 chain** | EUDI | `x5c` | Certificate chain in JWT header |
-| **did:web** | Gaia-X | `kid` | `did:web:did.ascs.digital:participants:bmw#key-1` |
+| **did:ethr** | Gaia-X | `kid` | `did:ethr:0x14a34:<address>#controller` |
 | **did:key** | Testing | `kid` | `did:key:zDn...#zDn...` |
 
 **X.509 (EUDI mandatory):**
+
 - HAIP: "The public key MUST be included in the `x5c` JOSE header parameter"
 - Certificate chain from issuer to trust anchor (e.g., eIDAS qualified certificate)
 - Trust anchor certificate excluded from chain
 - No self-signed end-entity certificates
 
-**did:web (Gaia-X):**
-- Resolves to DID Document at well-known URL
-- DID Document contains JWK public key(s)
-- Used for organizational identities (ASCS, BMW, etc.)
+**did:ethr (Gaia-X):**
+
+- Resolves through the Base contract + resolver stack
+- Signer DID documents expose JWK public key(s), with the primary key at `#controller`
+- Used for all Harbour identities (infrastructure, organizations, users)
 - Gaia-X GXDCH uses X.509 certificates as trust anchors for DIDs
 
 **did:key (testing):**
+
 - Public key encoded directly in identifier
 - No network resolution needed
 - `did:key:zDn...` for P-256, `did:key:z6Mk...` for Ed25519

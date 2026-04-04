@@ -1,7 +1,6 @@
 [submodule "submodules/ontology-management-base"]
 	path = submodules/ontology-management-base
 	url = https://github.com/ASCS-eV/ontology-management-base.git
-	branch = feat/unified-catalog-validation
 	shallow = true
 
 [submodule "submodules/w3id.org"]

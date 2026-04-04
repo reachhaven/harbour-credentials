@@ -16,13 +16,13 @@ make setup
 source .venv/bin/activate
 
 # Run all tests (Python + TypeScript)
-make test-all
+make test full
 
 # Run Python tests only
 make test
 
 # Run TypeScript tests only
-make test-ts
+make test ts
 
 # Run a single Python test file
 PYTHONPATH=src/python:$PYTHONPATH pytest tests/python/harbour/test_sign.py -v
@@ -40,7 +40,7 @@ cd src/typescript/harbour && yarn vitest run --config vitest.config.ts ../../../
 PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
 
 # Build TypeScript
-make build-ts
+make build
 
 # Lint and format
 make lint
@@ -65,12 +65,15 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `verifier` / `verify` | `verifier.py` | `verify.ts` | JWT verification |
 | `sd_jwt` / `sd-jwt` | `sd_jwt.py` | `sd-jwt.ts` | SD-JWT-VC selective disclosure |
 | `kb_jwt` / `kb-jwt` | `kb_jwt.py` | `kb-jwt.ts` | Key Binding JWT |
+| `delegation` | `delegation.py` | `delegation.ts` | Delegated signing evidence (OID4VP) |
+| `sd_jwt_vp` / `sd-jwt-vp` | `sd_jwt_vp.py` | `sd-jwt-vp.ts` | SD-JWT VP issue/verify with evidence |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates |
 | `credentials/` | Python only | — | Credential processing pipeline |
 
 ### Test Layout
 
 Tests live in `tests/` with shared fixtures:
+
 - `tests/fixtures/` — shared keys (`keys/`), tokens (`tokens/`), credentials (`credentials/`), `sample-vc.json`
 - `tests/python/harbour/` — Python harbour module tests
 - `tests/python/credentials/` — Python credentials pipeline tests
@@ -80,7 +83,7 @@ Tests live in `tests/` with shared fixtures:
 
 ### TypeScript Toolchain
 
-- Package manager: **Yarn 4** via corepack (`corepack enable`)
+- Package manager: **Yarn 4** via corepack (`corepack yarn ...`)
 - Test runner: **vitest** (config in `src/typescript/harbour/vitest.config.ts`)
 - Build: `tsc` (strict mode, ES2022 target)
 - Package: `@reachhaven/harbour-credentials`
@@ -107,6 +110,8 @@ from harbour.signer import sign_vc_jose
 from harbour.verifier import verify_vc_jose, VerificationError
 from harbour.sd_jwt import issue_sd_jwt_vc, verify_sd_jwt_vc
 from harbour.kb_jwt import create_kb_jwt, verify_kb_jwt
+from harbour.delegation import TransactionData, create_delegation_challenge, verify_challenge
+from harbour.sd_jwt_vp import issue_sd_jwt_vp, verify_sd_jwt_vp
 from harbour.x509 import generate_self_signed_cert, validate_x5c_chain
 ```
 
@@ -118,22 +123,26 @@ import {
   signJwt, verifyJwt,
   issueSdJwt, verifySdJwt,
   createKbJwt, verifyKbJwt,
+  createDelegationChallenge, verifyChallenge, createTransactionData,
+  issueSdJwtVp, verifySdJwtVp,
 } from '@reachhaven/harbour-credentials';
 ```
 
 ## CLI Entry Points
 
-All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python -m harbour.signer --help`, etc. Also: `python -m credentials.claim_mapping --help`, `python -m credentials.example_signer --help`.
+All Python modules have CLI interfaces: `python -m harbour.keys --help`, `python -m harbour.signer --help`, etc. Also: `python -m credentials.example_signer --help`.
 
 ## Coding Conventions
 
 ### Python
+
 - **Python 3.12+** with type hints on public APIs
 - **pathlib.Path** (never `os.path`)
 - All modules must have `main()` with `argparse` and `--help`
-- Formatter: black (line-length 88), isort (profile: black)
+- Formatter/linter: ruff (line-length 88, rules: E/F/W/I)
 
 ### TypeScript
+
 - **TypeScript 5.x** with strict mode, ES2022 target
 - **async/await** for crypto operations
 - Export types alongside functions
@@ -153,7 +162,10 @@ git commit -s -S -m "feat(harbour): add KB-JWT support"
 
 ## Change Documentation
 
-When instructed to prepare a commit or PR, **do not commit directly**. Create these files in `.playground/` (gitignored) for human review:
+When instructed to prepare a commit or PR, default to updating these files in
+`.playground/` (gitignored) first. After explicit human confirmation in the
+current session, the agent may use them to create the signed commit, push the
+branch, and open the PR directly. Otherwise, keep them for human review:
 
 | File | Purpose |
 |------|---------|
@@ -166,7 +178,7 @@ When instructed to prepare a commit or PR, **do not commit directly**. Create th
 |-------|------|
 | Agent instructions | [AGENTS.md](AGENTS.md) |
 | Copilot instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
-| Documentation | [docs/README.md](docs/README.md) |
+| Architecture | [docs/architecture.md](docs/architecture.md) |
 | ADRs | [docs/decisions/](docs/decisions/) |
 
 ## Common Mistakes to Avoid

@@ -2,6 +2,16 @@
 
 Reads expanded (human-readable) examples from examples/*.json and produces
 wire-format signed JWTs plus decoded companion files in examples/signed/.
+When given a directory, also processes gaiax/ subdirectory if present,
+outputting signed artifacts to each subdirectory's own signed/ folder.
+
+Each role in the trust chain uses a **separate P-256 key** so that the
+signed artifacts cryptographically demonstrate who signed what:
+
+  - Trust Anchor key  → self-signed VC, evidence VPs authorising orgs
+  - Haven key         → all outer credentials (issuer)
+  - Company key       → evidence VPs authorising employees
+  - Employee key      → consent VPs for delegated signing
 
 Output per credential:
   - <name>.jwt                      — VC-JOSE-COSE compact JWS (wire format)
@@ -26,9 +36,11 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ec import (
     SECP256R1,
+    EllipticCurvePrivateKey,
     EllipticCurvePrivateNumbers,
     EllipticCurvePublicNumbers,
 )
+
 from harbour.keys import PrivateKey, p256_public_key_to_did_key
 from harbour.signer import sign_vc_jose, sign_vp_jose
 
@@ -55,8 +67,71 @@ def _decode_jwt(token: str) -> dict:
     return {"header": header, "payload": payload}
 
 
+def _load_jwk_private_key(jwk_path: Path) -> EllipticCurvePrivateKey:
+    """Load a P-256 private key from a JWK file."""
+    jwk = json.loads(jwk_path.read_text())
+    x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
+    y = int.from_bytes(_b64url_decode(jwk["y"]), "big")
+    d = int.from_bytes(_b64url_decode(jwk["d"]), "big")
+    pub_numbers = EllipticCurvePublicNumbers(x, y, SECP256R1())
+    priv_numbers = EllipticCurvePrivateNumbers(d, pub_numbers)
+    return priv_numbers.private_key()
+
+
+class RoleKeyring:
+    """Manages per-role P-256 keys and DID-to-key resolution.
+
+    Loads role-specific key files from ``tests/fixtures/keys/`` and builds
+    a mapping from did:ethr addresses to (private_key, kid) pairs.
+    """
+
+    ROLE_FILES = {
+        "trust-anchor": "trust-anchor.p256.json",
+        "haven": "haven.p256.json",
+        "company": "company.p256.json",
+        "employee": "employee.p256.json",
+        "ascs": "ascs.p256.json",
+    }
+
+    def __init__(self, keys_dir: Path):
+        from harbour.keys import p256_public_key_to_did_ethr
+
+        self._keys: dict[str, tuple[EllipticCurvePrivateKey, str]] = {}
+        self._role_dids: dict[str, str] = {}
+
+        for role, filename in self.ROLE_FILES.items():
+            key_path = keys_dir / filename
+            if not key_path.exists():
+                continue
+            priv = _load_jwk_private_key(key_path)
+            did = p256_public_key_to_did_ethr(priv.public_key())
+            kid = f"{did}#controller"
+            self._keys[did] = (priv, kid)
+            self._role_dids[role] = did
+
+        if self._keys:
+            print(f"  Loaded {len(self._keys)} role keys:")
+            for role, did in self._role_dids.items():
+                print(f"    {role}: {did}")
+
+    @property
+    def role_dids(self) -> dict[str, str]:
+        return dict(self._role_dids)
+
+    def resolve(self, did: str) -> tuple[EllipticCurvePrivateKey, str] | None:
+        """Resolve a DID to its (private_key, kid) pair."""
+        return self._keys.get(did)
+
+    def get_role_key(self, role: str) -> tuple[EllipticCurvePrivateKey, str] | None:
+        """Get key pair for a named role."""
+        did = self._role_dids.get(role)
+        if did:
+            return self._keys[did]
+        return None
+
+
 def load_test_p256_keypair(fixtures_dir: Path | None = None):
-    """Load the committed P-256 test keypair."""
+    """Load the committed P-256 test keypair (legacy single-key mode)."""
     if fixtures_dir is None:
         repo_root = _find_repo_root()
         fixtures_dir = (
@@ -69,21 +144,39 @@ def load_test_p256_keypair(fixtures_dir: Path | None = None):
         jwk_path = keys_dir / "test-keypair-p256.json"
     else:
         jwk_path = fixtures_dir / "test-keypair-p256.json"
-    jwk = json.loads(jwk_path.read_text())
-    x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
-    y = int.from_bytes(_b64url_decode(jwk["y"]), "big")
-    d = int.from_bytes(_b64url_decode(jwk["d"]), "big")
-    pub_numbers = EllipticCurvePublicNumbers(x, y, SECP256R1())
-    priv_numbers = EllipticCurvePrivateNumbers(d, pub_numbers)
-    private_key = priv_numbers.private_key()
-    return private_key, private_key.public_key()
+    priv = _load_jwk_private_key(jwk_path)
+    return priv, priv.public_key()
 
 
-def sign_evidence_vp(vp: dict, private_key: PrivateKey, kid: str) -> str:
+def load_role_keyring(fixtures_dir: Path | None = None) -> RoleKeyring | None:
+    """Load the multi-role keyring if role key files exist."""
+    if fixtures_dir is None:
+        repo_root = _find_repo_root()
+        fixtures_dir = (
+            repo_root / "submodules" / "harbour-credentials" / "tests" / "fixtures"
+        )
+        if not fixtures_dir.is_dir():
+            fixtures_dir = repo_root / "tests" / "fixtures"
+    keys_dir = fixtures_dir / "keys"
+    if not keys_dir.is_dir():
+        return None
+    probe = keys_dir / "haven.p256.json"
+    if not probe.exists():
+        return None
+    return RoleKeyring(keys_dir)
+
+
+def sign_evidence_vp(
+    vp: dict,
+    private_key: PrivateKey,
+    kid: str,
+    keyring: RoleKeyring | None = None,
+) -> str:
     """Sign an evidence VP and its inner VCs as VC-JOSE-COSE JWTs.
 
-    Takes the expanded VP object, signs each inner VC, replaces them with
-    JWT strings, then signs the VP envelope.
+    When *keyring* is provided, each inner VC is signed with its own
+    issuer's key (looked up by ``issuer`` DID).  The VP envelope is
+    signed with *private_key* / *kid* (the holder's key).
     """
     clean_vp = {
         "@context": vp.get("@context", ["https://www.w3.org/ns/credentials/v2"]),
@@ -93,15 +186,19 @@ def sign_evidence_vp(vp: dict, private_key: PrivateKey, kid: str) -> str:
     if "holder" in vp:
         clean_vp["holder"] = vp["holder"]
 
-    # Sign inner VCs
     inner_vcs = vp.get("verifiableCredential", [])
     inner_jwts = []
     for vc in inner_vcs:
         if isinstance(vc, dict):
-            inner_jwt = sign_vc_jose(vc, private_key, kid=kid)
+            inner_issuer = vc.get("issuer", "")
+            inner_key, inner_kid = private_key, kid
+            if keyring:
+                resolved = keyring.resolve(inner_issuer)
+                if resolved:
+                    inner_key, inner_kid = resolved
+            inner_jwt = sign_vc_jose(vc, inner_key, kid=inner_kid)
             inner_jwts.append(inner_jwt)
         else:
-            # Already a JWT string
             inner_jwts.append(vc)
     if inner_jwts:
         clean_vp["verifiableCredential"] = inner_jwts
@@ -132,15 +229,31 @@ def decode_evidence_vp(vp_jwt: str) -> dict:
 
 
 def process_example(
-    example_path: Path, private_key: PrivateKey, kid: str, output_dir: Path
+    example_path: Path,
+    private_key: PrivateKey,
+    kid: str,
+    output_dir: Path,
+    keyring: RoleKeyring | None = None,
 ) -> Path:
     """Process a single example credential.
 
     Reads the expanded example, signs evidence and outer VC, writes all
     artifacts to output_dir. Never modifies the source file.
+
+    When *keyring* is provided, the outer VC is signed with the key
+    matching the credential's ``issuer`` DID, and each evidence VP is
+    signed with the key matching the VP's ``holder`` DID.
     """
     vc = json.loads(example_path.read_text())
     stem = example_path.stem
+
+    # Determine outer credential signing key
+    outer_key, outer_kid = private_key, kid
+    if keyring:
+        issuer_did = vc.get("issuer", "")
+        resolved = keyring.resolve(issuer_did)
+        if resolved:
+            outer_key, outer_kid = resolved
 
     evidence_vp_jwt = None
 
@@ -150,13 +263,20 @@ def process_example(
         for ev in vc_for_signing["evidence"]:
             vp_obj = ev.get("verifiablePresentation")
             if isinstance(vp_obj, dict):
-                # Expanded VP — sign it
-                evidence_vp_jwt = sign_evidence_vp(vp_obj, private_key, kid)
-                # Replace with JWT string for outer VC signing
+                # Determine evidence VP signing key (holder's key)
+                ev_holder = vp_obj.get("holder", "")
+                ev_key, ev_kid = private_key, kid
+                if keyring:
+                    resolved = keyring.resolve(ev_holder)
+                    if resolved:
+                        ev_key, ev_kid = resolved
+                evidence_vp_jwt = sign_evidence_vp(
+                    vp_obj, ev_key, ev_kid, keyring=keyring
+                )
                 ev["verifiablePresentation"] = evidence_vp_jwt
 
     # Sign the outer credential
-    vc_jwt = sign_vc_jose(vc_for_signing, private_key, kid=kid)
+    vc_jwt = sign_vc_jose(vc_for_signing, outer_key, kid=outer_kid)
 
     # Write outputs
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -227,13 +347,16 @@ Examples:
 
     args = parser.parse_args()
 
-    # Load key
+    # Load key(s)
+    keyring = None
     if args.key:
         from harbour._crypto import load_private_key as _load_private_key
 
         private_key, _ = _load_private_key(args.key)
         public_key = private_key.public_key()
     else:
+        # Try multi-role keyring first, fall back to single test key
+        keyring = load_role_keyring()
         private_key, public_key = load_test_p256_keypair()
 
     kid = p256_public_key_to_did_key(public_key)
@@ -244,7 +367,22 @@ Examples:
     for path_str in args.examples:
         path = Path(path_str)
         if path.is_dir():
-            example_files.extend(sorted(path.glob("*.json")))
+            # Only process credential/receipt files, skip VPs and other artifacts
+            example_files.extend(
+                p
+                for p in sorted(path.glob("*.json"))
+                if p.parent.name != "signed"
+                and any(t in p.stem for t in ("credential", "receipt", "offering"))
+            )
+            # Also process gaiax/ subdirectory if it exists
+            gaiax_dir = path / "gaiax"
+            if gaiax_dir.is_dir():
+                example_files.extend(
+                    p
+                    for p in sorted(gaiax_dir.glob("*.json"))
+                    if p.parent.name != "signed"
+                    and any(t in p.stem for t in ("credential", "receipt", "offering"))
+                )
         elif path.is_file():
             example_files.append(path)
         else:
@@ -254,24 +392,28 @@ Examples:
         print("No example credentials found", file=sys.stderr)
         sys.exit(1)
 
-    # Determine output directory
-    if args.output_dir:
-        output_dir = Path(args.output_dir)
-    else:
-        # Use first input's parent/signed/
-        output_dir = example_files[0].parent / "signed"
-
     print(f"Signing {len(example_files)} example credentials...")
     print(f"  kid: {kid_vm}")
-    print(f"  output: {output_dir}")
 
+    output_dirs_used: set[Path] = set()
     for path in example_files:
-        jwt_path = process_example(path, private_key, kid_vm, output_dir)
-        print(f"  {path.name} -> {jwt_path.name}")
+        # Per-file output: each file's signed artifacts go to file.parent / "signed"
+        if args.output_dir:
+            output_dir = Path(args.output_dir)
+        else:
+            output_dir = path.parent / "signed"
+        jwt_path = process_example(
+            path, private_key, kid_vm, output_dir, keyring=keyring
+        )
+        output_dirs_used.add(output_dir)
+        rel = path.parent.name
+        prefix = f"{rel}/" if rel != "examples" else ""
+        print(f"  {prefix}{path.name} -> {output_dir.name}/{jwt_path.name}")
 
     # List all generated files
-    signed_files = sorted(output_dir.iterdir())
-    print(f"\nGenerated {len(signed_files)} files in {output_dir}/")
+    for out_dir in sorted(output_dirs_used):
+        signed_files = sorted(out_dir.iterdir())
+        print(f"\nGenerated {len(signed_files)} files in {out_dir}/")
 
     print("Done.")
 

@@ -11,11 +11,16 @@ pip install harbour-credentials
 ### From Source
 
 ```bash
-git clone https://github.com/ASCS-eV/harbour-credentials.git
+git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 
 # Create virtual environment
-python3 -m venv .venv
+python -m venv .venv
+
+# PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux / Git Bash
 source .venv/bin/activate
 
 # Install with dev dependencies
@@ -26,7 +31,7 @@ pip install -e ".[dev]"
 
 ```bash
 make setup
-make install-dev
+make install dev
 ```
 
 ## TypeScript
@@ -40,27 +45,27 @@ npm install @reachhaven/harbour-credentials
 ### From Source
 
 ```bash
-git clone https://github.com/ASCS-eV/harbour-credentials.git
+git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials/src/typescript/harbour
 
-npm install
-npm run build
+corepack yarn install
+corepack yarn build
 ```
 
 ## Verify Installation
 
-=== "Python"
+**Python:**
 
-    ```bash
-    python -m harbour.keys --help
-    make test
-    ```
+```bash
+python -m harbour.keys --help
+make test
+```
 
-=== "TypeScript"
+**TypeScript:**
 
-    ```bash
-    npm test
-    ```
+```bash
+npm test
+```
 
 ## Dependencies
 

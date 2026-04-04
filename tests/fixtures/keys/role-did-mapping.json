@@ -1,0 +1,27 @@
+{
+  "trust-anchor": {
+    "did_ethr": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+    "did_key": "did:key:zDnaeotFceWszHurnw1CQuhqVsBCsX6scX7npWxanRSguYifG",
+    "eth_addr": "0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"
+  },
+  "haven": {
+    "did_ethr": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+    "did_key": "did:key:zDnaefrde2MxCJfVoE1Z6RW6Zk6S91ot2w2x1c9Xwm5WiBMo9",
+    "eth_addr": "0x31f1ca3dc5da9f83f360d805662d11a418950202"
+  },
+  "company": {
+    "did_ethr": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+    "did_key": "did:key:zDnaeXyPKbKzPn6vR73hsPF8T12hexnmhfAjv3bzvSmihDy8M",
+    "eth_addr": "0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+  },
+  "employee": {
+    "did_ethr": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
+    "did_key": "did:key:zDnaeupW53s139booGLf5QepJbWnvc9eSfMWyTmbSF2rF8A5b",
+    "eth_addr": "0x272c04206c826047add586cbf7f4ffc4386da129"
+  },
+  "ascs": {
+    "did_ethr": "did:ethr:0x14a34:0x26bac51329c3c13230a77e8524bfbb62e1a8e2d3",
+    "did_key": "did:key:zDnaebg1BPCQvqzPWHD53VtVvbFjKwWVMStEHxhK8zPuDNiWR",
+    "eth_addr": "0x26bac51329c3c13230a77e8524bfbb62e1a8e2d3"
+  }
+}

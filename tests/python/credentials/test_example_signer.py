@@ -10,6 +10,7 @@ Verifies:
 from pathlib import Path
 
 import pytest
+
 from credentials.example_signer import (
     decode_evidence_vp,
     load_test_p256_keypair,
@@ -24,6 +25,7 @@ while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.pare
     _REPO_ROOT = _REPO_ROOT.parent
 
 EXAMPLES_DIR = _REPO_ROOT / "examples"
+GAIAX_EXAMPLES_DIR = EXAMPLES_DIR / "gaiax"
 
 
 @pytest.fixture(scope="module")
@@ -57,15 +59,15 @@ class TestEvidenceSigning:
         vp = {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiablePresentation"],
-            "holder": "did:web:participant.example.com",
+            "holder": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
             "verifiableCredential": [
                 {
                     "@context": ["https://www.w3.org/ns/credentials/v2"],
                     "type": ["VerifiableCredential"],
-                    "issuer": "did:web:notary.example.com",
+                    "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
                     "validFrom": "2024-01-10T00:00:00Z",
                     "credentialSubject": {
-                        "id": "did:web:participant.example.com",
+                        "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
                         "type": "gx:LegalPerson",
                     },
                 }
@@ -101,7 +103,7 @@ class TestEvidenceSigning:
                 {
                     "@context": ["https://www.w3.org/ns/credentials/v2"],
                     "type": ["VerifiableCredential"],
-                    "issuer": "did:web:notary.example.com",
+                    "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
                     "validFrom": "2024-01-10T00:00:00Z",
                     "credentialSubject": {"id": "did:example:sub"},
                 }
@@ -113,7 +115,7 @@ class TestEvidenceSigning:
 
         assert "header" in decoded
         assert "payload" in decoded
-        assert decoded["header"]["typ"] == "vp+ld+jwt"
+        assert decoded["header"]["typ"] == "vp+jwt"
 
         inner_vcs = decoded["payload"]["verifiableCredential"]
         assert len(inner_vcs) == 1
@@ -128,10 +130,9 @@ class TestProcessExample:
         """Process an example with evidence VP through the full pipeline."""
         private_key, public_key, kid = signing_key
 
-        # Load legal person example (has evidence)
-        example_path = EXAMPLES_DIR / "legal-person-credential.json"
+        example_path = GAIAX_EXAMPLES_DIR / "legal-person-credential.json"
         if not example_path.exists():
-            pytest.skip("examples/ not populated")
+            pytest.skip("examples/gaiax/ not populated")
 
         output_dir = tmp_path / "signed"
         jwt_path = process_example(example_path, private_key, kid, output_dir)
@@ -148,7 +149,7 @@ class TestProcessExample:
         vc_jwt = jwt_path.read_text().strip()
         vc_payload = verify_vc_jose(vc_jwt, public_key)
         assert vc_payload["id"] == "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        assert "harbour:LegalPersonCredential" in vc_payload["type"]
+        assert "harbour.gx:LegalPersonCredential" in vc_payload["type"]
 
         # Evidence should now be a JWT string
         evidence = vc_payload["evidence"][0]
@@ -160,37 +161,127 @@ class TestProcessExample:
         vp_payload = verify_vp_jose(vp_jwt_str, public_key)
         assert "VerifiablePresentation" in vp_payload["type"]
 
-    def test_process_example_without_evidence(self, signing_key, tmp_path):
-        """Process an example without evidence VP."""
+    def test_process_delegated_signing_receipt(self, signing_key, tmp_path):
+        """Process the delegated signing receipt with DelegatedSignatureEvidence."""
         private_key, public_key, kid = signing_key
 
-        example_path = EXAMPLES_DIR / "service-offering-credential.json"
+        example_path = GAIAX_EXAMPLES_DIR / "delegated-signing-receipt.json"
         if not example_path.exists():
-            pytest.skip("examples/ not populated")
+            pytest.skip("examples/gaiax/ not populated")
 
         output_dir = tmp_path / "signed"
         jwt_path = process_example(example_path, private_key, kid, output_dir)
 
         # Verify output files exist
         assert jwt_path.exists()
-        assert (output_dir / "service-offering-credential.decoded.json").exists()
-        # No evidence VP files
-        assert not (output_dir / "service-offering-credential.evidence-vp.jwt").exists()
+        assert (output_dir / "delegated-signing-receipt.decoded.json").exists()
+        assert (output_dir / "delegated-signing-receipt.evidence-vp.jwt").exists()
 
         # Verify outer VC JWT
         vc_jwt = jwt_path.read_text().strip()
         vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour:ServiceOfferingCredential" in vc_payload["type"]
+        assert "harbour.delegate:SigningReceipt" in vc_payload["type"]
+
+        # Evidence should contain DelegatedSignatureEvidence with transaction_data
+        evidence = vc_payload["evidence"][0]
+        ev_type = evidence["type"]
+        if isinstance(ev_type, list):
+            assert "harbour:SignatureEvidence" in ev_type
+        else:
+            assert ev_type == "harbour:SignatureEvidence"
+        assert "transaction_data" in evidence
+        assert evidence["transaction_data"]["type"] == "harbour.delegate:data.purchase"
+        assert (
+            evidence["delegatedTo"]
+            == "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
+        )
+
+        # Evidence VP should be a signed JWT
+        vp_jwt_str = evidence["verifiablePresentation"]
+        assert isinstance(vp_jwt_str, str)
+        assert vp_jwt_str.count(".") == 2
 
     def test_process_all_examples(self, signing_key, tmp_path):
-        """Process all examples and verify each produces a valid JWT."""
+        """Process all examples (root + gaiax) and verify each produces a valid JWT."""
         private_key, public_key, kid = signing_key
 
-        example_files = sorted(EXAMPLES_DIR.glob("*.json"))
+        example_files = sorted(EXAMPLES_DIR.glob("*-credential.json"))
+        example_files += sorted(EXAMPLES_DIR.glob("*-receipt.json"))
+        if GAIAX_EXAMPLES_DIR.is_dir():
+            example_files += sorted(GAIAX_EXAMPLES_DIR.glob("*-credential.json"))
+            example_files += sorted(GAIAX_EXAMPLES_DIR.glob("*-receipt.json"))
         if not example_files:
-            pytest.skip("examples/ not populated")
+            pytest.skip("No examples found")
 
         output_dir = tmp_path / "signed"
+        for path in example_files:
+            jwt_path = process_example(path, private_key, kid, output_dir)
+            vc_jwt = jwt_path.read_text().strip()
+            vc_payload = verify_vc_jose(vc_jwt, public_key)
+            assert "VerifiableCredential" in vc_payload["type"]
+
+
+class TestProcessGaiaxExample:
+    """Test processing Gaia-X domain extension examples."""
+
+    def test_process_gaiax_legal_person(self, signing_key, tmp_path):
+        """Process the Gaia-X legal person credential through the pipeline."""
+        private_key, public_key, kid = signing_key
+
+        example_path = GAIAX_EXAMPLES_DIR / "legal-person-credential.json"
+        if not example_path.exists():
+            pytest.skip("examples/gaiax/ not populated")
+
+        output_dir = tmp_path / "gaiax" / "signed"
+        jwt_path = process_example(example_path, private_key, kid, output_dir)
+
+        assert jwt_path.exists()
+        assert (output_dir / "legal-person-credential.decoded.json").exists()
+        assert (output_dir / "legal-person-credential.evidence-vp.jwt").exists()
+
+        # Verify outer VC JWT
+        vc_jwt = jwt_path.read_text().strip()
+        vc_payload = verify_vc_jose(vc_jwt, public_key)
+        assert "harbour.gx:LegalPersonCredential" in vc_payload["type"]
+
+        # Subject should have compliance data (no entity data)
+        subject = vc_payload["credentialSubject"]
+        assert subject["type"] == "harbour.gx:LegalPerson"
+        assert "harbour.gx:labelLevel" in subject
+
+    def test_process_gaiax_natural_person(self, signing_key, tmp_path):
+        """Process the Gaia-X natural person credential through the pipeline."""
+        private_key, public_key, kid = signing_key
+
+        example_path = GAIAX_EXAMPLES_DIR / "natural-person-credential.json"
+        if not example_path.exists():
+            pytest.skip("examples/gaiax/ not populated")
+
+        output_dir = tmp_path / "gaiax" / "signed"
+        jwt_path = process_example(example_path, private_key, kid, output_dir)
+
+        assert jwt_path.exists()
+        vc_jwt = jwt_path.read_text().strip()
+        vc_payload = verify_vc_jose(vc_jwt, public_key)
+        assert "harbour.gx:NaturalPersonCredential" in vc_payload["type"]
+
+        # Subject should have the NaturalPerson data directly
+        subject = vc_payload["credentialSubject"]
+        assert subject["type"] == "harbour.gx:NaturalPerson"
+        assert "givenName" in subject
+
+    def test_process_all_gaiax_examples(self, signing_key, tmp_path):
+        """Process all Gaia-X examples and verify each produces a valid JWT."""
+        private_key, public_key, kid = signing_key
+
+        if not GAIAX_EXAMPLES_DIR.is_dir():
+            pytest.skip("examples/gaiax/ not populated")
+
+        example_files = sorted(GAIAX_EXAMPLES_DIR.glob("*-credential.json"))
+        if not example_files:
+            pytest.skip("No Gaia-X credential examples found")
+
+        output_dir = tmp_path / "gaiax" / "signed"
         for path in example_files:
             jwt_path = process_example(path, private_key, kid, output_dir)
             vc_jwt = jwt_path.read_text().strip()

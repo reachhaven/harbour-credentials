@@ -1,0 +1,91 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/reachhaven/harbour/core/v1/",
+    "https://w3id.org/reachhaven/harbour/gx/v1/",
+    "https://w3id.org/reachhaven/harbour/delegate/v1/"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "harbour.delegate:SigningReceipt"
+  ],
+  "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
+  "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+  "validFrom": "2025-06-25T10:00:00Z",
+  "credentialSubject": {
+    "id": "urn:uuid:receipt-b7c8d9e0-f1a2-3456-789a-bcdef0123456",
+    "type": "harbour:TransactionReceipt",
+    "transactionHash": "c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b",
+    "blockchainTxId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+  },
+  "credentialStatus": [
+    {
+      "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202:services:revocation-registry/f7e8d9c0b1a23456",
+      "type": "harbour:CRSetEntry",
+      "statusPurpose": "revocation"
+    }
+  ],
+  "evidence": [
+    {
+      "type": [
+        "harbour:SignatureEvidence"
+      ],
+      "verifiablePresentation": {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2"
+        ],
+        "type": [
+          "VerifiablePresentation",
+          "harbour:VerifiablePresentation"
+        ],
+        "holder": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6IjZka1U2Wk1GSzc5V3dpY3dKNXJieEUxM3pTdWtCWTJPb0VpVlVFanFNRWMiLCJ5IjoiUm5Iem55VmxyUFNNVDdpckRzMTVEOXd4Z01vamlTREFRcGZGaHFUa0xSWSJ9",
+        "verifiableCredential": [
+          {
+            "@context": [
+              "https://www.w3.org/ns/credentials/v2",
+              "https://w3id.org/reachhaven/harbour/core/v1/",
+              "https://w3id.org/reachhaven/harbour/gx/v1/"
+            ],
+            "type": [
+              "VerifiableCredential",
+              "harbour:VerifiableCredential"
+            ],
+            "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+            "validFrom": "2024-01-15T00:00:00Z",
+            "credentialSubject": {
+              "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
+              "type": "harbour.gx:NaturalPerson",
+              "memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+            },
+            "credentialStatus": [
+              {
+                "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202:services:revocation-registry/np00000001",
+                "type": "harbour:CRSetEntry",
+                "statusPurpose": "revocation"
+              }
+            ]
+          }
+        ]
+      },
+      "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+      "transaction_data": {
+        "type": "harbour.delegate:data.purchase",
+        "credential_ids": [
+          "harbour_natural_person"
+        ],
+        "transaction_data_hashes_alg": [
+          "sha-256"
+        ],
+        "nonce": "da9b1009",
+        "iat": 1771934400,
+        "txn": {
+          "asset_id": "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+          "price": "100",
+          "currency": "ENVITED",
+          "marketplace": "did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c"
+        }
+      },
+      "challenge": "da9b1009 HARBOUR_DELEGATE c3d4ba771c1103935ab4121874c4b3a78c8471719c80f60d59ca5811e232089b"
+    }
+  ]
+}

@@ -57,11 +57,11 @@ describe("verifyVpJose", () => {
   it("validates nonce and audience", async () => {
     const token = await signVpJose(sampleVp, privateKey, {
       nonce: "test-nonce",
-      audience: "did:web:verifier.example.com",
+      audience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     });
     const result = await verifyVpJose(token, publicKey, {
       expectedNonce: "test-nonce",
-      expectedAudience: "did:web:verifier.example.com",
+      expectedAudience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     });
     expect(result.type).toEqual(["VerifiablePresentation"]);
     expect(result.nonce).toBe("test-nonce");
@@ -76,10 +76,10 @@ describe("verifyVpJose", () => {
 
   it("throws on wrong audience", async () => {
     const token = await signVpJose(sampleVp, privateKey, {
-      audience: "did:web:real.example.com",
+      audience: "did:ethr:0x14a34:0x6176cb54dc4498765590d7e5522523ef9e634906",
     });
     await expect(
-      verifyVpJose(token, publicKey, { expectedAudience: "did:web:evil.example.com" }),
+      verifyVpJose(token, publicKey, { expectedAudience: "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace" }),
     ).rejects.toThrow(VerificationError);
   });
 

@@ -7,37 +7,38 @@ This repository contains cryptographic libraries for signing and verifying verif
 ```bash
 # Install dev dependencies
 make setup
-make install-dev
+make install dev
 
 # Run all tests (Python + TypeScript)
-make test-all
+make test full
 
 # Run Python tests only
 make test
 
 # Run TypeScript tests only
-make test-ts
+make test ts
 
 # Build TypeScript
-make build-ts
+make build
 
 # Lint and format
 make lint
 make format
 
 # Run with coverage
-make test-cov
+make test cov
 ```
 
 ## Instruction Files
 
 Read these BEFORE making changes:
 
-| Topic              | File                   |
-| ------------------ | ---------------------- |
-| Agent instructions | [../AGENTS.md](../AGENTS.md) |
-| Claude guidance    | [../CLAUDE.md](../CLAUDE.md) |
-| Documentation      | [../README.md](../README.md) |
+| Topic              | File                                      |
+| ------------------ | ----------------------------------------- |
+| Agent instructions | [AGENTS.md](../AGENTS.md)                 |
+| Claude guidance    | [CLAUDE.md](../CLAUDE.md)                 |
+| Documentation      | [README.md](../README.md)                 |
+| Architecture       | [architecture.md](../docs/architecture.md)|
 
 ## Core Principles
 
@@ -47,7 +48,7 @@ Read these BEFORE making changes:
 
 ## Project Structure
 
-```
+```text
 src/
 ├── python/
 │   ├── harbour/        # Crypto library (keys, sign, verify, sd-jwt, kb-jwt, x509)
@@ -102,7 +103,10 @@ git commit -s -S -m "feat(harbour): add KB-JWT support"
 
 ## Preparing Commits and Pull Requests
 
-When instructed to prepare a commit or PR, **do not commit directly**. Instead:
+When instructed to prepare a commit or PR, default to preparing the `.playground`
+files first. After **explicit human confirmation in the current session**, the
+agent may directly create the signed commit, push the branch, and open the PR
+using the prepared `.playground` content. Otherwise:
 
 1. Create files in the `.playground/` directory (already in `.gitignore`)
 2. Generate two markdown files:
@@ -110,7 +114,9 @@ When instructed to prepare a commit or PR, **do not commit directly**. Instead:
    - `.playground/pr-description.md` — PR description
 
 The human operator will review these files and either:
-- Use them to manually commit/push and create a PR, or
+
+- Use them to manually commit/push and create a PR,
+- Ask the agent to perform the signed commit/push/PR flow directly after explicit confirmation, or
 - Use automated tooling with signed commits (`git commit -s -S`)
 
 ## Common Mistakes to Avoid
@@ -119,4 +125,4 @@ The human operator will review these files and either:
 - ❌ **Don't forget CLI** — All Python modules need `main()` with `--help`
 - ❌ **Don't break parity** — Keep Python and TypeScript APIs consistent
 - ❌ **Don't commit without signing** — Always use `-s -S`
-- ❌ **Don't skip tests** — Run `make test-all` before committing
+- ❌ **Don't skip tests** — Run `make test full` before committing

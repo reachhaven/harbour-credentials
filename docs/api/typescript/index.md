@@ -35,6 +35,10 @@ import {
   // KB-JWT
   createKbJwt,
   verifyKbJwt,
+
+  // SD-JWT VP
+  issueSdJwtVp,
+  verifySdJwtVp,
   
   // X.509
   generateSelfSignedCert,
@@ -69,10 +73,15 @@ interface KbJwtOptions {
   audience: string;
   issuedAt?: number;
 }
+
+interface SdJwtVpOptions {
+  disclosedClaims?: string[];
+  evidence?: Record<string, unknown>;
+  nonce?: string;
+  audience?: string;
+}
 ```
 
 ## Generated Documentation
 
-Full TypeScript API documentation is generated with TypeDoc and available at:
-
-- [TypeDoc API Reference](./typedoc/index.html)
+Full TypeScript API documentation can be generated with TypeDoc by running `yarn docs` in the TypeScript package directory.

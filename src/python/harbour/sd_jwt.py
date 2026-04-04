@@ -1,7 +1,11 @@
 """SD-JWT-VC — IETF SD-JWT-based Verifiable Credentials.
 
 Provides issuance and verification of SD-JWT-VC credentials with selective
-disclosure, using ES256 (P-256) or EdDSA (Ed25519) algorithms.
+disclosure per RFC 9901, using ES256 (P-256) or EdDSA (Ed25519) algorithms.
+
+Supports both flat and structured (nested) selective disclosure:
+  - Flat: ``disclosable=["email", "duns"]`` — top-level claims
+  - Structured: ``disclosable=["credentialSubject.email"]`` — nested paths
 
 CLI Usage:
     python -m harbour.sd_jwt --help
@@ -11,11 +15,15 @@ CLI Usage:
 
 import argparse
 import base64
+import copy
 import hashlib
 import json
 import secrets
 import sys
 from pathlib import Path
+from typing import Any
+
+from joserfc import jws
 
 from harbour._crypto import import_private_key as _import_private_key
 from harbour._crypto import import_public_key as _import_public_key
@@ -23,10 +31,76 @@ from harbour._crypto import resolve_private_key_alg as _resolve_alg
 from harbour._crypto import resolve_public_key_alg as _alg_for_key
 from harbour.keys import PrivateKey, PublicKeyType
 from harbour.verifier import VerificationError
-from joserfc import jws
 
 # SD-JWT uses ~-delimited format: <issuer-jwt>~<disclosure1>~<disclosure2>~...~
 SD_JWT_SEPARATOR = "~"
+
+
+def _create_disclosure(claim_name: str, claim_value: Any) -> tuple[str, str]:
+    """Create a single SD-JWT disclosure.
+
+    Returns:
+        Tuple of (base64url-encoded disclosure, base64url-encoded SHA-256 digest).
+    """
+    salt = secrets.token_urlsafe(16)
+    disclosure_array = [salt, claim_name, claim_value]
+    disclosure_json = json.dumps(disclosure_array, ensure_ascii=False).encode("utf-8")
+    disclosure_b64 = base64.urlsafe_b64encode(disclosure_json).rstrip(b"=").decode()
+    digest = (
+        base64.urlsafe_b64encode(
+            hashlib.sha256(disclosure_b64.encode("ascii")).digest()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
+    return disclosure_b64, digest
+
+
+def _apply_structured_disclosures(
+    payload: dict, disclosable: list[str]
+) -> tuple[dict, list[str]]:
+    """Apply structured selective disclosure to a nested payload.
+
+    Processes dot-path disclosable entries (e.g. ``"credentialSubject.email"``)
+    by placing ``_sd`` digests at the correct nesting level per RFC 9901 §6.2.
+
+    Simple (non-dotted) names are treated as top-level disclosable claims
+    for backward compatibility.
+
+    Args:
+        payload: The claims dict (will be deep-copied, not mutated).
+        disclosable: List of claim paths (dot-separated for nested).
+
+    Returns:
+        Tuple of (modified payload with _sd arrays, list of disclosure strings).
+    """
+    result = copy.deepcopy(payload)
+    disclosures: list[str] = []
+
+    for path in disclosable:
+        parts = path.split(".")
+        leaf_key = parts[-1]
+        parent_parts = parts[:-1]
+
+        # Navigate to the parent object
+        parent = result
+        for part in parent_parts:
+            if isinstance(parent, dict) and part in parent:
+                parent = parent[part]
+            else:
+                break
+        else:
+            # Successfully navigated to parent — check leaf exists
+            if isinstance(parent, dict) and leaf_key in parent:
+                value = parent.pop(leaf_key)
+                disc_b64, digest = _create_disclosure(leaf_key, value)
+                disclosures.append(disc_b64)
+                parent.setdefault("_sd", []).append(digest)
+                continue
+
+        # Path not found — skip silently (claim may not be present)
+
+    return result, disclosures
 
 
 def issue_sd_jwt_vc(
@@ -39,57 +113,37 @@ def issue_sd_jwt_vc(
     x5c: list[str] | None = None,
     cnf: dict | None = None,
 ) -> str:
-    """Issue an SD-JWT-VC credential.
+    """Issue an SD-JWT-VC credential with selective disclosure.
+
+    Supports both flat and structured (nested) claims per RFC 9901 §6:
+      - Flat: ``claims={"email": "a@b.com"}, disclosable=["email"]``
+      - Structured: ``claims={"credentialSubject": {"email": "a@b.com"}},
+        disclosable=["credentialSubject.email"]``
 
     Args:
-        claims: The credential claims (flat key-value pairs).
+        claims: Credential claims dict (flat or nested).
         private_key: Issuer's private key (P-256 or Ed25519).
         vct: Verifiable Credential Type URI.
-        disclosable: List of claim names to make selectively disclosable.
+        disclosable: Claim names/paths to make selectively disclosable.
+            Use dot-separated paths for nested claims.
         alg: Algorithm override (default: ES256 for P-256).
         x5c: X.509 certificate chain for JOSE header.
         cnf: Confirmation key (holder's public key JWK for key binding).
 
     Returns:
-        SD-JWT compact string: <issuer-jwt>~<disclosure1>~...~
+        SD-JWT compact string: ``<issuer-jwt>~<disclosure1>~...~``
     """
     alg = _resolve_alg(private_key, alg)
     disclosable = disclosable or []
 
-    # Separate disclosable and always-disclosed claims
-    sd_claims = {}
-    disclosed_claims = {"vct": vct}
-    disclosures = []
+    # Build the base payload with vct
+    payload = {**claims, "vct": vct}
 
-    for key, value in claims.items():
-        if key in disclosable:
-            # Create a disclosure: [salt, claim_name, claim_value]
-            salt = secrets.token_urlsafe(16)
-            disclosure_array = [salt, key, value]
-            disclosure_json = json.dumps(disclosure_array, ensure_ascii=False).encode(
-                "utf-8"
-            )
-            disclosure_b64 = (
-                base64.urlsafe_b64encode(disclosure_json).rstrip(b"=").decode()
-            )
-            disclosures.append(disclosure_b64)
+    # Apply structured disclosures (handles both flat and nested paths)
+    payload, disclosures = _apply_structured_disclosures(payload, disclosable)
 
-            # Hash the disclosure for the SD digest array
-            digest = (
-                base64.urlsafe_b64encode(
-                    hashlib.sha256(disclosure_b64.encode("ascii")).digest()
-                )
-                .rstrip(b"=")
-                .decode()
-            )
-            sd_claims.setdefault("_sd", []).append(digest)
-        else:
-            disclosed_claims[key] = value
-
-    # Build JWT payload
-    payload = {**disclosed_claims}
-    if "_sd" in sd_claims:
-        payload["_sd"] = sd_claims["_sd"]
+    # Set _sd_alg if any disclosures were created
+    if disclosures:
         payload["_sd_alg"] = "sha-256"
 
     if cnf is not None:
@@ -110,6 +164,55 @@ def issue_sd_jwt_vc(
     return SD_JWT_SEPARATOR.join(parts)
 
 
+def _collect_sd_digests(obj: Any) -> set[str]:
+    """Recursively collect all _sd digests from a nested payload."""
+    digests: set[str] = set()
+    if isinstance(obj, dict):
+        digests.update(obj.get("_sd", []))
+        for v in obj.values():
+            digests.update(_collect_sd_digests(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            digests.update(_collect_sd_digests(item))
+    return digests
+
+
+def _insert_disclosure_recursive(
+    obj: dict, claim_name: str, claim_value: Any, digest: str
+) -> bool:
+    """Recursively find the _sd array containing this digest and insert the claim.
+
+    Returns True if the digest was found and the claim was inserted.
+    """
+    if isinstance(obj, dict):
+        sd_array = obj.get("_sd", [])
+        if digest in sd_array:
+            obj[claim_name] = claim_value
+            sd_array.remove(digest)
+            if not sd_array:
+                del obj["_sd"]
+            return True
+            # Recurse into nested objects
+        for v in obj.values():
+            if isinstance(v, dict):
+                if _insert_disclosure_recursive(v, claim_name, claim_value, digest):
+                    return True
+    return False
+
+
+def _clean_sd_metadata(obj: Any) -> Any:
+    """Remove remaining _sd arrays and _sd_alg from the processed payload."""
+    if isinstance(obj, dict):
+        return {
+            k: _clean_sd_metadata(v)
+            for k, v in obj.items()
+            if k not in ("_sd", "_sd_alg")
+        }
+    elif isinstance(obj, list):
+        return [_clean_sd_metadata(item) for item in obj]
+    return obj
+
+
 def verify_sd_jwt_vc(
     sd_jwt: str,
     public_key: PublicKeyType,
@@ -118,13 +221,17 @@ def verify_sd_jwt_vc(
 ) -> dict:
     """Verify an SD-JWT-VC and return all disclosed claims.
 
+    Supports recursive ``_sd`` processing per RFC 9901 §7.1: digests may
+    appear at any nesting level in the payload.
+
     Args:
-        sd_jwt: SD-JWT compact string (<issuer-jwt>~<disclosure1>~...~).
+        sd_jwt: SD-JWT compact string (``<issuer-jwt>~<disclosure1>~...~``).
         public_key: Issuer's public key (P-256 or Ed25519).
         expected_vct: If provided, verify the vct claim matches.
 
     Returns:
-        Dict with all disclosed claims (always-disclosed + selectively-disclosed).
+        Dict with all disclosed claims (always-disclosed + selectively-disclosed),
+        preserving the original nesting structure.
 
     Raises:
         VerificationError: If signature is invalid or disclosures don't match.
@@ -161,24 +268,23 @@ def verify_sd_jwt_vc(
             f"VCT mismatch: expected {expected_vct!r}, got {payload.get('vct')!r}"
         )
 
-    # Process disclosures
-    sd_digests = set(payload.get("_sd", []))
-    disclosed_claims = {k: v for k, v in payload.items() if k not in ("_sd", "_sd_alg")}
+    # Collect all _sd digests recursively
+    all_digests = _collect_sd_digests(payload)
 
+    # Process each disclosure: find its matching _sd digest and insert
     for disc_b64 in disclosure_strings:
-        # Verify this disclosure matches a digest in _sd
         disc_hash = (
             base64.urlsafe_b64encode(hashlib.sha256(disc_b64.encode("ascii")).digest())
             .rstrip(b"=")
             .decode()
         )
-        if disc_hash not in sd_digests:
+        if disc_hash not in all_digests:
             raise VerificationError(
                 f"Disclosure hash {disc_hash[:16]}... not found in _sd digests"
             )
-        sd_digests.discard(disc_hash)
+        all_digests.discard(disc_hash)
 
-        # Decode and extract claim
+        # Decode disclosure
         disc_json = base64.urlsafe_b64decode(disc_b64 + "=" * (-len(disc_b64) % 4))
         disc_array = json.loads(disc_json)
         if len(disc_array) != 3:
@@ -186,9 +292,17 @@ def verify_sd_jwt_vc(
                 "Invalid disclosure format: expected [salt, name, value]"
             )
         _, claim_name, claim_value = disc_array
-        disclosed_claims[claim_name] = claim_value
 
-    return disclosed_claims
+        # Insert the claim at the correct nesting level
+        if not _insert_disclosure_recursive(
+            payload, claim_name, claim_value, disc_hash
+        ):
+            raise VerificationError(
+                f"Could not locate _sd digest for claim {claim_name!r}"
+            )
+
+    # Clean up _sd metadata from the result
+    return _clean_sd_metadata(payload)
 
 
 def main():

@@ -1,0 +1,8 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "tKjHMweiTEmNdgXye76UgmVSMA7mg5lsdZeav2alTyY",
+  "y": "lI83pcZ5BeUmOdrmLgx0KJ0DTbpcTC320WoryselneU",
+  "d": "9lapE-EQItu9EzUm8bnai1-nrYZ91IaM_DcU7JrD1KE",
+  "_comment": "TEST ONLY \u2014 Employee (Natural Person) \u2014 individual subject, signs consent VPs"
+}

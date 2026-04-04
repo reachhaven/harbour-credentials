@@ -25,7 +25,7 @@ export async function verifyVcJose(
   token: string,
   publicKey: CryptoKey,
 ): Promise<Record<string, unknown>> {
-  return verifyJose(token, publicKey, "vc+ld+jwt");
+  return verifyJose(token, publicKey, "vc+jwt");
 }
 
 /**
@@ -36,7 +36,7 @@ export async function verifyVpJose(
   publicKey: CryptoKey,
   options: VpVerifyOptions = {},
 ): Promise<Record<string, unknown>> {
-  const payload = await verifyJose(token, publicKey, "vp+ld+jwt");
+  const payload = await verifyJose(token, publicKey, "vp+jwt");
 
   if (options.expectedNonce !== undefined) {
     if (payload.nonce !== options.expectedNonce) {

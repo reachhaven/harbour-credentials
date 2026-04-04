@@ -1,0 +1,66 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/reachhaven/harbour/core/v1/",
+    {
+      "JsonWebKey": "https://w3id.org/security#JsonWebKey",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#controller",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "5TDhagEwEJvWbr7gt91Pds6g74LVYlqunw6a863jAoQ",
+        "y": "uAaJmh4wdv9sAacVZyMDF55WscI8Gk9NwdVJzXjYek4"
+      }
+    },
+    {
+      "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#delegate-1",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "5TDhagEwEJvWbr7gt91Pds6g74LVYlqunw6a863jAoQ",
+        "y": "uAaJmh4wdv9sAacVZyMDF55WscI8Gk9NwdVJzXjYek4"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#controller"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#controller"
+  ],
+  "capabilityDelegation": [
+    "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#delegate-1"
+  ],
+  "service": [
+    {
+      "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#service-1",
+      "type": "harbour:TrustAnchorService",
+      "serviceEndpoint": {
+        "@type": "schema:Organization",
+        "name": "Haven Trust Anchor",
+        "url": "https://resolver.harbour.id/trust-anchors/did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"
+      }
+    },
+    {
+      "id": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202#service-2",
+      "type": "harbour:CRSetRevocationRegistryService",
+      "serviceEndpoint": {
+        "@type": "harbour:CRSetServiceEndpoint",
+        "registryEndpoint": "https://resolver.harbour.id/crset/"
+      }
+    }
+  ]
+}

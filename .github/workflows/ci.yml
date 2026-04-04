@@ -24,10 +24,23 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: python3 -m pip install -e ".[dev]"
+        run: make install dev
 
       - name: Run pre-commit
-        run: pre-commit run --all-files
+        run: make lint
+
+  lint-markdown:
+    name: Lint (Markdown)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Lint Markdown
+        run: npx --yes markdownlint-cli2
 
   lint-ts:
     name: Lint (TypeScript)
@@ -39,20 +52,16 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        working-directory: src/typescript/harbour
-        run: yarn install --immutable
-
-      - name: Type check
-        working-directory: src/typescript/harbour
-        run: yarn lint
+      - name: Lint TypeScript
+        run: make lint ts
 
   generate-validate:
-    name: Generate & Validate
-    runs-on: ubuntu-latest
+    name: Generate & Validate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,10 +72,10 @@ jobs:
           python-version: "3.12"
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install dependencies and submodules
         run: |
-          python3 -m pip install -e ".[dev]" linkml
-          python3 -m pip install -e "./submodules/ontology-management-base"
+          make install dev
+          make setup submodules
 
       - name: Generate artifacts
         run: make generate
@@ -75,28 +84,37 @@ jobs:
         run: make validate
 
       - name: Validate examples (SHACL conformance)
-        run: make validate-shacl
+        run: make validate shacl
 
   test-python:
-    name: Test (Python)
-    runs-on: ubuntu-latest
+    name: Test (Python) (${{ matrix.os }}, py${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
       - name: Install dependencies
-        run: python3 -m pip install -e ".[dev]"
+        run: make install dev
 
       - name: Run tests
-        run: PYTHONPATH=src/python:$PYTHONPATH pytest tests/ -v --tb=short --cov
+        run: make test
 
   test-ts:
-    name: Test (TypeScript)
-    runs-on: ubuntu-latest
+    name: Test (TypeScript) (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -104,20 +122,16 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        working-directory: src/typescript/harbour
-        run: yarn install --immutable
-
       - name: Run tests
-        working-directory: src/typescript/harbour
-        run: yarn test
+        run: make test ts
 
   test-interop:
-    name: Cross-Runtime Interop
-    runs-on: ubuntu-latest
+    name: Cross-Runtime Interop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     needs: [test-python, test-ts]
     steps:
       - uses: actions/checkout@v4
@@ -131,15 +145,38 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install Python dependencies
-        run: python3 -m pip install -e ".[dev]"
+        run: make install dev
 
-      - name: Install TypeScript dependencies
-        working-directory: src/typescript/harbour
-        run: yarn install --immutable
+      - name: Build TypeScript
+        run: make build ts
 
       - name: Run interop tests
-        run: PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v --tb=short
+        run: make test interop
+
+  # --- Credential Lifecycle Story ---
+  story:
+    name: Credential Story (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    needs: [generate-validate]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - name: Install dependencies and submodules
+        run: |
+          make install dev
+          make setup submodules
+
+      - name: Run credential storyline (generate → sign → verify → SHACL validate)
+        run: make story

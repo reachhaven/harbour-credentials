@@ -1,5 +1,13 @@
 """X.509 certificate chain support for EUDI-compliant VC signing.
 
+This module validates X.509 chain structure and signatures only. It does
+NOT perform certificate revocation checking (CRL/OCSP) because Harbour
+credentials use CRSet (harbour:CRSetEntry) for credential-level revocation,
+not X.509 certificate revocation. X.509 chains provide issuer identity
+binding; CRSet provides credential status.
+
+See: RFC 5280 (X.509 PKI), CRSet paper (https://arxiv.org/abs/2501.17089).
+
 CLI Usage:
     python -m harbour.x509 --help
     python -m harbour.x509 generate --key key.jwk --subject "CN=Test" --output cert.pem
@@ -17,6 +25,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.x509.oid import NameOID
+
 from harbour.keys import PrivateKey, PublicKeyType
 
 
@@ -280,6 +289,7 @@ Examples:
         pub_key = extract_public_key(cert)
 
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
         from harbour.keys import p256_public_key_to_jwk, public_key_to_jwk
 
         if isinstance(pub_key, Ed25519PublicKey):

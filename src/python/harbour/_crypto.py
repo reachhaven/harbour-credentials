@@ -17,6 +17,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
+from joserfc.jwk import ECKey, OKPKey
+
 from harbour.keys import (
     PrivateKey,
     PublicKeyType,
@@ -26,7 +28,6 @@ from harbour.keys import (
     p256_public_key_to_jwk,
     public_key_to_jwk,
 )
-from joserfc.jwk import ECKey, OKPKey
 
 
 def import_private_key(private_key: PrivateKey, alg: str) -> ECKey | OKPKey:

@@ -1,0 +1,8 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "5TDhagEwEJvWbr7gt91Pds6g74LVYlqunw6a863jAoQ",
+  "y": "uAaJmh4wdv9sAacVZyMDF55WscI8Gk9NwdVJzXjYek4",
+  "d": "Lh_iWmDLKDnznSCIToKUSEQfyegJCc53ulS5z1vrua0",
+  "_comment": "TEST ONLY \u2014 Haven Signing Service \u2014 sole issuer of all harbour credentials"
+}

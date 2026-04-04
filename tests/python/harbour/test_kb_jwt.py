@@ -1,6 +1,7 @@
 """Tests for KB-JWT creation and verification with transaction_data support."""
 
 import pytest
+
 from harbour.kb_jwt import create_kb_jwt, verify_kb_jwt
 from harbour.keys import (
     generate_p256_keypair,
@@ -11,12 +12,12 @@ from harbour.sd_jwt import issue_sd_jwt_vc
 from harbour.verifier import VerificationError
 
 SAMPLE_CLAIMS = {
-    "iss": "did:web:did.ascs.digital:participants:ascs",
-    "legalName": "Bayerische Motoren Werke AG",
-    "email": "imprint@bmw.com",
+    "iss": "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
+    "legalName": "Example Corporation GmbH",
+    "email": "info@example.com",
 }
 
-VCT = "https://w3id.org/ascs-ev/simpulse-id/credentials/v1/ParticipantCredential"
+VCT = "https://w3id.org/reachhaven/harbour/core/v1/LegalPersonCredential"
 
 
 @pytest.fixture()

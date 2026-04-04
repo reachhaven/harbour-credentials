@@ -2,6 +2,11 @@
 
 **Harbour Credentials** is a cryptographic library for signing and verifying verifiable credentials. It provides dual-runtime support for both Python and TypeScript with feature parity.
 
+!!! tip "New here?"
+    Start with the [Credential Lifecycle](guide/credential-lifecycle.md) guide
+    to see how companies and employees get credentialed, how transactions
+    work, and what ends up in each wallet — with swimlane diagrams.
+
 ## Features
 
 - 🔑 **Key Management** — P-256 and Ed25519 key generation with DID:key encoding
@@ -13,60 +18,62 @@
 
 ## Quick Start
 
-=== "Python"
+**Python:**
 
-    ```python
-    from harbour.keys import generate_p256_keypair, p256_public_key_to_did_key
-    from harbour.signer import sign_vc_jose
-    from harbour.verifier import verify_vc_jose
+```python
+from harbour.keys import generate_p256_keypair, p256_public_key_to_did_key
+from harbour.signer import sign_vc_jose
+from harbour.verifier import verify_vc_jose
 
-    # Generate keypair
-    private_key, public_key = generate_p256_keypair()
-    did = p256_public_key_to_did_key(public_key)
+# Generate keypair
+private_key, public_key = generate_p256_keypair()
+did = p256_public_key_to_did_key(public_key)
 
-    # Sign a credential
-    credential = {"type": ["VerifiableCredential"], "issuer": did, ...}
-    jwt = sign_vc_jose(credential, private_key)
+# Sign a credential
+credential = {"type": ["VerifiableCredential"], "issuer": did, ...}
+jwt = sign_vc_jose(credential, private_key)
 
-    # Verify
-    result = verify_vc_jose(jwt, public_key)
-    ```
+# Verify
+result = verify_vc_jose(jwt, public_key)
+```
 
-=== "TypeScript"
+**TypeScript:**
 
-    ```typescript
-    import { generateP256Keypair, p256PublicKeyToDid, signJwt, verifyJwt } from '@reachhaven/harbour-credentials';
+```typescript
+import { generateP256Keypair, p256PublicKeyToDid, signJwt, verifyJwt } from '@reachhaven/harbour-credentials';
 
-    // Generate keypair
-    const { privateKey, publicKey } = await generateP256Keypair();
-    const did = await p256PublicKeyToDid(publicKey);
+// Generate keypair
+const { privateKey, publicKey } = await generateP256Keypair();
+const did = await p256PublicKeyToDid(publicKey);
 
-    // Sign a credential
-    const credential = { type: ['VerifiableCredential'], issuer: did, ... };
-    const jwt = await signJwt(credential, privateKey);
+// Sign a credential
+const credential = { type: ['VerifiableCredential'], issuer: did, ... };
+const jwt = await signJwt(credential, privateKey);
 
-    // Verify
-    const result = await verifyJwt(jwt, publicKey);
-    ```
+// Verify
+const result = await verifyJwt(jwt, publicKey);
+```
 
 ## Installation
 
-=== "Python"
+**Python:**
 
-    ```bash
-    pip install harbour-credentials
-    ```
+```bash
+pip install harbour-credentials
+```
 
-=== "TypeScript"
+**TypeScript:**
 
-    ```bash
-    npm install @reachhaven/harbour-credentials
-    ```
+```bash
+npm install @reachhaven/harbour-credentials
+```
 
 ## Documentation
 
+- [Credential Lifecycle](guide/credential-lifecycle.md) — **Start here**: onboarding flows, wallet contents, presentation scenarios
 - [Installation](getting-started/installation.md) — Detailed setup instructions
 - [Quick Start](getting-started/quickstart.md) — Get up and running
-- [User Guide](guide/keys.md) — In-depth usage guides
 - [CLI Reference](cli/index.md) — Command-line tools
 - [API Reference](api/python/index.md) — Python and TypeScript APIs
+- [DID Identity System](did-identity-system.md) — `did:ethr` + P-256 + IdentityController architecture
+- [DID Method Evaluation](specs/did-method-evaluation.md) — `did:ethr` modeling notes and local reference specs

@@ -32,7 +32,7 @@ describe("tamper detection", () => {
       Buffer.from(parts[1], "base64url").toString(),
     ) as Record<string, any>;
     (payload.credentialSubject as any).id =
-      "did:web:did.ascs.digital:participants:evil";
+      "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace";
     const tampered = Buffer.from(JSON.stringify(payload)).toString("base64url");
 
     const tamperedToken = `${parts[0]}.${tampered}.${parts[2]}`;
@@ -65,7 +65,7 @@ describe("tamper detection", () => {
     const header = JSON.parse(
       Buffer.from(parts[0], "base64url").toString(),
     );
-    header.kid = "did:web:evil.example.com#key-1";
+    header.kid = "did:ethr:0x14a34:0x81c6d42b1781bb3bb7a280f564d66ec9d41beace#key-1";
     const tampered = Buffer.from(JSON.stringify(header)).toString("base64url");
 
     const tamperedToken = `${tampered}.${parts[1]}.${parts[2]}`;

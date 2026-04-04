@@ -1,0 +1,300 @@
+id: https://w3id.org/reachhaven/harbour/delegate/v1
+name: harbour-core-delegation
+description: >
+  Delegation transaction types for the Harbour signing flow.
+  Defines typed transaction data objects used in OID4VP-aligned delegated
+  signing flows. Each transaction type specifies the action being delegated
+  (data purchase, blockchain transfer, contract signing, etc.) and the
+  structure of its action-specific details (txn).
+  These types are referenced via the harbour.delegate: prefix in the
+  transaction_data.type field of DelegatedSignatureEvidence (harbour core).
+
+# ============================================================================
+# SPECIFICATION REFERENCES
+# ============================================================================
+# [OID4VP]       OpenID for Verifiable Presentations 1.0 (Final)
+#                https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
+#                Local: docs/specs/references/oid4vp-1.0.md
+# [OID4VP-§5.1]  OID4VP §5.1 — transaction_data is a request parameter
+#                (array of base64url JSON objects).
+# [OID4VP-§8.4]  OID4VP §8.4 — Wallet MUST process each transaction_data object.
+# [OID4VP-§B.3]  OID4VP §B.3.3 — KB-JWT carries transaction_data_hashes + _alg.
+# [HARBOUR-DEL]  Harbour Delegation Challenge Encoding Specification
+#                Local: docs/specs/delegation-challenge-encoding.md
+# [HARBOUR-DEL-§3]   §3 — Transaction data structure (type, credential_ids,
+#                     nonce, iat, txn).
+# [HARBOUR-DEL-§3.4] §3.4 — Transaction details (txn) by action type.
+# [HARBOUR-DEL-§3.6] §3.6 — Computing the hash (canonical JSON, SHA-256).
+#
+# NAMING CONVENTIONS [HARBOUR-DEL §3.4 "Naming Conventions"]
+# ============================================================================
+# OID4VP protocol fields use snake_case exactly as specified:
+#   transaction_data, credential_ids, transaction_data_hashes_alg
+# Harbour action payload (txn) keys use snake_case (profile-defined):
+#   asset_id, price, currency, marketplace, etc.
+# IMPORTANT: txn keys are part of canonicalization and hashing.
+#   Renaming a key (e.g. asset_id → assetId) changes the canonical JSON
+#   and therefore changes the challenge/hash binding.
+# ============================================================================
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  harbour: https://w3id.org/reachhaven/harbour/core/v1/
+  harbour.delegate: https://w3id.org/reachhaven/harbour/delegate/v1/
+
+default_prefix: harbour.delegate
+default_range: string
+
+imports:
+  - linkml:types
+
+classes:
+  # ==========================================
+  # 1. BASE TRANSACTION DATA
+  # ==========================================
+  # [OID4VP-§5.1] — transaction_data is an array of base64url JSON objects.
+  # [HARBOUR-DEL-§3] — structure: type, credential_ids, nonce, iat, txn.
+  # [HARBOUR-DEL-§3.6] — hash computed over canonical JSON (sorted keys,
+  #   no whitespace) using SHA-256.
+
+  TransactionData:
+    description: >
+      Base class for OID4VP-aligned transaction data objects [OID4VP-§5.1].
+      Contains common fields required by all transaction types per
+      [HARBOUR-DEL-§3]: type identifier, credential references, replay
+      protection (nonce, iat), and optional expiration/description.
+      Subclasses define the action-specific txn object [HARBOUR-DEL-§3.4].
+    class_uri: harbour.delegate:TransactionData
+    attributes:
+      # [HARBOUR-DEL-§3.2] — REQUIRED. Format: harbour.delegate:<action>
+      credential_ids:
+        description: >
+          References to DCQL Credential Query id fields that can authorize
+          this transaction [OID4VP-§5.1]. Array of string identifiers.
+        slot_uri: harbour.delegate:credential_ids
+        range: string
+        multivalued: true
+        required: true
+      # [HARBOUR-DEL-§3.2] — REQUIRED. Hash algorithms supported.
+      transaction_data_hashes_alg:
+        description: >
+          Hash algorithms supported for transaction data binding
+          [OID4VP-§B.3.3]. Default: ["sha-256"].
+        slot_uri: harbour.delegate:transaction_data_hashes_alg
+        range: string
+        multivalued: true
+      # [HARBOUR-DEL-§3.2] — REQUIRED. Unique replay protection nonce.
+      nonce:
+        description: >
+          Unique identifier for replay protection [HARBOUR-DEL-§3.2].
+          Same nonce appears in the challenge string.
+        slot_uri: harbour.delegate:nonce
+        range: string
+        required: true
+      # [HARBOUR-DEL-§3.2] — REQUIRED. Issued-at Unix timestamp.
+      iat:
+        description: >
+          Issued-at Unix timestamp (seconds since epoch)
+          [HARBOUR-DEL-§3.2].
+        slot_uri: harbour.delegate:iat
+        range: integer
+        required: true
+      # [HARBOUR-DEL-§3.3] — OPTIONAL. Expiration Unix timestamp.
+      exp:
+        description: >
+          Expiration Unix timestamp (seconds since epoch)
+          [HARBOUR-DEL-§3.3]. If absent, no expiry.
+        slot_uri: harbour.delegate:exp
+        range: integer
+      # [HARBOUR-DEL-§3.3] — OPTIONAL. Human-readable description.
+      description:
+        description: >
+          Human-readable description for wallet consent display
+          [HARBOUR-DEL-§3.3].
+        slot_uri: harbour.delegate:description
+        range: string
+
+  # ==========================================
+  # 2. TRANSACTION TYPES (txn objects)
+  # ==========================================
+  # [HARBOUR-DEL-§3.4] — each action type defines its own txn fields.
+  # These are the typed txn payloads embedded in TransactionData.
+
+  # ------------------------------------------
+  # 2a. DATA PURCHASE
+  # ------------------------------------------
+  # [HARBOUR-DEL-§3.4] — harbour.delegate:data.purchase
+  #   txn fields: asset_id, price, currency, marketplace
+  DataPurchaseTransaction:
+    description: >
+      Transaction for purchasing a data asset on a marketplace
+      [HARBOUR-DEL-§3.4]. The txn object identifies the asset,
+      price, currency, and marketplace DID.
+    class_uri: harbour.delegate:data.purchase
+    attributes:
+      asset_id:
+        description: URN or URI identifying the data asset being purchased.
+        slot_uri: harbour.delegate:asset_id
+        range: uri
+        required: true
+      price:
+        description: Price amount as a string (to preserve precision).
+        slot_uri: harbour.delegate:price
+        range: string
+        required: true
+      currency:
+        description: >
+          Currency identifier (e.g. "ENVITED", "EUR", "USD").
+        slot_uri: harbour.delegate:currency
+        range: string
+        required: true
+      marketplace:
+        description: DID of the marketplace facilitating the transaction.
+        slot_uri: harbour.delegate:marketplace
+        range: uri
+        required: true
+
+  # ------------------------------------------
+  # 2b. BLOCKCHAIN TRANSFER
+  # ------------------------------------------
+  # [HARBOUR-DEL-§3.4] — harbour.delegate:blockchain.transfer
+  #   txn fields: chain, contract, recipient, amount, token
+  BlockchainTransferTransaction:
+    description: >
+      Transaction for transferring tokens or value on a blockchain
+      [HARBOUR-DEL-§3.4]. Uses CAIP-2 chain identifier format.
+    class_uri: harbour.delegate:blockchain.transfer
+    attributes:
+      chain:
+        description: >
+          CAIP-2 chain identifier (e.g. "eip155:42793" for Polygon zkEVM).
+        slot_uri: harbour.delegate:chain
+        range: string
+        required: true
+      contract:
+        description: Smart contract address for the transfer.
+        slot_uri: harbour.delegate:contract
+        range: string
+        required: true
+      recipient:
+        description: Recipient address on the target chain.
+        slot_uri: harbour.delegate:recipient
+        range: string
+        required: true
+      amount:
+        description: >
+          Transfer amount in smallest unit (wei for EVM chains).
+          String to preserve precision.
+        slot_uri: harbour.delegate:amount
+        range: string
+        required: true
+      token:
+        description: >
+          Token identifier (contract address or symbol). Optional for
+          native currency transfers.
+        slot_uri: harbour.delegate:token
+        range: string
+
+  # ------------------------------------------
+  # 2c. BLOCKCHAIN EXECUTE
+  # ------------------------------------------
+  # [HARBOUR-DEL-§3.4] — harbour.delegate:blockchain.execute
+  #   txn fields: chain, contract, method, params, value
+  BlockchainExecuteTransaction:
+    description: >
+      Transaction for executing a smart contract method on a blockchain
+      [HARBOUR-DEL-§3.4]. Used for arbitrary contract interactions
+      beyond simple transfers.
+    class_uri: harbour.delegate:blockchain.execute
+    attributes:
+      chain:
+        description: >
+          CAIP-2 chain identifier (e.g. "eip155:42793" for Polygon zkEVM).
+        slot_uri: harbour.delegate:chain_exec
+        range: string
+        required: true
+      contract:
+        description: Smart contract address to interact with.
+        slot_uri: harbour.delegate:contract_exec
+        range: string
+        required: true
+      method:
+        description: >
+          Smart contract method name or function selector to invoke.
+        slot_uri: harbour.delegate:method
+        range: string
+        required: true
+      params:
+        description: >
+          Method parameters as a JSON-encoded string (preserves
+          arbitrary typed arguments).
+        slot_uri: harbour.delegate:params
+        range: string
+      value:
+        description: >
+          Native currency value to send with the transaction (in wei).
+          String to preserve precision.
+        slot_uri: harbour.delegate:value
+        range: string
+
+  # ------------------------------------------
+  # 2d. CONTRACT SIGN
+  # ------------------------------------------
+  # [HARBOUR-DEL-§3.4] — harbour.delegate:contract.sign
+  #   txn fields: document_hash, document_uri, parties
+  ContractSignTransaction:
+    description: >
+      Transaction for digitally signing a legal or business document
+      [HARBOUR-DEL-§3.4]. References the document by hash and URI,
+      and lists all signing parties.
+    class_uri: harbour.delegate:contract.sign
+    attributes:
+      document_hash:
+        description: >
+          Content hash of the document (format: "sha256:<hex>").
+          Used for integrity verification.
+        slot_uri: harbour.delegate:document_hash
+        range: string
+        required: true
+      document_uri:
+        description: URI where the document can be retrieved.
+        slot_uri: harbour.delegate:document_uri
+        range: uri
+      parties:
+        description: >
+          DIDs of all parties involved in the signing ceremony.
+        slot_uri: harbour.delegate:parties
+        range: uri
+        multivalued: true
+        required: true
+
+  # ------------------------------------------
+  # 2e. CREDENTIAL ISSUE
+  # ------------------------------------------
+  # [HARBOUR-DEL-§3.4] — harbour.delegate:credential.issue
+  #   txn fields: credential_type, subject, claims
+  CredentialIssueTransaction:
+    description: >
+      Transaction for delegating credential issuance to a signing service
+      [HARBOUR-DEL-§3.4]. The user authorizes Haven to issue a credential
+      of the specified type to the specified subject.
+    class_uri: harbour.delegate:credential.issue
+    attributes:
+      credential_type:
+        description: >
+          Type URI of the credential to be issued (e.g.
+          "harbour.gx:NaturalPersonCredential").
+        slot_uri: harbour.delegate:credential_type
+        range: string
+        required: true
+      subject:
+        description: DID of the credential subject.
+        slot_uri: harbour.delegate:subject
+        range: uri
+        required: true
+      claims:
+        description: >
+          JSON-encoded claims to include in the credential.
+          Preserved as string to support arbitrary claim structures.
+        slot_uri: harbour.delegate:claims
+        range: string

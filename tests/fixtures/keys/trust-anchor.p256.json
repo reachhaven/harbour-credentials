@@ -1,0 +1,8 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "XHiins22glZnQ_fFRbt1biH1-0IUj2gpl0jbaUxe1Cc",
+  "y": "jW9z3Tz4x1ontNTdV3apbP3e8odM3ln9BHyu0zndRM8",
+  "d": "HIVaaLBVhqeLr91yhVE9_7cKyPyUJTedFSecAs0p-kM",
+  "_comment": "TEST ONLY \u2014 Trust Anchor \u2014 root of trust, self-signed LinkedCredentialService"
+}

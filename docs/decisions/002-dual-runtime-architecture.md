@@ -19,7 +19,7 @@ Both groups need to sign and verify the same credentials. If the Python implemen
 
 ### Repository Structure
 
-```
+```text
 harbour-credentials/
 ├── src/
 │   ├── python/
@@ -47,7 +47,7 @@ harbour-credentials/
 │   ├── python/credentials/    # Python credentials module tests
 │   ├── typescript/harbour/    # TypeScript tests (vitest)
 │   └── interop/               # Cross-runtime interop tests
-├── linkml/                    # LinkML schemas (harbour.yaml, core.yaml, gaiax-domain.yaml)
+├── linkml/                    # LinkML schemas (harbour-core-credential.yaml, harbour-gx-credential.yaml)
 ├── artifacts/                 # Generated OWL/SHACL/JSON-LD context
 └── docs/
 ```
@@ -62,7 +62,8 @@ The interop guarantee is enforced by **shared test fixtures**:
 4. `tests/fixtures/tokens/signed-vc-p256.jwt` — Reference signed JWT (committed, deterministic)
 
 **Interop test pattern:**
-```
+
+```text
 Python signs sample-vc.json → JWT string → JavaScript verifies ✓
 JavaScript signs sample-vc.json → JWT string → Python verifies ✓
 Both produce identical JWT for same input + key ✓
@@ -77,10 +78,11 @@ jobs:
   lint:         # black, isort, flake8, eslint, prettier
   test-python:  # pytest tests/
   test-js:      # npm test (vitest or jest)
-  test-interop: # Cross-runtime verification
+  interop-tests: # Cross-runtime verification
 ```
 
 The interop job:
+
 1. Installs both Python and Node.js
 2. Python signs → writes JWT to stdout → Node.js reads and verifies
 3. Node.js signs → writes JWT to stdout → Python reads and verifies
@@ -96,17 +98,20 @@ The interop job:
 ## Consequences
 
 ### Positive
+
 - Web developers can `npm install` the JS package and sign/verify immediately
 - Python developers can `pip install` the Python package
 - Cross-runtime bugs are caught by CI, not in production
 - Proves the format is truly standard (if two independent implementations agree, it works)
 
 ### Negative
+
 - Repository needs both Python and Node.js tooling
 - CI pipeline is more complex (two runtimes)
 - Contributors need familiarity with both ecosystems (or can focus on one)
 
 ### Decided Since Initial Proposal
+
 - **npm package name** — `@reachhaven/harbour-credentials`
 - **JS test framework** — vitest (fast, ESM-native)
 - **Package manager** — Yarn 4 via corepack

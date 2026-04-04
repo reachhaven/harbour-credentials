@@ -16,7 +16,7 @@ import {
 const FIXTURES_DIR = resolve(__dirname, "../../fixtures");
 
 const SAMPLE_CLAIMS = {
-  iss: "did:web:issuer.example.com",
+  iss: "did:ethr:0x14a34:0x212025b9751231b17ead53fdcaad8ddeffa0106c",
   iat: Math.floor(Date.now() / 1000),
   legalName: "Test Corp",
 };
@@ -45,7 +45,7 @@ describe("KB-JWT creation", () => {
 
     const withKb = await createKbJwt(sdJwt, holderPrivateKey, {
       nonce: "test-nonce-123",
-      audience: "did:web:verifier.example.com",
+      audience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
     });
 
     // Should have one more ~ segment than the original
@@ -63,15 +63,15 @@ describe("KB-JWT creation", () => {
 
     const withKb = await createKbJwt(sdJwt, holderPrivateKey, {
       nonce: "test-nonce",
-      audience: "did:web:verifier.example.com",
-      transactionData: ["tx1", "tx2"],
+      audience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
+      transaction_data: ["tx1", "tx2"],
     });
 
     // Verify and check payload
     const payload = await verifyKbJwt(withKb, holderPublicKey, {
       expectedNonce: "test-nonce",
-      expectedAudience: "did:web:verifier.example.com",
-      expectedTransactionData: ["tx1", "tx2"],
+      expectedAudience: "did:ethr:0x14a34:0x6c6ddd7fb6c9732f30734a63db7e257987aed0e0",
+      expected_transaction_data: ["tx1", "tx2"],
     });
 
     expect(payload.transaction_data_hashes).toBeDefined();
@@ -152,14 +152,14 @@ describe("KB-JWT verification", () => {
     const withKb = await createKbJwt(sdJwt, holderPrivateKey, {
       nonce: "nonce",
       audience: "aud",
-      transactionData: ["tx1", "tx2"],
+      transaction_data: ["tx1", "tx2"],
     });
 
     await expect(
       verifyKbJwt(withKb, holderPublicKey, {
         expectedNonce: "nonce",
         expectedAudience: "aud",
-        expectedTransactionData: ["tx1", "WRONG"],
+        expected_transaction_data: ["tx1", "WRONG"],
       })
     ).rejects.toThrow(KbJwtVerificationError);
   });
