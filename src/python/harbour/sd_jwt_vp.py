@@ -25,6 +25,7 @@ import argparse
 import base64
 import hashlib
 import json
+import logging
 import sys
 import time
 from copy import deepcopy
@@ -42,9 +43,12 @@ from harbour.delegation import (
     TransactionData,
     compute_transaction_data_param_hash,
     create_delegation_challenge,
+    validate_transaction_data,
 )
 from harbour.keys import PrivateKey, PublicKeyType
 from harbour.verifier import VerificationError
+
+logger = logging.getLogger(__name__)
 
 # SD-JWT uses ~-delimited format
 SD_JWT_SEPARATOR = "~"
@@ -340,6 +344,8 @@ def verify_sd_jwt_vp(
     *,
     expected_nonce: str | None = None,
     expected_audience: str | None = None,
+    check_transaction_freshness: bool = False,
+    max_transaction_age_seconds: int = 300,
 ) -> dict:
     """Verify an SD-JWT VP and return disclosed claims and evidence.
 
@@ -349,6 +355,11 @@ def verify_sd_jwt_vp(
         holder_public_key: Holder's public key (for VP and KB-JWT verification).
         expected_nonce: If provided, verify nonce matches.
         expected_audience: If provided, verify audience matches.
+        check_transaction_freshness: If True, validate transaction data
+            timestamps (iat, exp) per EVES-009 §5 time-bounding requirement.
+        max_transaction_age_seconds: Maximum age of transaction data in
+            seconds (default: 300). Only used when check_transaction_freshness
+            is True.
 
     Returns:
         dict with:
@@ -517,7 +528,31 @@ def verify_sd_jwt_vp(
         if kb_audience != expected_audience:
             raise VerificationError("Audience mismatch in KB-JWT")
 
-    # 8. Process disclosures
+    # 8a. Credential status check (EVES-009 §5: credential freshness)
+    credential_status = vc_payload.get("credentialStatus")
+    if credential_status is not None:
+        logger.warning(
+            "Credential contains credentialStatus but revocation check is not "
+            "performed by verify_sd_jwt_vp(). Caller SHOULD verify revocation "
+            "status independently per EVES-009 §5."
+        )
+
+    # 8b. Transaction freshness check (EVES-009 §5: time-bounding)
+    if check_transaction_freshness and evidence_list:
+        for ev_item in evidence_list:
+            tx_data_raw = ev_item.get("transaction_data")
+            if tx_data_raw and isinstance(tx_data_raw, dict):
+                try:
+                    tx = TransactionData(**tx_data_raw)
+                    validate_transaction_data(
+                        tx, max_age_seconds=max_transaction_age_seconds
+                    )
+                except Exception as e:
+                    raise VerificationError(
+                        f"Transaction data freshness check failed: {e}"
+                    ) from e
+
+    # 8c. Process disclosures
     sd_digests = set(vc_payload.get("_sd", []))
     disclosed_claims = {
         k: v for k, v in vc_payload.items() if k not in ("_sd", "_sd_alg")
