@@ -104,18 +104,12 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Install Python dependencies
-        run: python3 -m pip install -e ".[dev,docs]"
-
-      - name: Install TypeScript dependencies
-        working-directory: src/typescript/harbour
-        run: yarn install --immutable
-
-      - name: Generate artifacts
-        run: make generate
-
-      - name: Validate artifacts
-        run: make validate shacl
+      - name: Install dependencies
+        env:
+          CI: "1"
+        run: |
+          make setup
+          python3 -m pip install -e ".[docs]"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
