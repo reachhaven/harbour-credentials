@@ -117,15 +117,15 @@ jobs:
       - name: Validate artifacts
         run: make validate shacl
 
-      - name: Generate TypeScript API docs
-        working-directory: src/typescript/harbour
-        run: npx typedoc --out ../../../docs/api/typescript index.ts --skipErrorChecking
-
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Build MkDocs site
         run: mkdocs build --strict --site-dir site
+
+      - name: Generate TypeScript API docs into site
+        working-directory: src/typescript/harbour
+        run: npx typedoc --out ../../../site/api/typescript-generated index.ts --skipErrorChecking
 
       - name: Prepare w3id artifacts
         run: make release-artifacts
