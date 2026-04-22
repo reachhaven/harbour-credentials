@@ -276,7 +276,9 @@ ontology-management-base pipeline.
 ## Revocation Infrastructure
 
 Harbour uses a **Credential Revocation Set (CRSet)** mechanism for
-status management:
+status management. The authoritative CRSet service is discovered by
+resolving the `statusServiceOperator` DID and selecting the service
+entry with type `harbour:CRSetRevocationRegistryService`:
 
 ```mermaid
 classDiagram
@@ -284,13 +286,16 @@ classDiagram
         class_uri = harbour:CRSetEntry
         type : string ⟨required⟩
         statusPurpose : string ⟨required⟩
-        statusListIndex : integer ⟨required⟩
-        statusListCredential : uri ⟨required⟩
+        statusServiceOperator : uri ⟨required⟩
+        statusIndex : string ⟨required⟩
+        statusId : uri ⟨optional⟩
     }
 ```
 
 Each credential carries a `credentialStatus` array of `CRSetEntry`
-objects pointing to an on-chain or hosted status list.
+objects. Verifiers resolve the `statusServiceOperator` DID, find the
+`harbour:CRSetRevocationRegistryService` by type, and query
+its `registryEndpoint` with the `statusIndex`.
 
 ---
 

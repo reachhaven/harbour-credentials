@@ -113,7 +113,7 @@ slots:
   # [VCDM2] §4.10 — The credentialStatus property is OPTIONAL and is used
   # to discover information about the current status of a verifiable
   # credential (e.g. whether it is suspended or revoked). Each status
-  # entry MUST specify its id and type.
+  # entry MUST specify its type; id is OPTIONAL.
   # [VC-CTX] maps credentialStatus with @type: @id.
   credentialStatus:
     slot_uri: cred:credentialStatus
@@ -121,7 +121,7 @@ slots:
     multivalued: true
     description: >
       [VCDM2] §4.10 — credentialStatus is OPTIONAL (0..*), each MUST have
-      id and type.
+      type; id is OPTIONAL.
 
   # [VCDM2] §4.6 — A verifiable credential MUST contain a
   # credentialSubject property. The value is a set of objects containing

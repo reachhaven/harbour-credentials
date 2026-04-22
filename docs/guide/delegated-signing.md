@@ -272,7 +272,9 @@ After executing the transaction, the signing service issues a **receipt credenti
   }],
   "credentialStatus": [{
     "type": "harbour:CRSetEntry",
-    "statusPurpose": "revocation"
+    "statusPurpose": "revocation",
+    "statusServiceOperator": "<did-of-crset-operator>",
+    "statusIndex": "<credential-specific-index>"
   }]
 }
 ```
