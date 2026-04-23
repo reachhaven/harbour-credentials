@@ -273,6 +273,15 @@ make test full
 # Python tests with coverage
 make test cov
 
+# Credential lifecycle story (Python: generate → sign → verify → SHACL validate)
+make story
+
+# Credential lifecycle story (TypeScript: generate → sign → verify → SHACL validate)
+make story ts
+
+# Cross-runtime story (TS-sign → Python-verify, then Python-sign → TS-verify)
+make story cross
+
 # Lint
 make lint
 

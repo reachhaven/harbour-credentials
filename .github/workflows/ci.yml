@@ -180,3 +180,63 @@ jobs:
 
       - name: Run credential storyline (generate → sign → verify → SHACL validate)
         run: make story
+
+  story-ts:
+    name: Credential Story — TypeScript (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    needs: [generate-validate, test-ts]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies and submodules
+        run: |
+          make install dev
+          make setup submodules
+
+      - name: Run TypeScript credential storyline
+        run: make story ts
+
+  story-cross:
+    name: Cross-Runtime Story (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    needs: [story, story-ts]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies and submodules
+        run: |
+          make install dev
+          make setup submodules
+
+      - name: Run cross-runtime story verification
+        run: make story cross
