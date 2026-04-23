@@ -119,6 +119,17 @@ def test_has_credential_status(credential_file):
     for entry in status:
         assert entry.get("type") == "harbour:CRSetEntry"
         assert "statusPurpose" in entry
+        # statusServiceOperator — bare DID of the CRSet operator.
+        svc = entry.get("statusServiceOperator", "")
+        assert svc.startswith("did:"), (
+            f"statusServiceOperator must be a DID, got: {svc}"
+        )
+        assert "#" not in svc, (
+            f"statusServiceOperator must not contain a fragment, got: {svc}"
+        )
+        # statusIndex — non-empty string.
+        idx = entry.get("statusIndex", "")
+        assert len(idx) > 0, "harbour:statusIndex must be a non-empty string"
 
 
 def test_credential_subject_has_type(credential_file):

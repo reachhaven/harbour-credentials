@@ -51,7 +51,7 @@
 
 - `credentialStatus` — OPTIONAL.
 - If present, value MUST be one or more objects, each containing:
-  - `id` — MUST be a URL identifying the status information.
+  - `id` — OPTIONAL. If present, MUST be a URL identifying the status information.
   - `type` — MUST be present, identifying the status mechanism.
 - The status mechanism is extensible (e.g., BitstringStatusList, CRSet).
 - Verifiers SHOULD check credential status during verification.

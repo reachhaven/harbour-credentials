@@ -149,9 +149,10 @@ Base skeleton examples live in `examples/` (no Gaia-X data). Gaia-X domain exten
   },
   "credentialStatus": [
     {
-      "id": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3:services:revocation-registry#abc123",
       "type": "harbour:CRSetEntry",
-      "statusPurpose": "revocation"
+      "statusPurpose": "revocation",
+      "statusServiceOperator": "did:ethr:0x14a34:0xf8abbe34d226eff3c1bc85ba9d567b9ab50b38c3",
+      "statusIndex": "abc123"
     }
   ]
 }
