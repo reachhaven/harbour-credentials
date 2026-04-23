@@ -13,5 +13,5 @@
     "resolveJsonModule": true
   },
   "include": ["*.ts"],
-  "exclude": ["node_modules", "dist", "vitest.config.ts"]
+  "exclude": ["node_modules", "dist", "vitest.config.ts", "story-sign.ts", "story-verify.ts"]
 }

@@ -9,7 +9,7 @@
 	_lint_default _lint_md _lint_ts \
 	_format_default _format_md \
 	_test_default _test_cov _test_ts _test_interop _test_all \
-	_story_default _story_sign _story_verify \
+	_story_default _story_sign _story_verify _story_ts _story_sign_ts _story_verify_ts _story_cross \
 	_build_ts
 
 TS_DIR := src/typescript/harbour
@@ -190,9 +190,11 @@ _help_test:
 
 _help_story:
 	@echo "Story subcommands:"
-	@echo "  make story         - Generate, sign, verify, and SHACL-validate examples"
-	@echo "  make story sign    - Write ignored signed example artifacts under examples/**/signed/"
-	@echo "  make story verify  - Verify the signed example artifacts with the real verifier"
+	@echo "  make story         - Generate, sign (Python), verify (Python), and SHACL-validate examples"
+	@echo "  make story ts      - Generate, sign (TypeScript), verify (TypeScript), and SHACL-validate"
+	@echo "  make story cross   - Cross-runtime: TS-sign → Python-verify, then Python-sign → TS-verify"
+	@echo "  make story sign    - Write ignored signed example artifacts under examples/**/signed/ (Python)"
+	@echo "  make story verify  - Verify the signed example artifacts with the real verifier (Python)"
 
 _help_build:
 	@echo "Build subcommands:"
@@ -553,6 +555,8 @@ story:
 	fi; \
 	case "$$subcommand" in \
 		default) "$(MAKE)" --no-print-directory _story_default ;; \
+		ts) "$(MAKE)" --no-print-directory _story_ts ;; \
+		cross) "$(MAKE)" --no-print-directory _story_cross ;; \
 		sign) "$(MAKE)" --no-print-directory _story_sign ;; \
 		verify) "$(MAKE)" --no-print-directory _story_verify ;; \
 		help) "$(MAKE)" --no-print-directory _help_story ;; \
@@ -579,6 +583,37 @@ _story_default:
 	@"$(MAKE)" --no-print-directory _story_verify
 	@"$(MAKE)" --no-print-directory _validate_shacl
 	@echo "OK: Harbour storyline complete"
+
+_story_sign_ts:
+	@echo "Signing Harbour example storylines (TypeScript)..."
+	@rm -rf examples/signed examples/gaiax/signed
+	@cd "$(TS_DIR)" && $(YARN) install --immutable 2>/dev/null || cd "$(TS_DIR)" && $(YARN) install
+	@cd "$(TS_DIR)" && $(YARN) story:sign
+
+_story_verify_ts:
+	@echo "Verifying Harbour signed examples (TypeScript)..."
+	@cd "$(TS_DIR)" && $(YARN) story:verify
+
+_story_ts:
+	@echo "Running Harbour storyline — TypeScript (generate + sign + verify + SHACL validate)..."
+	@"$(MAKE)" --no-print-directory generate
+	@"$(MAKE)" --no-print-directory _build_ts
+	@"$(MAKE)" --no-print-directory _story_sign_ts
+	@"$(MAKE)" --no-print-directory _story_verify_ts
+	@"$(MAKE)" --no-print-directory _validate_shacl
+	@echo "OK: Harbour TypeScript storyline complete"
+
+_story_cross:
+	@echo "Running cross-runtime story verification..."
+	@"$(MAKE)" --no-print-directory generate
+	@"$(MAKE)" --no-print-directory _build_ts
+	@echo "--- Phase 1: TypeScript signs → Python verifies ---"
+	@"$(MAKE)" --no-print-directory _story_sign_ts
+	@"$(MAKE)" --no-print-directory _story_verify
+	@echo "--- Phase 2: Python signs → TypeScript verifies ---"
+	@"$(MAKE)" --no-print-directory _story_sign
+	@"$(MAKE)" --no-print-directory _story_verify_ts
+	@echo "OK: Cross-runtime story verification complete"
 
 # ---------- Release Artifacts ----------
 
