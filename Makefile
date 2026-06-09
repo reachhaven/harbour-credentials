@@ -10,6 +10,7 @@
 	_format_default _format_md \
 	_test_default _test_cov _test_ts _test_interop _test_all \
 	_story_default _story_sign _story_verify _story_ts _story_sign_ts _story_verify_ts _story_cross \
+	_story_digests _story_digests_ts \
 	_build_ts
 
 TS_DIR := src/typescript/harbour
@@ -190,11 +191,12 @@ _help_test:
 
 _help_story:
 	@echo "Story subcommands:"
-	@echo "  make story         - Generate, sign (Python), verify (Python), and SHACL-validate examples"
-	@echo "  make story ts      - Generate, sign (TypeScript), verify (TypeScript), and SHACL-validate"
-	@echo "  make story cross   - Cross-runtime: TS-sign → Python-verify, then Python-sign → TS-verify"
+	@echo "  make story         - Generate, sign + verify (Python), check digestSRI, and SHACL-validate examples"
+	@echo "  make story ts      - Generate, sign + verify (TypeScript), check digestSRI, and SHACL-validate"
+	@echo "  make story cross   - Cross-runtime: TS-sign → Python-verify, then Python-sign → TS-verify, + digestSRI"
 	@echo "  make story sign    - Write ignored signed example artifacts under examples/**/signed/ (Python)"
 	@echo "  make story verify  - Verify the signed example artifacts with the real verifier (Python)"
+	@echo "  make story digests - Verify example digestSRI integrity hashes (Python)"
 
 _help_build:
 	@echo "Build subcommands:"
@@ -559,6 +561,7 @@ story:
 		cross) "$(MAKE)" --no-print-directory _story_cross ;; \
 		sign) "$(MAKE)" --no-print-directory _story_sign ;; \
 		verify) "$(MAKE)" --no-print-directory _story_verify ;; \
+		digests) "$(MAKE)" --no-print-directory _story_digests ;; \
 		help) "$(MAKE)" --no-print-directory _help_story ;; \
 		*) echo "ERROR: Unknown story subcommand '$$subcommand'"; echo "Run 'make story help' for available options."; exit 1 ;; \
 	esac
@@ -576,11 +579,22 @@ _story_verify:
 	@PYTHONIOENCODING=utf-8 PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.verify_signed_examples
 	@echo "OK: Signed Harbour example artifacts verified"
 
+_story_digests:
+	$(call check_dev_setup)
+	@echo "Verifying example digestSRI integrity hashes (Python)..."
+	@PYTHONIOENCODING=utf-8 PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.digest_sri_examples --check
+	@echo "OK: Example digestSRI integrity verified"
+
+_story_digests_ts:
+	@echo "Verifying example digestSRI integrity hashes (TypeScript)..."
+	@cd "$(TS_DIR)" && $(YARN) story:digests
+
 _story_default:
-	@echo "Running Harbour storyline (generate + sign + verify + SHACL validate)..."
+	@echo "Running Harbour storyline (generate + sign + verify + digestSRI + SHACL validate)..."
 	@"$(MAKE)" --no-print-directory generate
 	@"$(MAKE)" --no-print-directory _story_sign
 	@"$(MAKE)" --no-print-directory _story_verify
+	@"$(MAKE)" --no-print-directory _story_digests
 	@"$(MAKE)" --no-print-directory _validate_shacl
 	@echo "OK: Harbour storyline complete"
 
@@ -595,11 +609,12 @@ _story_verify_ts:
 	@cd "$(TS_DIR)" && $(YARN) story:verify
 
 _story_ts:
-	@echo "Running Harbour storyline — TypeScript (generate + sign + verify + SHACL validate)..."
+	@echo "Running Harbour storyline — TypeScript (generate + sign + verify + digestSRI + SHACL validate)..."
 	@"$(MAKE)" --no-print-directory generate
 	@"$(MAKE)" --no-print-directory _build_ts
 	@"$(MAKE)" --no-print-directory _story_sign_ts
 	@"$(MAKE)" --no-print-directory _story_verify_ts
+	@"$(MAKE)" --no-print-directory _story_digests_ts
 	@"$(MAKE)" --no-print-directory _validate_shacl
 	@echo "OK: Harbour TypeScript storyline complete"
 
@@ -613,6 +628,9 @@ _story_cross:
 	@echo "--- Phase 2: Python signs → TypeScript verifies ---"
 	@"$(MAKE)" --no-print-directory _story_sign
 	@"$(MAKE)" --no-print-directory _story_verify_ts
+	@echo "--- Phase 3: digestSRI integrity (Python + TypeScript) ---"
+	@"$(MAKE)" --no-print-directory _story_digests
+	@"$(MAKE)" --no-print-directory _story_digests_ts
 	@echo "OK: Cross-runtime story verification complete"
 
 # ---------- Release Artifacts ----------

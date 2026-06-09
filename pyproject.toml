@@ -27,6 +27,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "base58>=2.1.0",
     "pycryptodome>=3.20",
+    "rfc8785>=0.1.4",
 ]
 
 [project.optional-dependencies]

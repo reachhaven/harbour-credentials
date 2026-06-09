@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "story:sign": "tsx story-sign.ts",
-    "story:verify": "tsx story-verify.ts"
+    "story:verify": "tsx story-verify.ts",
+    "story:digests": "tsx story-digests.ts"
   },
   "exports": {
     ".": {
@@ -25,6 +26,7 @@
   ],
   "license": "EPL-2.0",
   "dependencies": {
+    "canonicalize": "^3.0.0",
     "jose": "^6.0.11"
   },
   "devDependencies": {

@@ -65,3 +65,12 @@ export {
   type VerifySdJwtVpOptions,
   type SdJwtVpResult,
 } from "./sd-jwt-vp.js";
+
+export {
+  canonicalJson,
+  computeDigestSri,
+  parseDigestSri,
+  verifyDigestSri,
+  DigestSriError,
+  type SriAlgorithm,
+} from "./digest-sri.js";

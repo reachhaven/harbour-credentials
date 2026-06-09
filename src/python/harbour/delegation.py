@@ -31,6 +31,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import rfc8785
+
 # Action type identifier
 ACTION_TYPE = "HARBOUR_DELEGATE"
 
@@ -107,10 +109,12 @@ class TransactionData:
         """Convert to JSON string.
 
         Args:
-            canonical: If True, use canonical form (sorted keys, no whitespace)
+            canonical: If True, use RFC 8785 (JCS) canonical form via the
+                ``rfc8785`` library — byte-identical to the TypeScript
+                ``canonicalize`` output, so hashes match across runtimes.
         """
         if canonical:
-            return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+            return rfc8785.dumps(self.to_dict()).decode("utf-8")
         return json.dumps(self.to_dict(), indent=2)
 
     def compute_hash(self) -> str:

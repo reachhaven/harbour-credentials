@@ -115,19 +115,19 @@
         "harbour.gx:compliantLegalPersonVC": {
           "type": "harbour.gx:CompliantCredentialReference",
           "harbour.gx:credentialType": "gx:LegalPerson",
-          "harbour.gx:digestSRI": "sha256-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+          "harbour.gx:digestSRI": "sha256-dl7zg1RuG2HhA97FckTfjuXIUxhc0Cagbp2MD4B6JTw=",
           "@id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#compliantLegalPersonVC"
         },
         "harbour.gx:compliantRegistrationVC": {
           "type": "harbour.gx:CompliantCredentialReference",
           "harbour.gx:credentialType": "gx:VatID",
-          "harbour.gx:digestSRI": "sha256-c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+          "harbour.gx:digestSRI": "sha256-0ki/4Jj9yg5q2jXsPE2BcpEaA2x+xRONEVyybfCSE3Y=",
           "@id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#compliantRegistrationVC"
         },
         "harbour.gx:compliantTermsVC": {
           "type": "harbour.gx:CompliantCredentialReference",
           "harbour.gx:credentialType": "gx:Issuer",
-          "harbour.gx:digestSRI": "sha256-e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6",
+          "harbour.gx:digestSRI": "sha256-1BYmvntWMgprmVmTGzeDw8Ium3t+65wFAklNFyg8xUE=",
           "@id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#compliantTermsVC"
         },
         "harbour.gx:labelLevel": "SC",
