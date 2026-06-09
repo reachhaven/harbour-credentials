@@ -15,6 +15,7 @@ They are copies of specifications published by their respective standards organi
 | `vc-data-model-2.0.md` | [W3C VC Data Model v2.0](https://www.w3.org/TR/vc-data-model-2.0/) | W3C | [W3C Document License](https://www.w3.org/copyright/document-license-2023/) |
 | `did-core.md` | [W3C DIDs v1.0](https://www.w3.org/TR/did-core/) | W3C | [W3C Document License](https://www.w3.org/copyright/document-license-2023/) |
 | `vc-jose-cose.md` | [VC-JOSE-COSE](https://www.w3.org/TR/vc-jose-cose/) | W3C | [W3C Document License](https://www.w3.org/copyright/document-license-2023/) |
+| `subresource-integrity.md` | [Subresource Integrity](https://www.w3.org/TR/SRI/) | W3C | [W3C Document License](https://www.w3.org/copyright/document-license-2023/) |
 | `sd-jwt-rfc9901.md` | [RFC 9901: SD-JWT](https://www.rfc-editor.org/rfc/rfc9901) | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
 | `sd-jwt-vc.md` | [SD-JWT-VC draft-15](https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/) | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
 | `token-status-list.md` | [Token Status List draft-19](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) | IETF | [IETF Trust](https://trustee.ietf.org/license-info) |
@@ -34,6 +35,7 @@ They are copies of specifications published by their respective standards organi
 - `vc-jose-cose.md`, `sd-jwt-vc.md`, `csc-data-model.md`: **2026-02-25**
 - `oid4vp-1.0.md`, `vc-data-model-2.0.md`, `did-core.md`, `sd-jwt-rfc9901.md`, `gx-architecture-document-25.11.md`: **2026-03-10**
 - `token-status-list.md`, `token-status-list-draft-19.txt`: **2026-03-20**
+- `subresource-integrity.md`: **2026-06-09**
 
 ## Usage
 
@@ -67,6 +69,7 @@ Always refer to the original sources for the most up-to-date and legally binding
 - **W3C VC Data Model**: https://www.w3.org/TR/vc-data-model-2.0/
 - **W3C DID Core**: https://www.w3.org/TR/did-core/
 - **W3C VC-JOSE-COSE**: https://www.w3.org/TR/vc-jose-cose/
+- **W3C Subresource Integrity (SRI)**: https://www.w3.org/TR/SRI/
 - **SD-JWT (RFC 9901)**: https://www.rfc-editor.org/rfc/rfc9901
 - **SD-JWT-VC**: https://datatracker.ietf.org/doc/draft-ietf-oauth-sd-jwt-vc/
 - **Token Status List**: https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/

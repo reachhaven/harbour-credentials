@@ -10,6 +10,8 @@
  * OID4VP-aligned transaction data object (§8.4).
  */
 
+import canonicalize from "canonicalize";
+
 /** Action type identifier. */
 export const ACTION_TYPE = "HARBOUR_DELEGATE";
 
@@ -90,37 +92,17 @@ function toDict(td: TransactionData): Record<string, unknown> {
 }
 
 /**
- * Recursively sort all keys in a JSON-serializable value.
+ * Convert TransactionData to RFC 8785 (JCS) canonical JSON.
  *
- * Python's json.dumps(sort_keys=True) sorts ALL keys recursively.
- * JavaScript JSON.stringify does NOT sort keys by default and does NOT
- * accept a replacer that recursively sorts. This function creates a
- * new object/array structure with sorted keys at every level.
- */
-function sortKeysRecursive(value: unknown): unknown {
-  if (value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.map(sortKeysRecursive);
-  if (typeof value === "object") {
-    const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-      sorted[key] = sortKeysRecursive(
-        (value as Record<string, unknown>)[key]
-      );
-    }
-    return sorted;
-  }
-  return value;
-}
-
-/**
- * Convert TransactionData to canonical JSON string.
- *
- * Matches Python's json.dumps(sort_keys=True, separators=(',', ':'))
- * which sorts ALL keys recursively with no whitespace.
+ * Backed by the `canonicalize` library (RFC 8785), which is byte-identical to
+ * the Python `rfc8785` output, so the challenge hash matches across runtimes.
  */
 export function toCanonicalJson(td: TransactionData): string {
-  const dict = toDict(td);
-  return JSON.stringify(sortKeysRecursive(dict));
+  const canonical = canonicalize(toDict(td));
+  if (canonical === undefined) {
+    throw new ChallengeError("transaction data is not JSON-serializable");
+  }
+  return canonical;
 }
 
 /**
