@@ -82,11 +82,85 @@ function targetFiles(): string[] {
     .map((f) => join(GAIAX_DIR, f));
 }
 
+/** Yield every object found anywhere in `node`. */
+function iterDicts(node: unknown, out: Json[]): void {
+  if (Array.isArray(node)) {
+    for (const item of node) iterDicts(item, out);
+  } else if (node !== null && typeof node === "object") {
+    const obj = node as Json;
+    out.push(obj);
+    for (const value of Object.values(obj)) iterDicts(value, out);
+  }
+}
+
+function hasType(node: Json, typeValue: string): boolean {
+  const t = node["type"];
+  const types = typeof t === "string" ? [t] : Array.isArray(t) ? t : [];
+  return types.includes(typeValue);
+}
+
+/**
+ * Map a self-signed org DID -> { credentialType: its own bundled gx VC }.
+ *
+ * Mirrors `credentials.digest_sri_examples.load_self_signed_sources`: a
+ * self-signed `harbour.gx:LegalPersonCredential` (issuer == credentialSubject.id,
+ * e.g. the Trust Anchor) bundles its own three gx VCs in its evidence VP. Those
+ * are that org's source of truth (it has no Example-Corp input file), so digestSRI
+ * references whose `@id` org DID is self-signed resolve against them.
+ */
+function loadSelfSignedSources(files: string[]): Record<string, Record<string, Json>> {
+  const sources: Record<string, Record<string, Json>> = {};
+  for (const path of files) {
+    const obj = JSON.parse(readFileSync(path, "utf-8"));
+    const dicts: Json[] = [];
+    iterDicts(obj, dicts);
+    for (const cred of dicts) {
+      if (!hasType(cred, "harbour.gx:LegalPersonCredential")) continue;
+      const subject = cred["credentialSubject"];
+      if (subject === null || typeof subject !== "object") continue;
+      const orgDid = (subject as Json)["id"];
+      if (typeof orgDid !== "string" || cred["issuer"] !== orgDid) continue; // not self-signed
+      const inners: Json[] = [];
+      iterDicts(cred["evidence"] ?? [], inners);
+      for (const inner of inners) {
+        const cs = inner["credentialSubject"];
+        if (cs !== null && typeof cs === "object") {
+          const cst = (cs as Json)["type"];
+          if (typeof cst === "string" && cst in INPUT_FILES) {
+            (sources[orgDid] ??= {})[cst] ??= inner;
+          }
+        }
+      }
+    }
+  }
+  return sources;
+}
+
+/**
+ * The gx VC a reference's digestSRI is taken over: a reference whose `@id` org
+ * DID is a self-signed org resolves to that org's own bundled gx VC; otherwise
+ * to the shared Example-Corp input VC.
+ */
+function resolveReferent(
+  ref: Json,
+  inputs: Record<string, Json>,
+  selfSigned: Record<string, Record<string, Json>>,
+): Json | undefined {
+  const ct = ref[CREDENTIAL_TYPE_KEY] as string;
+  const id = typeof ref["@id"] === "string" ? (ref["@id"] as string) : "";
+  const orgDid = id.split("#", 1)[0];
+  if (orgDid in selfSigned && ct in selfSigned[orgDid]) {
+    return selfSigned[orgDid][ct];
+  }
+  return inputs[ct];
+}
+
 async function main(): Promise<void> {
   if (!existsSync(GAIAX_DIR)) {
     throw new Error(`gaiax examples directory not found: ${GAIAX_DIR}`);
   }
   const inputs = loadInputVcs();
+  const selfSigned = loadSelfSignedSources(targetFiles());
   const errors: string[] = [];
   let totalRefs = 0;
 
@@ -103,15 +177,18 @@ async function main(): Promise<void> {
     for (const ref of refs) {
       const credentialType = ref[CREDENTIAL_TYPE_KEY] as string;
       const stored = ref[DIGEST_KEY] as string;
-      const sourceVc = inputs[credentialType];
+      const sourceVc = resolveReferent(ref, inputs, selfSigned);
       if (!sourceVc) {
-        fileErrors.push(`unknown credentialType '${credentialType}'`);
+        fileErrors.push(
+          `cannot resolve referent for credentialType '${credentialType}' / @id ${ref["@id"]}`,
+        );
         continue;
       }
-      // The digest must match the source-of-truth input VC.
+      // The digest must match its source-of-truth VC (Example-Corp input VC,
+      // or the org's own bundled gx VC for self-signed organizations).
       if (!(await verifyDigestSri(sourceVc, stored))) {
         fileErrors.push(
-          `${credentialType} digestSRI does not match ${INPUT_FILES[credentialType]}\n` +
+          `${credentialType} digestSRI does not match its source VC\n` +
             `      stored:   ${stored}\n` +
             `      expected: ${await computeDigestSri(sourceVc)}`,
         );
