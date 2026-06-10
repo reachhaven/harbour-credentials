@@ -388,12 +388,14 @@ _validate_shacl:
 			fi ; \
 			"$(PYTHON_ABS)" -m src.tools.validators.validation_suite \
 				--run check-data-conformance \
+				--per-resource \
 				$$allow_online_flag \
 				--data-paths "$$target_path" ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
 				--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
 		else \
 			"$(PYTHON_ABS)" -m src.tools.validators.validation_suite \
 				--run check-data-conformance \
+				--per-resource \
 				$$allow_online_flag \
 				--data-paths $(addprefix ../../,$(HARBOUR_EXAMPLE_FILES)) ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
 				--artifacts ../../artifacts > $$tmp_output 2>&1 ; \

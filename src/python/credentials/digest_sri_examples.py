@@ -88,7 +88,70 @@ def iter_reference_nodes(node: Any) -> Iterator[dict]:
             yield from iter_reference_nodes(item)
 
 
-def fill_file(path: Path, inputs: dict[str, dict]) -> bool:
+def _iter_dicts(node: Any) -> Iterator[dict]:
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _iter_dicts(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _iter_dicts(item)
+
+
+def _has_type(node: dict, type_value: str) -> bool:
+    types = node.get("type")
+    if isinstance(types, str):
+        types = [types]
+    return isinstance(types, list) and type_value in types
+
+
+def load_self_signed_sources(gaiax_dir: Path) -> dict[str, dict[str, dict]]:
+    """Map a self-signed org DID -> {credentialType: its own gx VC}.
+
+    The Trust Anchor self-signs its LegalPersonCredential (issuer ==
+    credentialSubject.id) and bundles its own three gx VCs in its evidence VP.
+    Those gx VCs are that org's source of truth (it has no Example-Corp input
+    file), and are registered globally so compact copies of the self-signed
+    credential embedded elsewhere resolve to the same digests.
+    """
+    sources: dict[str, dict[str, dict]] = {}
+    for path in collect_target_files(gaiax_dir):
+        obj = json.loads(path.read_text(encoding="utf-8"))
+        for cred in _iter_dicts(obj):
+            if not _has_type(cred, "harbour.gx:LegalPersonCredential"):
+                continue
+            subject = cred.get("credentialSubject")
+            if not isinstance(subject, dict):
+                continue
+            org_did = subject.get("id")
+            if not org_did or cred.get("issuer") != org_did:
+                continue  # not self-signed
+            # collect plain gx VCs bundled in this credential's evidence VP(s)
+            for inner in _iter_dicts(cred.get("evidence", [])):
+                cs = inner.get("credentialSubject")
+                if isinstance(cs, dict) and cs.get("type") in INPUT_FILES:
+                    sources.setdefault(org_did, {}).setdefault(cs["type"], inner)
+    return sources
+
+
+def _resolve_referent(
+    ref: dict, inputs: dict[str, dict], self_signed: dict[str, dict[str, dict]]
+) -> dict | None:
+    """The gx VC a reference's digestSRI is taken over.
+
+    A reference whose ``@id`` org DID is a self-signed org resolves to that
+    org's own gx VC; otherwise it resolves to the Example-Corp input VC.
+    """
+    ct = ref.get(_CREDENTIAL_TYPE_KEY)
+    org_did = str(ref.get("@id", "")).split("#", 1)[0]
+    if org_did in self_signed and ct in self_signed[org_did]:
+        return self_signed[org_did][ct]
+    return inputs.get(ct)
+
+
+def fill_file(
+    path: Path, inputs: dict[str, dict], self_signed: dict[str, dict[str, dict]]
+) -> bool:
     """Rewrite *path* with real digestSRI values (and canonical embedded VCs).
 
     Returns ``True`` if the file content changed.
@@ -97,16 +160,15 @@ def fill_file(path: Path, inputs: dict[str, dict]) -> bool:
     obj = json.loads(original)
 
     for ref in iter_reference_nodes(obj):
-        credential_type = ref[_CREDENTIAL_TYPE_KEY]
-        if credential_type not in inputs:
+        referent = _resolve_referent(ref, inputs, self_signed)
+        if referent is None:
             raise ValueError(
-                f"{path.name}: reference to unknown credentialType "
-                f"{credential_type!r} (no input VC source of truth)"
+                f"{path.name}: cannot resolve referent for credentialType "
+                f"{ref.get(_CREDENTIAL_TYPE_KEY)!r} / @id {ref.get('@id')!r}"
             )
-        source_vc = inputs[credential_type]
-        ref[_DIGEST_KEY] = compute_digest_sri(source_vc)
+        ref[_DIGEST_KEY] = compute_digest_sri(referent)
         if _EMBEDDED_KEY in ref:
-            ref[_EMBEDDED_KEY] = canonical_json(source_vc)
+            ref[_EMBEDDED_KEY] = canonical_json(referent)
 
     updated = json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
     if updated != original:
@@ -115,7 +177,9 @@ def fill_file(path: Path, inputs: dict[str, dict]) -> bool:
     return False
 
 
-def check_file(path: Path, inputs: dict[str, dict]) -> tuple[list[str], int]:
+def check_file(
+    path: Path, inputs: dict[str, dict], self_signed: dict[str, dict[str, dict]]
+) -> tuple[list[str], int]:
     """Verify every digestSRI in *path*.
 
     Returns ``(errors, reference_count)`` where *errors* is a list of
@@ -128,20 +192,20 @@ def check_file(path: Path, inputs: dict[str, dict]) -> tuple[list[str], int]:
     for ref in refs:
         credential_type = ref.get(_CREDENTIAL_TYPE_KEY)
         stored = ref.get(_DIGEST_KEY)
-        if credential_type not in inputs:
+        referent = _resolve_referent(ref, inputs, self_signed)
+        if referent is None:
             errors.append(
-                f"{path.name}: reference to unknown credentialType {credential_type!r}"
+                f"{path.name}: cannot resolve referent for credentialType "
+                f"{credential_type!r} / @id {ref.get('@id')!r}"
             )
             continue
-        source_vc = inputs[credential_type]
 
-        # The digest must match the source-of-truth input VC.
-        if not verify_digest_sri(source_vc, stored):
+        if not verify_digest_sri(referent, stored):
             errors.append(
-                f"{path.name}: {credential_type} digestSRI does not match "
-                f"{INPUT_FILES[credential_type]}\n"
+                f"{path.name}: {credential_type} digestSRI does not match its "
+                f"source VC\n"
                 f"      stored:   {stored}\n"
-                f"      expected: {compute_digest_sri(source_vc)}"
+                f"      expected: {compute_digest_sri(referent)}"
             )
             continue
 
@@ -217,15 +281,21 @@ Examples:
         sys.exit(1)
 
     inputs = load_input_vcs(gaiax_dir)
+    self_signed = load_self_signed_sources(gaiax_dir)
     targets = collect_target_files(gaiax_dir)
 
     if args.write:
         print(f"Filling digestSRI hashes in {gaiax_dir}/ ...")
         for credential_type, vc in inputs.items():
             print(f"  {credential_type}: {compute_digest_sri(vc)}")
+        for org_did, by_type in self_signed.items():
+            for credential_type, vc in by_type.items():
+                print(
+                    f"  [self-signed {org_did[-8:]}] {credential_type}: {compute_digest_sri(vc)}"
+                )
         changed = 0
         for path in targets:
-            if fill_file(path, inputs):
+            if fill_file(path, inputs, self_signed):
                 changed += 1
                 print(f"  updated {path.name}")
         print(f"Done. {changed} file(s) updated.")
@@ -236,7 +306,7 @@ Examples:
     all_errors: list[str] = []
     total_refs = 0
     for path in targets:
-        errors, ref_count = check_file(path, inputs)
+        errors, ref_count = check_file(path, inputs, self_signed)
         total_refs += ref_count
         if ref_count:
             status = "FAIL" if errors else "ok"

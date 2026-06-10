@@ -63,9 +63,22 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Enable Git long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+      - name: Init required submodules (excludes asam-openx-standards)
+        # asam-openx-standards nests deep doc-tooling submodules
+        # (OpenCRG -> antora -> citation-style-language) that exceed the
+        # Windows MAX_PATH/GIT_DIR limits and are unused by harbour. Init
+        # everything else (linkml fork + Gaia-X service-characteristics).
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 submodules/ontology-management-base submodules/w3id.org
+          git -C submodules/ontology-management-base submodule update --init --depth 1 --recursive \
+            submodules/linkml submodules/service-characteristics submodules/sunrise_ontology submodules/w3id.org
 
       - uses: actions/setup-python@v5
         with:
@@ -164,9 +177,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [generate-validate]
     steps:
+      - name: Enable Git long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+      - name: Init required submodules (excludes asam-openx-standards)
+        # asam-openx-standards nests deep doc-tooling submodules
+        # (OpenCRG -> antora -> citation-style-language) that exceed the
+        # Windows MAX_PATH/GIT_DIR limits and are unused by harbour. Init
+        # everything else (linkml fork + Gaia-X service-characteristics).
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 submodules/ontology-management-base submodules/w3id.org
+          git -C submodules/ontology-management-base submodule update --init --depth 1 --recursive \
+            submodules/linkml submodules/service-characteristics submodules/sunrise_ontology submodules/w3id.org
 
       - uses: actions/setup-python@v5
         with:
@@ -190,9 +216,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [generate-validate, test-ts]
     steps:
+      - name: Enable Git long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+      - name: Init required submodules (excludes asam-openx-standards)
+        # asam-openx-standards nests deep doc-tooling submodules
+        # (OpenCRG -> antora -> citation-style-language) that exceed the
+        # Windows MAX_PATH/GIT_DIR limits and are unused by harbour. Init
+        # everything else (linkml fork + Gaia-X service-characteristics).
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 submodules/ontology-management-base submodules/w3id.org
+          git -C submodules/ontology-management-base submodule update --init --depth 1 --recursive \
+            submodules/linkml submodules/service-characteristics submodules/sunrise_ontology submodules/w3id.org
 
       - uses: actions/setup-python@v5
         with:
@@ -220,9 +259,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [story, story-ts]
     steps:
+      - name: Enable Git long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+      - name: Init required submodules (excludes asam-openx-standards)
+        # asam-openx-standards nests deep doc-tooling submodules
+        # (OpenCRG -> antora -> citation-style-language) that exceed the
+        # Windows MAX_PATH/GIT_DIR limits and are unused by harbour. Init
+        # everything else (linkml fork + Gaia-X service-characteristics).
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 submodules/ontology-management-base submodules/w3id.org
+          git -C submodules/ontology-management-base submodule update --init --depth 1 --recursive \
+            submodules/linkml submodules/service-characteristics submodules/sunrise_ontology submodules/w3id.org
 
       - uses: actions/setup-python@v5
         with:

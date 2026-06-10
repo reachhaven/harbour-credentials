@@ -11,7 +11,7 @@
   ],
   "id": "urn:uuid:f7e8d9c0-b1a2-3456-7890-abcdef012345",
   "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-  "validFrom": "2025-06-25T10:00:00Z",
+  "validFrom": "2026-02-24T10:00:00Z",
   "credentialSubject": {
     "id": "urn:uuid:receipt-b7c8d9e0-f1a2-3456-789a-bcdef0123456",
     "type": "harbour:TransactionReceipt",
@@ -52,10 +52,13 @@
               "harbour:VerifiableCredential"
             ],
             "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-            "validFrom": "2024-01-15T00:00:00Z",
+            "validFrom": "2026-01-15T00:00:00Z",
             "credentialSubject": {
               "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
               "type": "harbour.gx:NaturalPerson",
+              "givenName": "Alice",
+              "familyName": "Smith",
+              "email": "alice.smith@example.com",
               "memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
             },
             "credentialStatus": [
