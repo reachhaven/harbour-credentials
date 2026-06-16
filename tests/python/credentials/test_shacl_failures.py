@@ -189,7 +189,10 @@ def _validate(
         temp_path = Path(f.name)
 
     try:
-        result = validator.validate([temp_path])
+        # Per-resource validation (each document in its own graph), matching
+        # `make validate shacl`. The session-scoped validator memoises the
+        # parsed shapes + ontology closure, so repeated calls are fast.
+        result = validator.validate_each([temp_path])[0]
         violations = (
             _extract_violations(result.report_graph)
             if result.report_graph is not None

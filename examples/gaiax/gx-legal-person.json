@@ -12,8 +12,8 @@
   ],
   "id": "urn:uuid:f1a2b3c4-d5e6-7890-abcd-ef1234567890",
   "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
-  "validFrom": "2024-01-15T00:00:00Z",
-  "validUntil": "2025-01-15T00:00:00Z",
+  "validFrom": "2026-01-15T00:00:00Z",
+  "validUntil": "2027-01-15T00:00:00Z",
   "credentialSubject": {
     "type": "gx:LegalPerson",
     "id": "urn:uuid:f1a2b3c4-d5e6-7890-abcd-ef1234567890#cs",
@@ -31,9 +31,9 @@
     "gx:legalAddress": {
       "type": "gx:Address",
       "gx:countryCode": "DE",
-      "vcard:street-address": "Musterstraße 42",
+      "vcard:street-address": "Beispielallee 7",
       "vcard:locality": "München",
-      "vcard:postal-code": "80331"
+      "vcard:postal-code": "80539"
     }
   }
 }
