@@ -85,8 +85,10 @@ slots:
     slot_uri: cred:validFrom
     range: datetime
     description: >
-      [VCDM2] §4.9 — validFrom is OPTIONAL, xsd:dateTime with mandatory
-      timezone offset.
+      [VCDM2] §4.9 — validFrom is OPTIONAL; its value is an xsd:dateTimeStamp
+      (a date-time WITH a mandatory timezone offset, e.g. the trailing "Z").
+      Modeled as LinkML `datetime` (→ xsd:dateTime in artifacts); all Harbour
+      examples include the offset so they are valid dateTimeStamp values.
 
   # [VCDM2] §4.9 — If present, the value of validUntil MUST be an
   # xsd:dateTimeStamp string value representing the date and time the
@@ -95,7 +97,9 @@ slots:
     slot_uri: cred:validUntil
     range: datetime
     description: >
-      [VCDM2] §4.9 — validUntil is OPTIONAL, xsd:dateTime.
+      [VCDM2] §4.9 — validUntil is OPTIONAL; its value is an xsd:dateTimeStamp
+      (date-time with a mandatory timezone offset). Modeled as LinkML
+      `datetime`; Harbour examples always include the offset.
 
   # [VCDM2] §5.6 — The evidence property provides information about the
   # process and/or evidence the issuer used when evaluating the claims
@@ -123,7 +127,7 @@ slots:
       [VCDM2] §4.10 — credentialStatus is OPTIONAL (0..*), each MUST have
       type; id is OPTIONAL.
 
-  # [VCDM2] §4.6 — A verifiable credential MUST contain a
+  # [VCDM2] §4.8 — A verifiable credential MUST contain a
   # credentialSubject property. The value is a set of objects containing
   # claims about the subject(s) of the credential. Each subject MAY
   # have an id property.
@@ -133,7 +137,7 @@ slots:
     range: Any
     multivalued: true
     description: >
-      [VCDM2] §4.6 — credentialSubject is REQUIRED (1..*), each MAY have id.
+      [VCDM2] §4.8 — credentialSubject is REQUIRED (1..*), each MAY have id.
 
   # [VCDM2] §6.1 — A verifiable presentation MUST have a holder property.
   # The value MUST be a URL (typically a DID) identifying the entity
