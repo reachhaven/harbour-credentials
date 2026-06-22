@@ -1,289 +1,174 @@
-"""End-to-end tests for the example_signer evidence signing flow.
+"""Tests for the dc+sd-jwt example issuance pipeline (batched evidence).
 
 Verifies:
-1. Expanded examples with evidence VPs can be signed
-2. Outer VC JWT is valid and verifiable
-3. Evidence VP JWT is valid with signed inner VCs
-4. The full chain: inner VC → VP → outer VC
+1. vct derivation, disclosable-path policy, and batch-authorizer detection
+2. Plain issuance round-trips (issuer signature + selective disclosure)
+3. Batch issuance: one authorization JWT shared across the batch, each
+   credential's inclusion proof verifies, and the leaf is disclosure-invariant
 """
 
+import json
 from pathlib import Path
 
 import pytest
 
 from credentials.example_signer import (
-    decode_evidence_vp,
+    batch_authorizer,
+    disclosable_paths,
+    load_role_keyring,
     load_test_p256_keypair,
-    process_example,
-    sign_evidence_vp,
+    process_batch,
+    process_plain,
+    vct_for_credential,
 )
+from credentials.verify_signed_examples import _build_did_to_pub, _raw_issuer_payload
+from harbour.batch_evidence import verify_batch_evidence
 from harbour.keys import p256_public_key_to_did_key
-from harbour.verifier import verify_vc_jose, verify_vp_jose
+from harbour.sd_jwt import verify_sd_jwt_vc
 
 _REPO_ROOT = Path(__file__).resolve().parent
 while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
     _REPO_ROOT = _REPO_ROOT.parent
+GAIAX = _REPO_ROOT / "examples" / "gaiax"
 
-EXAMPLES_DIR = _REPO_ROOT / "examples"
-GAIAX_EXAMPLES_DIR = EXAMPLES_DIR / "gaiax"
+TRUST_ANCHOR = "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"
 
 
 @pytest.fixture(scope="module")
-def signing_key():
-    """Load the test P-256 keypair."""
-    private_key, public_key = load_test_p256_keypair()
-    did = p256_public_key_to_did_key(public_key)
-    kid = f"{did}#{did.split(':')[-1]}"
-    return private_key, public_key, kid
+def keyring():
+    kr = load_role_keyring()
+    if kr is None:
+        pytest.skip("role keyring not available")
+    return kr
 
 
-@pytest.fixture(
-    params=(
-        [p for p in sorted(EXAMPLES_DIR.glob("*.json"))]
-        if EXAMPLES_DIR.exists()
-        else []
-    ),
-    ids=lambda p: p.name,
-)
-def example_path(request):
-    return request.param
+@pytest.fixture(scope="module")
+def did_to_pub(keyring):
+    return _build_did_to_pub(keyring)
 
 
-class TestEvidenceSigning:
-    """Test the evidence VP signing flow."""
+@pytest.fixture(scope="module")
+def fallback():
+    priv, pub = load_test_p256_keypair()
+    return priv, p256_public_key_to_did_key(pub)
 
-    def test_sign_evidence_vp(self, signing_key):
-        """Sign an evidence VP with inner VCs and verify the chain."""
-        private_key, public_key, kid = signing_key
 
-        vp = {
-            "@context": ["https://www.w3.org/ns/credentials/v2"],
-            "type": ["VerifiablePresentation"],
-            "holder": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
-            "verifiableCredential": [
-                {
-                    "@context": ["https://www.w3.org/ns/credentials/v2"],
-                    "type": ["VerifiableCredential"],
-                    "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
-                    "validFrom": "2024-01-10T00:00:00Z",
-                    "credentialSubject": {
-                        "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
-                        "type": "gx:LegalPerson",
-                    },
-                }
-            ],
+def _load(name: str) -> dict:
+    path = GAIAX / name
+    if not path.exists():
+        pytest.skip(f"{name} not present")
+    return json.loads(path.read_text())
+
+
+# --- pure helpers -----------------------------------------------------------
+
+
+def test_vct_for_credential():
+    assert (
+        vct_for_credential(
+            {"type": ["VerifiableCredential", "harbour.gx:LegalPersonCredential"]}
+        )
+        == "https://w3id.org/reachhaven/harbour/gx/v1/LegalPersonCredential"
+    )
+    assert (
+        vct_for_credential(
+            {"type": ["VerifiableCredential", "harbour:VerifiableCredential"]}
+        )
+        == "https://w3id.org/reachhaven/harbour/core/v1/VerifiableCredential"
+    )
+    assert vct_for_credential({"type": ["VerifiableCredential"]}).endswith(
+        "VerifiableCredential"
+    )
+
+
+def test_disclosable_paths():
+    vc = {
+        "credentialSubject": {
+            "id": "did:x",
+            "type": "T",
+            "givenName": "Alice",
+            "email": "a@b.com",
         }
-
-        vp_jwt = sign_evidence_vp(vp, private_key, kid)
-
-        assert isinstance(vp_jwt, str)
-        assert vp_jwt.count(".") == 2
-
-        # Verify the VP JWT
-        vp_payload = verify_vp_jose(vp_jwt, public_key)
-        assert "VerifiablePresentation" in vp_payload["type"]
-
-        # Inner VCs should be JWT strings
-        inner_vcs = vp_payload.get("verifiableCredential", [])
-        assert len(inner_vcs) == 1
-        assert isinstance(inner_vcs[0], str)
-
-        # Verify inner VC JWT
-        inner_vc = verify_vc_jose(inner_vcs[0], public_key)
-        assert "VerifiableCredential" in inner_vc["type"]
-
-    def test_decode_evidence_vp(self, signing_key):
-        """Decode an evidence VP JWT and verify inner VCs are decoded."""
-        private_key, public_key, kid = signing_key
-
-        vp = {
-            "@context": ["https://www.w3.org/ns/credentials/v2"],
-            "type": ["VerifiablePresentation"],
-            "verifiableCredential": [
-                {
-                    "@context": ["https://www.w3.org/ns/credentials/v2"],
-                    "type": ["VerifiableCredential"],
-                    "issuer": "did:ethr:0x14a34:0x7863e20b04934e8a439e196beac92f3cc3b3676c",
-                    "validFrom": "2024-01-10T00:00:00Z",
-                    "credentialSubject": {"id": "did:example:sub"},
-                }
-            ],
-        }
-
-        vp_jwt = sign_evidence_vp(vp, private_key, kid)
-        decoded = decode_evidence_vp(vp_jwt)
-
-        assert "header" in decoded
-        assert "payload" in decoded
-        assert decoded["header"]["typ"] == "vp+jwt"
-
-        inner_vcs = decoded["payload"]["verifiableCredential"]
-        assert len(inner_vcs) == 1
-        assert "_jwt" in inner_vcs[0]
-        assert "_decoded" in inner_vcs[0]
+    }
+    paths = disclosable_paths(vc)
+    assert "credentialSubject.givenName" in paths
+    assert "credentialSubject.email" in paths
+    assert "credentialSubject.id" not in paths
+    assert "credentialSubject.type" not in paths
 
 
-class TestProcessExample:
-    """Test the full example processing pipeline."""
+def test_batch_authorizer():
+    lp = _load("legal-person-credential.json")
+    assert batch_authorizer(lp) == TRUST_ANCHOR
+    # no evidence → not a batch
+    assert batch_authorizer({"type": ["VerifiableCredential"]}) is None
 
-    def test_process_example_with_evidence(self, signing_key, tmp_path):
-        """Process an example with evidence VP through the full pipeline."""
-        private_key, public_key, kid = signing_key
 
-        example_path = GAIAX_EXAMPLES_DIR / "legal-person-credential.json"
-        if not example_path.exists():
-            pytest.skip("examples/gaiax/ not populated")
+# --- issuance round-trips ---------------------------------------------------
 
-        output_dir = tmp_path / "signed"
-        jwt_path = process_example(example_path, private_key, kid, output_dir)
 
-        # Verify output files exist
-        assert jwt_path.exists()
-        assert (output_dir / "legal-person-credential.decoded.json").exists()
-        assert (output_dir / "legal-person-credential.evidence-vp.jwt").exists()
-        assert (
-            output_dir / "legal-person-credential.evidence-vp.decoded.json"
-        ).exists()
+def test_process_plain_round_trip(keyring, did_to_pub, fallback, tmp_path):
+    vc = _load("trust-anchor-credential.json")
+    process_plain(vc, tmp_path, "trust-anchor-credential", keyring, fallback)
+    sd = (tmp_path / "trust-anchor-credential.sd-jwt").read_text().strip()
+    issuer_pub = did_to_pub[vc["issuer"]]
+    disclosed = verify_sd_jwt_vc(sd, issuer_pub)
+    assert disclosed["vct"].endswith("VerifiableCredential")
+    assert "credentialStatus" in disclosed
+    # plain credentials carry no batch evidence
+    assert batch_authorizer(_raw_issuer_payload(sd)) is None
 
-        # Verify outer VC JWT
-        vc_jwt = jwt_path.read_text().strip()
-        vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert vc_payload["id"] == "urn:uuid:a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        assert "harbour.gx:LegalPersonCredential" in vc_payload["type"]
 
-        # Evidence should now be a JWT string
-        evidence = vc_payload["evidence"][0]
-        vp_jwt_str = evidence["verifiablePresentation"]
-        assert isinstance(vp_jwt_str, str)
-        assert vp_jwt_str.count(".") == 2
+def test_process_batch_one_signature_and_proofs(
+    keyring, did_to_pub, fallback, tmp_path
+):
+    lp = _load("legal-person-credential.json")
+    lpe = _load("legal-person-credential-embedded.json")  # same authorizer (TA)
+    authorizer = batch_authorizer(lp)
+    batch = [
+        (Path("legal-person-credential.json"), lp, tmp_path),
+        (Path("legal-person-credential-embedded.json"), lpe, tmp_path),
+    ]
+    process_batch(batch, authorizer, keyring, fallback)
 
-        # Verify evidence VP
-        vp_payload = verify_vp_jose(vp_jwt_str, public_key)
-        assert "VerifiablePresentation" in vp_payload["type"]
-
-    def test_process_delegated_signing_receipt(self, signing_key, tmp_path):
-        """Process the delegated signing receipt with DelegatedSignatureEvidence."""
-        private_key, public_key, kid = signing_key
-
-        example_path = GAIAX_EXAMPLES_DIR / "delegated-signing-receipt.json"
-        if not example_path.exists():
-            pytest.skip("examples/gaiax/ not populated")
-
-        output_dir = tmp_path / "signed"
-        jwt_path = process_example(example_path, private_key, kid, output_dir)
-
-        # Verify output files exist
-        assert jwt_path.exists()
-        assert (output_dir / "delegated-signing-receipt.decoded.json").exists()
-        assert (output_dir / "delegated-signing-receipt.evidence-vp.jwt").exists()
-
-        # Verify outer VC JWT
-        vc_jwt = jwt_path.read_text().strip()
-        vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour.delegate:SigningReceipt" in vc_payload["type"]
-
-        # Evidence should contain DelegatedSignatureEvidence with transaction_data
-        evidence = vc_payload["evidence"][0]
-        ev_type = evidence["type"]
-        if isinstance(ev_type, list):
-            assert "harbour:SignatureEvidence" in ev_type
-        else:
-            assert ev_type == "harbour:SignatureEvidence"
-        assert "transaction_data" in evidence
-        assert evidence["transaction_data"]["type"] == "harbour.delegate:data.purchase"
-        assert (
-            evidence["delegatedTo"]
-            == "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"
+    authorizer_pub = did_to_pub[authorizer]
+    raws = {}
+    for stem, vc in [
+        ("legal-person-credential", lp),
+        ("legal-person-credential-embedded", lpe),
+    ]:
+        sd = (tmp_path / f"{stem}.sd-jwt").read_text().strip()
+        raw = _raw_issuer_payload(sd)
+        raws[stem] = raw
+        verify_sd_jwt_vc(sd, did_to_pub[vc["issuer"]])  # issuer signature
+        verify_batch_evidence(
+            raw, raw["evidence"][0], authorizer_pub, expected_audience=vc["issuer"]
         )
 
-        # Evidence VP should be a signed JWT
-        vp_jwt_str = evidence["verifiablePresentation"]
-        assert isinstance(vp_jwt_str, str)
-        assert vp_jwt_str.count(".") == 2
-
-    def test_process_all_examples(self, signing_key, tmp_path):
-        """Process all examples (root + gaiax) and verify each produces a valid JWT."""
-        private_key, public_key, kid = signing_key
-
-        example_files = sorted(EXAMPLES_DIR.glob("*-credential.json"))
-        example_files += sorted(EXAMPLES_DIR.glob("*-receipt.json"))
-        if GAIAX_EXAMPLES_DIR.is_dir():
-            example_files += sorted(GAIAX_EXAMPLES_DIR.glob("*-credential.json"))
-            example_files += sorted(GAIAX_EXAMPLES_DIR.glob("*-receipt.json"))
-        if not example_files:
-            pytest.skip("No examples found")
-
-        output_dir = tmp_path / "signed"
-        for path in example_files:
-            jwt_path = process_example(path, private_key, kid, output_dir)
-            vc_jwt = jwt_path.read_text().strip()
-            vc_payload = verify_vc_jose(vc_jwt, public_key)
-            assert "VerifiableCredential" in vc_payload["type"]
+    # One signature shared across the whole batch.
+    auths = {r["evidence"][0]["authorization"] for r in raws.values()}
+    assert len(auths) == 1
+    # N=2 batch → each proof has exactly one sibling.
+    for raw in raws.values():
+        assert len(raw["evidence"][0]["merkleProof"]["path"]) == 1
 
 
-class TestProcessGaiaxExample:
-    """Test processing Gaia-X domain extension examples."""
-
-    def test_process_gaiax_legal_person(self, signing_key, tmp_path):
-        """Process the Gaia-X legal person credential through the pipeline."""
-        private_key, public_key, kid = signing_key
-
-        example_path = GAIAX_EXAMPLES_DIR / "legal-person-credential.json"
-        if not example_path.exists():
-            pytest.skip("examples/gaiax/ not populated")
-
-        output_dir = tmp_path / "gaiax" / "signed"
-        jwt_path = process_example(example_path, private_key, kid, output_dir)
-
-        assert jwt_path.exists()
-        assert (output_dir / "legal-person-credential.decoded.json").exists()
-        assert (output_dir / "legal-person-credential.evidence-vp.jwt").exists()
-
-        # Verify outer VC JWT
-        vc_jwt = jwt_path.read_text().strip()
-        vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour.gx:LegalPersonCredential" in vc_payload["type"]
-
-        # Subject should have compliance data (no entity data)
-        subject = vc_payload["credentialSubject"]
-        assert subject["type"] == "harbour.gx:LegalPerson"
-        assert "harbour.gx:labelLevel" in subject
-
-    def test_process_gaiax_natural_person(self, signing_key, tmp_path):
-        """Process the Gaia-X natural person credential through the pipeline."""
-        private_key, public_key, kid = signing_key
-
-        example_path = GAIAX_EXAMPLES_DIR / "natural-person-credential.json"
-        if not example_path.exists():
-            pytest.skip("examples/gaiax/ not populated")
-
-        output_dir = tmp_path / "gaiax" / "signed"
-        jwt_path = process_example(example_path, private_key, kid, output_dir)
-
-        assert jwt_path.exists()
-        vc_jwt = jwt_path.read_text().strip()
-        vc_payload = verify_vc_jose(vc_jwt, public_key)
-        assert "harbour.gx:NaturalPersonCredential" in vc_payload["type"]
-
-        # Subject should have the NaturalPerson data directly
-        subject = vc_payload["credentialSubject"]
-        assert subject["type"] == "harbour.gx:NaturalPerson"
-        assert "givenName" in subject
-
-    def test_process_all_gaiax_examples(self, signing_key, tmp_path):
-        """Process all Gaia-X examples and verify each produces a valid JWT."""
-        private_key, public_key, kid = signing_key
-
-        if not GAIAX_EXAMPLES_DIR.is_dir():
-            pytest.skip("examples/gaiax/ not populated")
-
-        example_files = sorted(GAIAX_EXAMPLES_DIR.glob("*-credential.json"))
-        if not example_files:
-            pytest.skip("No Gaia-X credential examples found")
-
-        output_dir = tmp_path / "gaiax" / "signed"
-        for path in example_files:
-            jwt_path = process_example(path, private_key, kid, output_dir)
-            vc_jwt = jwt_path.read_text().strip()
-            vc_payload = verify_vc_jose(vc_jwt, public_key)
-            assert "VerifiableCredential" in vc_payload["type"]
+def test_natural_person_selective_disclosure(keyring, did_to_pub, fallback, tmp_path):
+    np = _load("natural-person-credential.json")
+    authorizer = batch_authorizer(np)
+    process_batch(
+        [(Path("natural-person-credential.json"), np, tmp_path)],
+        authorizer,
+        keyring,
+        fallback,
+    )
+    sd = (tmp_path / "natural-person-credential.sd-jwt").read_text().strip()
+    raw = _raw_issuer_payload(sd)
+    # Raw issuer payload hides PII behind _sd digests...
+    assert "givenName" not in raw["credentialSubject"]
+    assert "_sd" in raw["credentialSubject"]
+    # ...but a full verification (all disclosures present) reveals it.
+    disclosed = verify_sd_jwt_vc(sd, did_to_pub[np["issuer"]])
+    assert disclosed["credentialSubject"]["givenName"] == "Alice"
+    # N=1 degenerate batch → empty proof path.
+    assert raw["evidence"][0]["merkleProof"]["path"] == []

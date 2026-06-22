@@ -181,7 +181,8 @@ class TestHarbourContextConsistency:
         base_classes = [
             "HarbourCredential",
             "CRSetEntry",
-            "CredentialEvidence",
+            "BatchCredentialEvidence",
+            "MerkleProof",
             "DelegatedSignatureEvidence",
         ]
         for cls in base_classes:
@@ -191,7 +192,7 @@ class TestHarbourContextConsistency:
         ctx = _load_json(HARBOUR_CONTEXT_PATH).get("@context", {})
         base_classes = [
             "CRSetEntry",
-            "CredentialEvidence",
+            "BatchCredentialEvidence",
             "DelegatedSignatureEvidence",
         ]
         has_vocab = "@vocab" in ctx
@@ -279,7 +280,8 @@ class TestHarbourShaclShapes:
         expected_shapes = [
             "harbour:Credential",
             "harbour:CRSetEntry",
-            "harbour:CredentialEvidence",
+            "harbour:BatchCredentialEvidence",
+            "harbour:MerkleProof",
             "harbour:SignatureEvidence",
         ]
         for shape in expected_shapes:
@@ -301,24 +303,29 @@ class TestHarbourShaclShapes:
             "HarbourCredential shape missing cred:issuer"
         )
 
-    def test_evidence_shapes_require_verifiable_presentation(self):
-        """Evidence shapes must require verifiablePresentation."""
+    def test_evidence_shapes_require_their_mandatory_slot(self):
+        """Each evidence shape must require its mandatory slot.
+
+        BatchCredentialEvidence requires ``harbour:authorizer`` (the batched
+        issuance-authorization model); DelegatedSignatureEvidence (canonical IRI
+        ``harbour:SignatureEvidence``) still requires ``harbour:verifiablePresentation``.
+        """
         content = HARBOUR_SHACL_PATH.read_text()
-        for ev_ns, ev_type in [
-            ("harbour", "CredentialEvidence"),
-            ("harbour", "SignatureEvidence"),
+        for ev_type, required_slot in [
+            ("BatchCredentialEvidence", "harbour:authorizer"),
+            ("SignatureEvidence", "harbour:verifiablePresentation"),
         ]:
-            marker = f"{ev_ns}:{ev_type} a sh:NodeShape"
+            marker = f"harbour:{ev_type} a sh:NodeShape"
             shape_start = content.index(marker)
             next_shape = content.find("\n\n", shape_start + 1)
             if next_shape == -1:
                 next_shape = len(content)
             shape_block = content[shape_start:next_shape]
-            assert "harbour:verifiablePresentation" in shape_block, (
-                f"{ev_type} shape missing harbour:verifiablePresentation"
+            assert required_slot in shape_block, (
+                f"{ev_type} shape missing {required_slot}"
             )
             assert "sh:minCount 1" in shape_block, (
-                f"{ev_type} shape missing sh:minCount 1 for verifiablePresentation"
+                f"{ev_type} shape missing sh:minCount 1 for {required_slot}"
             )
 
 

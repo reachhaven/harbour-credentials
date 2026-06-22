@@ -82,7 +82,7 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 
 The `examples/` directory is the authoritative end-to-end narrative, not just test data (full walkthrough in `examples/README.md`):
 
-- **`examples/*.json`** — Harbour credential skeletons showing the VC envelope and nested evidence-VP structure.
+- **`examples/*.json`** — Harbour credential skeletons showing the VC envelope and batched evidence structure.
 - **`examples/gaiax/`** — Complete journey with 4 actors and role-based authorization via evidence VPs.
 - **`examples/gaiax_external/`** — Third-party Gaia-X credentials *not* produced by our pipeline.
 - **`examples/signed/`, `examples/gaiax/signed/`** — Story-pipeline output (`.jwt`, `.decoded.json`, `.evidence-vp.jwt`); **gitignored**.

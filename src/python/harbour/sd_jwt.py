@@ -103,6 +103,70 @@ def _apply_structured_disclosures(
     return result, disclosures
 
 
+def build_sd_jwt_payload(
+    claims: dict,
+    *,
+    vct: str,
+    disclosable: list[str] | None = None,
+    cnf: dict | None = None,
+) -> tuple[dict, list[str]]:
+    """Build the issuer SD-JWT payload (with ``_sd`` digests) and its disclosures.
+
+    This is the salt-fixing step of issuance, split out from signing so callers
+    can compute a stable hash of the payload before signing — e.g. the Merkle
+    leaf for batched credential evidence (the leaf is over the issuer payload,
+    so salts must be fixed first; see docs/specs/batched-credential-evidence.md
+    §4.1). The returned payload may be augmented (e.g. an ``evidence`` member
+    added) and then handed to :func:`sign_sd_jwt`.
+
+    Args:
+        claims: Credential claims dict (flat or nested).
+        vct: Verifiable Credential Type URI.
+        disclosable: Claim names/paths to make selectively disclosable
+            (dot-separated for nested, per RFC 9901 §6).
+        cnf: Confirmation key (holder's public key JWK for key binding).
+
+    Returns:
+        ``(payload, disclosures)`` — the issuer payload and the base64url
+        disclosure strings (salts already fixed).
+    """
+    disclosable = disclosable or []
+    payload = {**claims, "vct": vct}
+    payload, disclosures = _apply_structured_disclosures(payload, disclosable)
+    if disclosures:
+        payload["_sd_alg"] = "sha-256"
+    if cnf is not None:
+        payload["cnf"] = cnf
+    return payload, disclosures
+
+
+def sign_sd_jwt(
+    payload: dict,
+    disclosures: list[str],
+    private_key: PrivateKey,
+    *,
+    alg: str | None = None,
+    x5c: list[str] | None = None,
+) -> str:
+    """Sign a prepared SD-JWT payload and assemble the compact SD-JWT.
+
+    Counterpart of :func:`build_sd_jwt_payload`: signs the (possibly augmented)
+    issuer payload and appends the previously-built disclosures.
+
+    Returns:
+        SD-JWT compact string: ``<issuer-jwt>~<disclosure1>~...~``
+    """
+    alg = _resolve_alg(private_key, alg)
+    header = {"alg": alg, "typ": "vc+sd-jwt"}
+    if x5c is not None:
+        header["x5c"] = x5c
+    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    key = _import_private_key(private_key, alg)
+    issuer_jwt = jws.serialize_compact(header, payload_bytes, key, algorithms=[alg])
+    parts = [issuer_jwt] + disclosures + [""]
+    return SD_JWT_SEPARATOR.join(parts)
+
+
 def issue_sd_jwt_vc(
     claims: dict,
     private_key: PrivateKey,
@@ -120,12 +184,13 @@ def issue_sd_jwt_vc(
       - Structured: ``claims={"credentialSubject": {"email": "a@b.com"}},
         disclosable=["credentialSubject.email"]``
 
+    Thin wrapper over :func:`build_sd_jwt_payload` + :func:`sign_sd_jwt`.
+
     Args:
         claims: Credential claims dict (flat or nested).
         private_key: Issuer's private key (P-256 or Ed25519).
         vct: Verifiable Credential Type URI.
         disclosable: Claim names/paths to make selectively disclosable.
-            Use dot-separated paths for nested claims.
         alg: Algorithm override (default: ES256 for P-256).
         x5c: X.509 certificate chain for JOSE header.
         cnf: Confirmation key (holder's public key JWK for key binding).
@@ -133,35 +198,10 @@ def issue_sd_jwt_vc(
     Returns:
         SD-JWT compact string: ``<issuer-jwt>~<disclosure1>~...~``
     """
-    alg = _resolve_alg(private_key, alg)
-    disclosable = disclosable or []
-
-    # Build the base payload with vct
-    payload = {**claims, "vct": vct}
-
-    # Apply structured disclosures (handles both flat and nested paths)
-    payload, disclosures = _apply_structured_disclosures(payload, disclosable)
-
-    # Set _sd_alg if any disclosures were created
-    if disclosures:
-        payload["_sd_alg"] = "sha-256"
-
-    if cnf is not None:
-        payload["cnf"] = cnf
-
-    # Build header
-    header = {"alg": alg, "typ": "vc+sd-jwt"}
-    if x5c is not None:
-        header["x5c"] = x5c
-
-    # Sign the issuer JWT
-    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    key = _import_private_key(private_key, alg)
-    issuer_jwt = jws.serialize_compact(header, payload_bytes, key, algorithms=[alg])
-
-    # Compose SD-JWT: issuer-jwt~disclosure1~disclosure2~...~
-    parts = [issuer_jwt] + disclosures + [""]
-    return SD_JWT_SEPARATOR.join(parts)
+    payload, disclosures = build_sd_jwt_payload(
+        claims, vct=vct, disclosable=disclosable, cnf=cnf
+    )
+    return sign_sd_jwt(payload, disclosures, private_key, alg=alg, x5c=x5c)
 
 
 def _collect_sd_digests(obj: Any) -> set[str]:
