@@ -4,11 +4,16 @@
  * Mirror of the Python ``credentials.verify_signed_examples``. For every
  * ``<name>.sd-jwt`` under ``examples/signed/`` and ``examples/gaiax/signed/``:
  *
- *   1. Verify the issuer SD-JWT signature (verifySdJwtVc).
+ *   1. Verify the issuer SD-JWT proof (verifySdJwtVc) against the verification
+ *      method the proof ``kid`` names in the ISSUER's DID document (ADR-006:
+ *      for sovereign issuers this is the Signing Service's assertion-only
+ *      #delegate-1 mandate key). The example DID documents under
+ *      ``examples/did-ethr/`` stand in for live did:ethr resolution.
  *   2. If the credential carries harbour:BatchCredentialEvidence, verify the
  *      batched evidence (verifyBatchEvidence): recompute the Merkle leaf from the
  *      raw issuer payload, fold the inclusion proof, and check it against the root
  *      signed in the authorization JWT — verified against the authorizer's key.
+ *   3. For credentials carrying memberOf, check memberOf == issuer (ADR-006).
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -77,6 +82,48 @@ function rawIssuerPayload(sdJwt: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf-8"));
 }
 
+function issuerHeader(sdJwt: string): Record<string, unknown> {
+  const headerB64 = sdJwt.split("~")[0].split(".")[0];
+  return JSON.parse(Buffer.from(headerB64, "base64url").toString("utf-8"));
+}
+
+/**
+ * Map verification-method DID URLs to public keys from the example DID docs.
+ *
+ * Stands in for live did:ethr resolution: a proof kid is looked up here, so a
+ * credential verifies exactly when its kid names a verification method
+ * published in the issuer's DID document (including the Signing Service's
+ * #delegate-1 mandate key, ADR-006).
+ */
+async function loadDidVmKeys(): Promise<Map<string, CryptoKey>> {
+  const keys = new Map<string, CryptoKey>();
+  const didDir = join(REPO_ROOT, "examples", "did-ethr");
+  if (!existsSync(didDir)) return keys;
+  for (const file of readdirSync(didDir).sort()) {
+    if (!file.endsWith(".did.json")) continue;
+    const doc = JSON.parse(readFileSync(join(didDir, file), "utf-8")) as {
+      verificationMethod?: { id?: string; publicKeyJwk?: JWK }[];
+    };
+    for (const vm of doc.verificationMethod ?? []) {
+      if (!vm.id || !vm.publicKeyJwk || vm.publicKeyJwk.crv !== "P-256") continue;
+      keys.set(vm.id, await importP256PublicKey(vm.publicKeyJwk));
+    }
+  }
+  return keys;
+}
+
+const MEMBER_OF_KEYS = ["harbour.gx:memberOf", "memberOf"];
+
+function memberOf(claims: Record<string, unknown>): string | null {
+  const subject = claims.credentialSubject;
+  if (!subject || typeof subject !== "object") return null;
+  for (const key of MEMBER_OF_KEYS) {
+    const value = (subject as Record<string, unknown>)[key];
+    if (typeof value === "string") return value;
+  }
+  return null;
+}
+
 function batchEvidence(raw: Record<string, unknown>): Record<string, unknown> | null {
   const evidence = raw.evidence;
   if (!Array.isArray(evidence) || evidence.length === 0) return null;
@@ -104,6 +151,7 @@ async function main(): Promise<void> {
 
   const didToPub = await loadDidToPub();
   const fallbackPub = await loadFallbackPub();
+  const vmKeys = await loadDidVmKeys();
 
   let credentials = 0;
   let batch = 0;
@@ -119,10 +167,26 @@ async function main(): Promise<void> {
       const sdJwt = readFileSync(join(signedDir, file), "utf-8").trim();
       const raw = rawIssuerPayload(sdJwt);
       const issuerDid = (raw.issuer as string) ?? "";
-      const issuerPub = didToPub.get(issuerDid) ?? fallbackPub;
 
+      // Resolve the proof key from the issuer's DID document via kid
+      // (ADR-006); the fallback key covers keyring-less environments.
+      const kid = issuerHeader(sdJwt).kid;
+      let issuerPub: CryptoKey;
+      if (typeof kid === "string" && vmKeys.size > 0) {
+        if (!kid.startsWith(`${issuerDid}#`)) {
+          errors.push(
+            `${file}: proof kid ${kid} does not name a verification method of issuer ${issuerDid}`,
+          );
+          continue;
+        }
+        issuerPub = vmKeys.get(kid) ?? fallbackPub;
+      } else {
+        issuerPub = didToPub.get(issuerDid) ?? fallbackPub;
+      }
+
+      let claims: Record<string, unknown>;
       try {
-        await verifySdJwtVc(sdJwt, issuerPub);
+        claims = await verifySdJwtVc(sdJwt, issuerPub);
       } catch (e) {
         errors.push(
           `${file}: issuer signature: ${e instanceof Error ? e.message : e}`,
@@ -130,6 +194,12 @@ async function main(): Promise<void> {
         continue;
       }
       credentials++;
+
+      const member = memberOf(claims);
+      if (member !== null && member !== issuerDid) {
+        errors.push(`${file}: memberOf ${member} != issuer ${issuerDid}`);
+        continue;
+      }
 
       const evidence = batchEvidence(raw);
       if (!evidence) {

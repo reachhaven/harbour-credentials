@@ -5,6 +5,8 @@ Verifies:
 2. Plain issuance round-trips (issuer signature + selective disclosure)
 3. Batch issuance: one authorization JWT shared across the batch, each
    credential's inclusion proof verifies, and the leaf is disclosure-invariant
+4. ADR-006 mandate signing: every proof is executed by the Signing Service
+   key, with ``kid`` naming the verification method in the issuer's document
 """
 
 import json
@@ -21,7 +23,11 @@ from credentials.example_signer import (
     process_plain,
     vct_for_credential,
 )
-from credentials.verify_signed_examples import _build_did_to_pub, _raw_issuer_payload
+from credentials.verify_signed_examples import (
+    _build_did_to_pub,
+    _issuer_header,
+    _raw_issuer_payload,
+)
 from harbour.batch_evidence import verify_batch_evidence
 from harbour.keys import p256_public_key_to_did_key
 from harbour.sd_jwt import verify_sd_jwt_vc
@@ -45,6 +51,12 @@ def keyring():
 @pytest.fixture(scope="module")
 def did_to_pub(keyring):
     return _build_did_to_pub(keyring)
+
+
+@pytest.fixture(scope="module")
+def ss_pub(keyring, did_to_pub):
+    """The Signing Service public key — verifies every proof (ADR-006)."""
+    return did_to_pub[keyring.role_dids["haven"]]
 
 
 @pytest.fixture(scope="module")
@@ -107,20 +119,20 @@ def test_batch_authorizer():
 # --- issuance round-trips ---------------------------------------------------
 
 
-def test_process_plain_round_trip(keyring, did_to_pub, fallback, tmp_path):
-    vc = _load("trust-anchor-credential.json")
-    process_plain(vc, tmp_path, "trust-anchor-credential", keyring, fallback)
-    sd = (tmp_path / "trust-anchor-credential.sd-jwt").read_text().strip()
-    issuer_pub = did_to_pub[vc["issuer"]]
-    disclosed = verify_sd_jwt_vc(sd, issuer_pub)
-    assert disclosed["vct"].endswith("VerifiableCredential")
+def test_process_plain_round_trip(keyring, ss_pub, fallback, tmp_path):
+    vc = _load("delegated-signing-receipt.json")
+    process_plain(vc, tmp_path, "delegated-signing-receipt", keyring, fallback)
+    sd = (tmp_path / "delegated-signing-receipt.sd-jwt").read_text().strip()
+    # The Signing Service issues its own receipts and signs as itself.
+    assert _issuer_header(sd)["kid"] == f"{vc['issuer']}#controller"
+    disclosed = verify_sd_jwt_vc(sd, ss_pub)
     assert "credentialStatus" in disclosed
     # plain credentials carry no batch evidence
     assert batch_authorizer(_raw_issuer_payload(sd)) is None
 
 
 def test_process_batch_one_signature_and_proofs(
-    keyring, did_to_pub, fallback, tmp_path
+    keyring, did_to_pub, ss_pub, fallback, tmp_path
 ):
     lp = _load("legal-person-credential.json")
     lpe = _load("legal-person-credential-embedded.json")  # same authorizer (TA)
@@ -140,7 +152,9 @@ def test_process_batch_one_signature_and_proofs(
         sd = (tmp_path / f"{stem}.sd-jwt").read_text().strip()
         raw = _raw_issuer_payload(sd)
         raws[stem] = raw
-        verify_sd_jwt_vc(sd, did_to_pub[vc["issuer"]])  # issuer signature
+        # Proof executed by the Signing Service via the issuer's mandate key.
+        assert _issuer_header(sd)["kid"] == f"{vc['issuer']}#delegate-1"
+        verify_sd_jwt_vc(sd, ss_pub)
         verify_batch_evidence(
             raw, raw["evidence"][0], authorizer_pub, expected_audience=vc["issuer"]
         )
@@ -153,9 +167,11 @@ def test_process_batch_one_signature_and_proofs(
         assert len(raw["evidence"][0]["merkleProof"]["path"]) == 1
 
 
-def test_natural_person_selective_disclosure(keyring, did_to_pub, fallback, tmp_path):
+def test_natural_person_selective_disclosure(keyring, ss_pub, fallback, tmp_path):
     np = _load("natural-person-credential.json")
     authorizer = batch_authorizer(np)
+    # ADR-006: the organization issues its own members' credentials.
+    assert np["issuer"] == authorizer
     process_batch(
         [(Path("natural-person-credential.json"), np, tmp_path)],
         authorizer,
@@ -168,7 +184,7 @@ def test_natural_person_selective_disclosure(keyring, did_to_pub, fallback, tmp_
     assert "givenName" not in raw["credentialSubject"]
     assert "_sd" in raw["credentialSubject"]
     # ...but a full verification (all disclosures present) reveals it.
-    disclosed = verify_sd_jwt_vc(sd, did_to_pub[np["issuer"]])
+    disclosed = verify_sd_jwt_vc(sd, ss_pub)
     assert disclosed["credentialSubject"]["givenName"] == "Alice"
     # N=1 degenerate batch → empty proof path.
     assert raw["evidence"][0]["merkleProof"]["path"] == []

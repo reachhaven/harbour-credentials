@@ -147,17 +147,24 @@ def sign_sd_jwt(
     *,
     alg: str | None = None,
     x5c: list[str] | None = None,
+    kid: str | None = None,
 ) -> str:
     """Sign a prepared SD-JWT payload and assemble the compact SD-JWT.
 
     Counterpart of :func:`build_sd_jwt_payload`: signs the (possibly augmented)
     issuer payload and appends the previously-built disclosures.
 
+    Args:
+        kid: Verification-method DID URL naming the signing key in the
+            issuer's DID document (ADR-006 mandate signing).
+
     Returns:
         SD-JWT compact string: ``<issuer-jwt>~<disclosure1>~...~``
     """
     alg = _resolve_alg(private_key, alg)
     header = {"alg": alg, "typ": "vc+sd-jwt"}
+    if kid is not None:
+        header["kid"] = kid
     if x5c is not None:
         header["x5c"] = x5c
     payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")

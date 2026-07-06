@@ -3,7 +3,8 @@
  *
  * Mirrors the Python `credentials.digest_sri_examples --check` step: each
  * `harbour.gx:CompliantCredentialReference` in the example credentials must
- * carry a `harbour.gx:digestSRI` that matches the source-of-truth input VC
+ * carry a `harbour.gx:digestSRI` that matches the source-of-truth input VC of
+ * the owning organization — resolved by the reference's `@id` DID prefix
  * (and its inline `harbour.gx:embeddedCredential`, when present), recomputed
  * with the real `verifyDigestSri` function.
  *
@@ -36,11 +37,23 @@ function findRepoRoot(): string {
 const REPO_ROOT = findRepoRoot();
 const GAIAX_DIR = join(REPO_ROOT, "examples", "gaiax");
 
-// credentialType -> input VC filename (the source of truth).
+// credentialType -> input VC filename (the default source of truth,
+// describing the example organization).
 const INPUT_FILES: Record<string, string> = {
   "gx:LegalPerson": "gx-legal-person.json",
   "gx:VatID": "gx-registration-number.json",
   "gx:Issuer": "gx-terms-and-conditions.json",
+};
+
+// Per-organization source overrides: org DID -> { credentialType -> filename }.
+// The Trust Anchor holds a normal LegalPersonCredential (ADR-006) whose
+// references point at its own gx input trio rather than the default one.
+const ORG_INPUT_FILES: Record<string, Record<string, string>> = {
+  "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774": {
+    "gx:LegalPerson": "gx-trust-anchor-legal-person.json",
+    "gx:VatID": "gx-trust-anchor-registration-number.json",
+    "gx:Issuer": "gx-trust-anchor-terms-and-conditions.json",
+  },
 };
 
 const CREDENTIAL_TYPE_KEY = "harbour.gx:credentialType";
@@ -76,61 +89,30 @@ function collectReferences(node: unknown, out: Json[]): void {
 
 function targetFiles(): string[] {
   const inputNames = new Set(Object.values(INPUT_FILES));
+  for (const files of Object.values(ORG_INPUT_FILES)) {
+    for (const f of Object.values(files)) inputNames.add(f);
+  }
   return readdirSync(GAIAX_DIR)
     .filter((f) => f.endsWith(".json") && !inputNames.has(f))
     .sort()
     .map((f) => join(GAIAX_DIR, f));
 }
 
-/** Yield every object found anywhere in `node`. */
-function iterDicts(node: unknown, out: Json[]): void {
-  if (Array.isArray(node)) {
-    for (const item of node) iterDicts(item, out);
-  } else if (node !== null && typeof node === "object") {
-    const obj = node as Json;
-    out.push(obj);
-    for (const value of Object.values(obj)) iterDicts(value, out);
-  }
-}
-
-function hasType(node: Json, typeValue: string): boolean {
-  const t = node["type"];
-  const types = typeof t === "string" ? [t] : Array.isArray(t) ? t : [];
-  return types.includes(typeValue);
-}
-
 /**
- * Map a self-signed org DID -> { credentialType: its own bundled gx VC }.
- *
- * Mirrors `credentials.digest_sri_examples.load_self_signed_sources`: a
- * self-signed `harbour.gx:LegalPersonCredential` (issuer == credentialSubject.id,
- * e.g. the Trust Anchor) bundles its own three gx VCs in its evidence VP. Those
- * are that org's source of truth (it has no Example-Corp input file), so digestSRI
- * references whose `@id` org DID is self-signed resolve against them.
+ * Load per-organization input VCs: org DID -> { credentialType: gx VC }.
+ * Mirrors `credentials.digest_sri_examples.load_org_input_vcs`.
  */
-function loadSelfSignedSources(files: string[]): Record<string, Record<string, Json>> {
+function loadOrgInputVcs(): Record<string, Record<string, Json>> {
   const sources: Record<string, Record<string, Json>> = {};
-  for (const path of files) {
-    const obj = JSON.parse(readFileSync(path, "utf-8"));
-    const dicts: Json[] = [];
-    iterDicts(obj, dicts);
-    for (const cred of dicts) {
-      if (!hasType(cred, "harbour.gx:LegalPersonCredential")) continue;
-      const subject = cred["credentialSubject"];
-      if (subject === null || typeof subject !== "object") continue;
-      const orgDid = (subject as Json)["id"];
-      if (typeof orgDid !== "string" || cred["issuer"] !== orgDid) continue; // not self-signed
-      const inners: Json[] = [];
-      iterDicts(cred["evidence"] ?? [], inners);
-      for (const inner of inners) {
-        const cs = inner["credentialSubject"];
-        if (cs !== null && typeof cs === "object") {
-          const cst = (cs as Json)["type"];
-          if (typeof cst === "string" && cst in INPUT_FILES) {
-            (sources[orgDid] ??= {})[cst] ??= inner;
-          }
-        }
+  for (const [orgDid, files] of Object.entries(ORG_INPUT_FILES)) {
+    for (const [credentialType, filename] of Object.entries(files)) {
+      const path = join(GAIAX_DIR, filename);
+      if (!existsSync(path)) {
+        throw new Error(`Missing source-of-truth input VC: ${path}`);
       }
+      (sources[orgDid] ??= {})[credentialType] = JSON.parse(
+        readFileSync(path, "utf-8"),
+      );
     }
   }
   return sources;
@@ -138,19 +120,19 @@ function loadSelfSignedSources(files: string[]): Record<string, Record<string, J
 
 /**
  * The gx VC a reference's digestSRI is taken over: a reference whose `@id` org
- * DID is a self-signed org resolves to that org's own bundled gx VC; otherwise
- * to the shared Example-Corp input VC.
+ * DID has its own input trio (ORG_INPUT_FILES) resolves to that org's gx VC;
+ * otherwise to the default input VC.
  */
 function resolveReferent(
   ref: Json,
   inputs: Record<string, Json>,
-  selfSigned: Record<string, Record<string, Json>>,
+  orgSources: Record<string, Record<string, Json>>,
 ): Json | undefined {
   const ct = ref[CREDENTIAL_TYPE_KEY] as string;
   const id = typeof ref["@id"] === "string" ? (ref["@id"] as string) : "";
   const orgDid = id.split("#", 1)[0];
-  if (orgDid in selfSigned && ct in selfSigned[orgDid]) {
-    return selfSigned[orgDid][ct];
+  if (orgDid in orgSources && ct in orgSources[orgDid]) {
+    return orgSources[orgDid][ct];
   }
   return inputs[ct];
 }
@@ -160,7 +142,7 @@ async function main(): Promise<void> {
     throw new Error(`gaiax examples directory not found: ${GAIAX_DIR}`);
   }
   const inputs = loadInputVcs();
-  const selfSigned = loadSelfSignedSources(targetFiles());
+  const orgSources = loadOrgInputVcs();
   const errors: string[] = [];
   let totalRefs = 0;
 
@@ -177,15 +159,15 @@ async function main(): Promise<void> {
     for (const ref of refs) {
       const credentialType = ref[CREDENTIAL_TYPE_KEY] as string;
       const stored = ref[DIGEST_KEY] as string;
-      const sourceVc = resolveReferent(ref, inputs, selfSigned);
+      const sourceVc = resolveReferent(ref, inputs, orgSources);
       if (!sourceVc) {
         fileErrors.push(
           `cannot resolve referent for credentialType '${credentialType}' / @id ${ref["@id"]}`,
         );
         continue;
       }
-      // The digest must match its source-of-truth VC (Example-Corp input VC,
-      // or the org's own bundled gx VC for self-signed organizations).
+      // The digest must match its source-of-truth VC (the default input VC,
+      // or the org's own input trio for orgs listed in ORG_INPUT_FILES).
       if (!(await verifyDigestSri(sourceVc, stored))) {
         fileErrors.push(
           `${credentialType} digestSRI does not match its source VC\n` +

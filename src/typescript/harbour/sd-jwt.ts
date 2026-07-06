@@ -105,15 +105,21 @@ export function buildSdJwtPayload(
   return { payload, disclosures };
 }
 
-/** Sign a prepared SD-JWT payload and assemble the compact SD-JWT. */
+/**
+ * Sign a prepared SD-JWT payload and assemble the compact SD-JWT.
+ *
+ * `kid` names the signing verification method in the issuer's DID document
+ * (ADR-006 mandate signing).
+ */
 export async function signSdJwt(
   payload: Record<string, unknown>,
   disclosures: string[],
   privateKey: CryptoKey,
-  options: { alg?: string; x5c?: string[] } = {},
+  options: { alg?: string; x5c?: string[]; kid?: string } = {},
 ): Promise<string> {
   const alg = options.alg ?? resolveAlg(privateKey);
   const header: Record<string, unknown> = { alg, typ: "vc+sd-jwt" };
+  if (options.kid) header.kid = options.kid;
   if (options.x5c) header.x5c = options.x5c;
   const signer = new CompactSign(
     new TextEncoder().encode(JSON.stringify(payload)),

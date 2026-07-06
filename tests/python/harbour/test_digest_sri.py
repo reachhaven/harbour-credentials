@@ -131,13 +131,13 @@ class TestExamplesConsistency:
             check_file,
             collect_target_files,
             load_input_vcs,
-            load_self_signed_sources,
+            load_org_input_vcs,
         )
 
         inputs = load_input_vcs(GAIAX)
-        self_signed = load_self_signed_sources(GAIAX)
+        org_sources = load_org_input_vcs(GAIAX)
         all_errors: list[str] = []
         for path in collect_target_files(GAIAX):
-            errors, _ = check_file(path, inputs, self_signed)
+            errors, _ = check_file(path, inputs, org_sources)
             all_errors.extend(errors)
         assert all_errors == [], "\n".join(all_errors)

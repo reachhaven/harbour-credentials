@@ -6,11 +6,16 @@
  * ``examples/*.json`` and ``examples/gaiax/*.json`` and issues dc+sd-jwt
  * credentials with batched evidence into each directory's ``signed/`` folder.
  *
+ *   - Issuers are sovereign (ADR-006): every proof is executed by the Signing
+ *     Service key — as itself (#controller) on its own artifacts, and via the
+ *     assertion-only #delegate-1 mandate in the issuer's DID document for
+ *     sovereign issuers. The proof ``kid`` names that verification method.
  *   - Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
- *     batch per (output dir, authorizer). The authorizer signs ONE authorization
- *     JWT over the batch Merkle root; each credential gets its own inclusion
- *     proof. Salts are fixed first (buildSdJwtPayload), the root is signed, the
- *     full evidence is injected, then the issuer JWT is signed (signSdJwt).
+ *     batch per (output dir, authorizer). The authorizer's admin key signs ONE
+ *     authorization JWT over the batch Merkle root; each credential gets its own
+ *     inclusion proof. Salts are fixed first (buildSdJwtPayload), the root is
+ *     signed, the full evidence is injected, then the issuer JWT is signed
+ *     (signSdJwt).
  *   - Credentials with no/other evidence are issued as plain dc+sd-jwt.
  *
  * Output per credential: ``<name>.sd-jwt`` and ``<name>.decoded.json``.
@@ -79,11 +84,17 @@ const ROLE_FILES: Record<string, string> = {
   ascs: "ascs.p256.json",
 };
 
-async function loadRoleKeyring(): Promise<Map<string, RoleKeyEntry>> {
+interface RoleKeyring {
+  byDID: Map<string, RoleKeyEntry>;
+  roleDids: Map<string, string>;
+}
+
+async function loadRoleKeyring(): Promise<RoleKeyring> {
   const mapping = JSON.parse(
     readFileSync(join(KEYS_DIR, "role-did-mapping.json"), "utf-8"),
   ) as Record<string, { did_ethr: string }>;
   const byDID = new Map<string, RoleKeyEntry>();
+  const roleDids = new Map<string, string>();
   for (const [role, filename] of Object.entries(ROLE_FILES)) {
     const jwk: JWK = JSON.parse(readFileSync(join(KEYS_DIR, filename), "utf-8"));
     const did = mapping[role]?.did_ethr;
@@ -92,8 +103,9 @@ async function loadRoleKeyring(): Promise<Map<string, RoleKeyEntry>> {
       privateKey: await importP256PrivateKey(jwk),
       kid: `${did}#controller`,
     });
+    roleDids.set(role, did);
   }
-  return byDID;
+  return { byDID, roleDids };
 }
 
 async function loadFallbackKey(): Promise<RoleKeyEntry> {
@@ -183,6 +195,27 @@ function resolveKey(
   return byDID.get(did) ?? fallback;
 }
 
+/**
+ * Signing Service key + kid for a credential proof (ADR-006).
+ *
+ * The Signing Service executes every proof: as itself (#controller) on its
+ * own artifacts, and through the assertion-only #delegate-1 mandate in the
+ * issuer's DID document for sovereign issuers.
+ */
+function proofKey(
+  issuerDid: string,
+  keyring: RoleKeyring,
+  fallback: RoleKeyEntry,
+): RoleKeyEntry {
+  const ssDid = keyring.roleDids.get("haven");
+  const ss = ssDid ? keyring.byDID.get(ssDid) : undefined;
+  if (ssDid && ss) {
+    const fragment = issuerDid === ssDid ? "#controller" : "#delegate-1";
+    return { privateKey: ss.privateKey, kid: `${issuerDid}${fragment}` };
+  }
+  return fallback;
+}
+
 interface BatchItem {
   path: string;
   vc: Record<string, unknown>;
@@ -191,27 +224,32 @@ interface BatchItem {
 
 async function processPlain(
   item: BatchItem,
-  byDID: Map<string, RoleKeyEntry>,
+  keyring: RoleKeyring,
   fallback: RoleKeyEntry,
 ): Promise<void> {
-  const issuer = resolveKey((item.vc.issuer as string) ?? "", byDID, fallback);
+  const proof = proofKey((item.vc.issuer as string) ?? "", keyring, fallback);
   const { payload, disclosures } = buildSdJwtPayload(item.vc, {
     vct: vctForCredential(item.vc),
     disclosable: disclosablePaths(item.vc),
   });
-  const sdJwt = await signSdJwt(payload, disclosures, issuer.privateKey);
+  const sdJwt = await signSdJwt(payload, disclosures, proof.privateKey, {
+    kid: proof.kid,
+  });
   writeOutputs(item.outputDir, basename(item.path, ".json"), sdJwt);
 }
 
 async function processBatch(
   batch: BatchItem[],
   authorizer: string,
-  byDID: Map<string, RoleKeyEntry>,
+  keyring: RoleKeyring,
   fallback: RoleKeyEntry,
 ): Promise<void> {
-  const authorizerKey = resolveKey(authorizer, byDID, fallback);
+  const authorizerKey = resolveKey(authorizer, keyring.byDID, fallback);
+  // All credentials in a batch share an issuer (usually the authorizer org
+  // itself, ADR-006); proofs are executed by the Signing Service via the
+  // issuer's mandate key.
   const issuerDid = (batch[0].vc.issuer as string) ?? "";
-  const issuer = resolveKey(issuerDid, byDID, fallback);
+  const proof = proofKey(issuerDid, keyring, fallback);
 
   // 1. Fix salts.
   const payloads: Record<string, unknown>[] = [];
@@ -235,7 +273,9 @@ async function processBatch(
   // 3. Inject the full evidence and sign each issuer JWT.
   for (let i = 0; i < batch.length; i++) {
     payloads[i].evidence = [evidenceObjs[i]];
-    const sdJwt = await signSdJwt(payloads[i], disclosures[i], issuer.privateKey);
+    const sdJwt = await signSdJwt(payloads[i], disclosures[i], proof.privateKey, {
+      kid: proof.kid,
+    });
     writeOutputs(batch[i].outputDir, basename(batch[i].path, ".json"), sdJwt);
   }
 }
@@ -253,10 +293,10 @@ function discoverExamples(dir: string): string[] {
 }
 
 async function main(): Promise<void> {
-  const byDID = await loadRoleKeyring();
+  const keyring = await loadRoleKeyring();
   const fallback = await loadFallbackKey();
 
-  console.log(`  Loaded ${byDID.size} role keys`);
+  console.log(`  Loaded ${keyring.byDID.size} role keys`);
 
   const examples = [
     ...discoverExamples(EXAMPLES_DIR),
@@ -301,11 +341,11 @@ async function main(): Promise<void> {
     const authorizer = key.split(" ")[1];
     const members = batch.map((b) => basename(b.path)).join(", ");
     console.log(`  batch (authorizer ${authorizer.slice(-8)}, N=${batch.length}): ${members}`);
-    await processBatch(batch, authorizer, byDID, fallback);
+    await processBatch(batch, authorizer, keyring, fallback);
     for (const b of batch) outputDirs.add(b.outputDir);
   }
   for (const item of plain) {
-    await processPlain(item, byDID, fallback);
+    await processPlain(item, keyring, fallback);
     outputDirs.add(item.outputDir);
     console.log(`  plain: ${basename(item.path)}`);
   }

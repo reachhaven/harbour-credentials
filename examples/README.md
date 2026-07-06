@@ -72,27 +72,42 @@ The examples use a **two-tier layout**:
 
 Credential types in the Gaia-X layer use the `harbour.gx:` namespace prefix
 (e.g. `harbour.gx:LegalPersonCredential`, `harbour.gx:NaturalPerson`) while core
-types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:CredentialEvidence`).
+types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:BatchCredentialEvidence`).
 
 ## Credential Issuance Model
 
-The Harbour Signing Service is the **sole issuer** of all credentials, acting
-"on behalf of" an authorizing party. The `evidence` field on each credential
-contains a VP proving who authorized the issuance:
+Issuers are **sovereign** ([ADR-006](../docs/decisions/006-sovereign-issuers.md)):
+a credential's `issuer` is the vouching party's own `did:ethr`, and the
+**Signing Service executes every proof under a mandate** — its key is listed
+as an assertion-only `#delegate-1` verification method in the issuer's DID
+document, and the proof `kid` names that method. Every credential carries two
+distinct signatures:
 
-- **LegalPersonCredential**: Trust Anchor authorizes the org by presenting a VP
-  containing its self-signed LegalPersonCredential. The Signing Service issues
-  the credential with this VP as evidence.
-- **NaturalPersonCredential**: Org authorizes the employee by presenting a VP
-  containing its own LegalPersonCredential (SD-JWT, sensitive fields redacted).
-  The Signing Service issues the credential with this VP as evidence.
+- **Evidence** (`harbour:BatchCredentialEvidence`) — the authorization,
+  signed by a *human admin* whose key is authorized on the issuing org's
+  `did:ethr`. One admin signature covers a whole batch via a Merkle root
+  (see [`batched-credential-evidence.md`](../docs/specs/batched-credential-evidence.md)).
+- **Proof** (the SD-JWT signature) — produced by the Signing Service via the
+  issuer's mandate key. It makes the credential verifiable; it decides nothing.
 
-### Trust Anchor Self-Signed Credential
+Who issues what:
 
-The Trust Anchor holds a **self-signed LegalPersonCredential** (analogous to a
-root CA certificate) where `issuer == credentialSubject.id`. This credential is
+- **LegalPersonCredential**: issued by the **Trust Anchor** (`issuer` = TA
+  DID); a Trust Anchor admin signs the batch evidence.
+- **NaturalPersonCredential**: issued by the **organization** (`issuer` = org
+  DID, and `memberOf` MUST equal `issuer`); an org admin signs the batch
+  evidence.
+
+### Trust Anchor Credential
+
+The Trust Anchor holds a **normal LegalPersonCredential** where
+`issuer == credentialSubject.id` (analogous to a root CA certificate): it is
+authorized and proof-signed exactly like any other LegalPersonCredential, and
+trust in it comes from out-of-band knowledge of the Trust Anchor's DID. It is
 publicly resolvable via a `LinkedCredentialService` endpoint in the Trust
-Anchor's DID document. See [`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json).
+Anchor's DID document. Its Gaia-X compliance references resolve to the Trust
+Anchor's own input trio (`gx-trust-anchor-*.json`). See
+[`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json).
 
 ## Actors and Identities
 
@@ -106,7 +121,7 @@ resolved DID document.
 | Actor | Role | Identity (`did:ethr`) | DID Document |
 |-------|------|-----------------------|--------------|
 | **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774` | [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) |
-| **Harbour Signing Service** | Issues ALL credentials (`#controller`), signs delegated txns (`#delegate-1`) | `did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
+| **Harbour Signing Service** | Executes all proofs via per-issuer mandate keys (ADR-006); signs delegated txns (`#delegate-1`) | `did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
 | **Example Corporation GmbH** | Legal person (organization) | `did:ethr:0x14a34:0xf7ef...dab` | [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
 | **Alice Smith** | Natural person (employee) | `did:ethr:0x14a34:0x26e4...16c9` | [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
 | **ENVITED Marketplace** | Data marketplace (external) | `did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c` | — |
@@ -121,8 +136,15 @@ The Signing Service DID document contains two P-256 verification methods:
 
 | Key | Relationship | Purpose |
 |-----|-------------|---------|
-| `#controller` | `authentication`, `assertionMethod` | Primary controller and credential issuance key |
+| `#controller` | `authentication`, `assertionMethod` | Primary controller key; signs the Signing Service's own artifacts (e.g. delegated-signing receipts) |
 | `#delegate-1` | `authentication`, `capabilityDelegation` | Delegated transaction signing |
+
+**The mandate (ADR-006):** the same Signing Service public key also appears as
+an **assertion-only `#delegate-1`** verification method in each sovereign
+issuer's DID document (Trust Anchor, organizations). Credential proofs carry a
+`kid` naming that method in the *issuer's* document — never the Signing
+Service's own DID — so any issuer can revoke the mandate unilaterally by
+editing its DID document.
 
 Signer DID documents in these Harbour examples expose local P-256 controller
 keys directly. They do not model a separate synthetic secp256k1 recovery method
@@ -132,85 +154,99 @@ in the example JSON output.
 
 ## Step 1: Organization Onboarding — LegalPersonCredential
 
-The Trust Anchor authorizes the Signing Service to issue a `LegalPersonCredential`
-for an organization. The Trust Anchor presents a VP containing its **self-signed
-LegalPersonCredential** to the Signing Service, which then issues the credential
-with this VP as evidence.
+The **Trust Anchor issues** the organization's `LegalPersonCredential`
+(`issuer` = Trust Anchor DID). A Trust Anchor **admin** signs one batch
+authorization JWT over the Merkle root of all LegalPersonCredentials issued in
+the batch (including the Trust Anchor's own); the **Signing Service** then
+executes each proof with the assertion-only `#delegate-1` mandate key in the
+Trust Anchor's DID document.
 
 ```mermaid
 sequenceDiagram
-    participant TA as Trust Anchor<br/>(did:ethr)
-    participant SS as Signing Service<br/>(did:ethr)
+    participant ADM as TA Admin<br/>(key on TA did:ethr)
+    participant SS as Signing Service<br/>(mandate key in TA DID doc)
     participant DW as did:ethr Registry
 
-    TA->>SS: Authorize org credential issuance
-    TA->>TA: Create VP with self-signed<br/>LegalPersonCredential
-    TA->>SS: Authorization VP (Trust Anchor's credential inside)
-    SS->>SS: Verify VP + Trust Anchor credential
     SS->>DW: Create did:ethr for legal person
-    SS->>SS: Sign LegalPersonCredential<br/>(evidence = Trust Anchor's VP)
+    SS->>SS: Assemble batch payloads,<br/>compute Merkle root
+    ADM->>ADM: Sign ONE authorization JWT<br/>(nonce = batch Merkle root)
+    ADM->>SS: Authorization JWT
+    SS->>SS: Embed per-credential evidence<br/>(authorizer, authorization, merkleProof)
+    SS->>SS: Sign each proof<br/>(kid = TA-DID#delegate-1)
     SS->>DW: Deliver LegalPersonCredential
 ```
 
-**What the evidence proves**: The Trust Anchor (root of trust) authorized the
-Signing Service to issue this credential. The VP contains the Trust Anchor's
-self-signed LegalPersonCredential, establishing the chain of trust.
+**What the evidence proves**: a human Trust Anchor admin authorized exactly
+this credential's payload (its Merkle leaf folds to the signed root). The
+Signing Service cannot fabricate an authorization — it cannot forge the
+admin's signature.
 
 ### Example files
 
 | File | Description |
 |------|-------------|
-| [`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json) | Trust Anchor's self-signed credential (root of trust) |
+| [`gaiax/trust-anchor-credential.json`](gaiax/trust-anchor-credential.json) | Trust Anchor's own LegalPersonCredential (root of trust, `issuer == subject`) |
 | [`gaiax/legal-person-credential.json`](gaiax/legal-person-credential.json) | Unsigned credential (expanded JSON-LD) |
-| [`gaiax/signed/legal-person-credential.jwt`](gaiax/signed/legal-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
-| [`gaiax/signed/legal-person-credential.decoded.json`](gaiax/signed/legal-person-credential.decoded.json) | Decoded JWT (header + payload) |
-| [`gaiax/signed/legal-person-credential.evidence-vp.jwt`](gaiax/signed/legal-person-credential.evidence-vp.jwt) | Evidence VP (Trust Anchor authorization) |
-| [`did-ethr/legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Legal person DID document |
+| `gaiax/signed/legal-person-credential.sd-jwt` | Signed credential (dc+sd-jwt wire format, gitignored) |
+| `gaiax/signed/legal-person-credential.decoded.json` | Decoded SD-JWT (header + payload + disclosures, gitignored) |
+| [`did-ethr/legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) | Legal person DID document (incl. Signing Service mandate key) |
 
 ### Code
 
 ```python
-# Python — sign the credential
-from harbour.signer import sign_vc_jose
-signed_jwt = sign_vc_jose(credential, private_key, kid=issuer_kid)
+# Python — issue with batched evidence (as the story pipeline does)
+from harbour.sd_jwt import build_sd_jwt_payload, sign_sd_jwt
+from harbour.batch_evidence import build_batch_evidence
+
+payload, disclosures = build_sd_jwt_payload(credential, vct=vct)
+evidence = build_batch_evidence([payload], admin_key, authorizer_did=ta_did, audience=ta_did)
+payload["evidence"] = [evidence[0]]
+sd_jwt = sign_sd_jwt(payload, disclosures, ss_key, kid=f"{ta_did}#delegate-1")
 ```
 
 ```typescript
-// TypeScript — sign the credential
-import { signJwt } from '@reachhaven/harbour-credentials';
-const signedJwt = await signJwt(credential, privateKey, { kid: issuerKid });
+// TypeScript — issue with batched evidence
+import { buildSdJwtPayload, signSdJwt, buildBatchEvidence } from '@reachhaven/harbour-credentials';
+
+const { payload, disclosures } = buildSdJwtPayload(credential, { vct });
+const evidence = await buildBatchEvidence([payload], adminKey, { authorizerDid: taDid, audience: taDid });
+payload.evidence = [evidence[0]];
+const sdJwt = await signSdJwt(payload, disclosures, ssKey, { kid: `${taDid}#delegate-1` });
 ```
 
 ---
 
 ## Step 2: Employee Onboarding — NaturalPersonCredential
 
-The organization authorizes the Signing Service to issue a `NaturalPersonCredential`
-for an employee. The org presents a VP containing its **LegalPersonCredential**
-(SD-JWT with sensitive fields redacted — registration number and addresses hidden,
-name/legalName disclosed). The Signing Service issues the credential with this VP
-as evidence.
+The **organization issues** its employee's `NaturalPersonCredential`
+(`issuer` = org DID, and `memberOf` MUST equal `issuer`). An **org admin**
+signs one batch authorization JWT over the Merkle root — one signature covers
+all employees onboarded in the batch — and the **Signing Service** executes
+each proof with the mandate key in the organization's DID document.
 
 ```mermaid
 sequenceDiagram
-    participant ORG as Organization<br/>(did:ethr)
-    participant SS as Signing Service<br/>(did:ethr)
+    participant ADM as Org Admin<br/>(key on org did:ethr)
+    participant SS as Signing Service<br/>(mandate key in org DID doc)
     participant DW as did:ethr Registry
 
-    ORG->>SS: Authorize employee credential issuance
-    ORG->>ORG: Create VP with LegalPersonCredential<br/>(SD-JWT, PII redacted)
-    ORG->>SS: Authorization VP (org credential inside)
-    SS->>SS: Verify VP + org credential<br/>(name disclosed, PII redacted)
     SS->>DW: Create did:ethr for natural person
-    SS->>SS: Sign NaturalPersonCredential<br/>(evidence = org's VP, memberOf link)
+    SS->>SS: Assemble batch payloads<br/>(memberOf = issuer = org DID)
+    ADM->>ADM: Sign ONE authorization JWT<br/>(nonce = batch Merkle root)
+    ADM->>SS: Authorization JWT
+    SS->>SS: Embed per-credential evidence
+    SS->>SS: Sign each proof<br/>(kid = org-DID#delegate-1)
     SS->>DW: Deliver NaturalPersonCredential
 ```
 
-**Chain of trust**: The Trust Anchor authorized the org (Step 1), the org
-authorizes the employee (Step 2), and the Signing Service issues both credentials.
-The `memberOf` field references the legal person's opaque `did:ethr` identifier
-(UUID-based, no company name). A verifier can resolve this DID to confirm
-organizational affiliation without the credential itself leaking PII.
+**Chain of trust**: The Trust Anchor issued the org's LegalPersonCredential
+(Step 1); the org issues its employees' credentials (Step 2); the Signing
+Service only executes proofs under each issuer's revocable mandate. The
+`memberOf` field references the legal person's opaque `did:ethr` identifier
+(UUID-based, no company name) and must equal the credential's `issuer`. A
+verifier resolves the org DID and its **published LegalPersonCredential**
+(`LinkedCredentialService`) to confirm organizational affiliation without the
+credential itself leaking PII.
 
 > **Discussion point**: `memberOf` is currently selectively disclosable. Whether
 > it should be always-disclosed (to guarantee the trust chain) or remain
@@ -460,7 +496,7 @@ artifacts to `examples/signed/` and `examples/gaiax/signed/` respectively.
 
 ## Related Documentation
 
-- [Evidence types](../docs/guide/evidence.md) — CredentialEvidence + DelegatedSignatureEvidence
+- [Evidence types](../docs/guide/evidence.md) — BatchCredentialEvidence + DelegatedSignatureEvidence
 - [Delegated signing flow](../docs/guide/delegated-signing.md) — Complete OID4VP consent flow
 - [Delegation challenge spec](../docs/specs/delegation-challenge-encoding.md) — Challenge format + transaction data
 - [DID documents](did-ethr/README.md) — All example `did:ethr` identifiers

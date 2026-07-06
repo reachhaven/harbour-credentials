@@ -1,0 +1,21 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/gaia-x/development#"
+  ],
+  "type": [
+    "VerifiableCredential"
+  ],
+  "id": "urn:uuid:abb81276-0e47-4382-8429-eea3bb6d9346",
+  "name": "VAT ID",
+  "description": "Value Added Tax Identifier",
+  "issuer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+  "validFrom": "2026-01-01T00:00:00Z",
+  "validUntil": "2027-01-01T00:00:00Z",
+  "credentialSubject": {
+    "type": "gx:VatID",
+    "id": "urn:uuid:abb81276-0e47-4382-8429-eea3bb6d9346#cs",
+    "gx:vatID": "DE298765432",
+    "gx:countryCode": "DE"
+  }
+}

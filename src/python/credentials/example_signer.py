@@ -5,21 +5,27 @@ Reads expanded (human-readable) examples from ``examples/*.json`` and issues
 directory's ``signed/`` folder. When given a directory, also processes the
 ``gaiax/`` subdirectory.
 
-Issuance model (see ``docs/specs/batched-credential-evidence.md``):
+Issuance model (see ``docs/specs/batched-credential-evidence.md`` and ADR-006):
 
   * Each role in the trust chain uses a **separate P-256 key** (Trust Anchor,
     Signing Service / Haven, Company, Employee), loaded from
     ``tests/fixtures/keys/``.
+  * Issuers are sovereign: a credential's ``issuer`` is the vouching party's
+    own did:ethr. Every **proof** is executed by the Signing Service key —
+    signing as itself (``#controller``) only on its own artifacts, and via the
+    assertion-only ``#delegate-1`` mandate in the issuer's DID document for
+    all sovereign issuers. The proof ``kid`` names that verification method.
   * Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
-    **batch per (output dir, authorizer)**. The authorizer signs **one**
-    authorization JWT over the batch Merkle root; each credential gets its own
-    inclusion proof. The leaf is the issuer SD-JWT payload (``evidence`` removed)
-    — so salts are fixed first (``build_sd_jwt_payload``), the root is signed,
-    the full evidence is injected, and the issuer JWT is signed last
-    (``sign_sd_jwt``), all in one pass.
-  * Credentials with no evidence (e.g. the Trust Anchor root) or non-batch
-    evidence (delegated-signing receipts, out of scope here) are issued as plain
-    dc+sd-jwt with their claims passed through.
+    **batch per (output dir, authorizer)**. The authorizer's admin key signs
+    **one** authorization JWT over the batch Merkle root; each credential gets
+    its own inclusion proof. The leaf is the issuer SD-JWT payload
+    (``evidence`` removed) — so salts are fixed first
+    (``build_sd_jwt_payload``), the root is signed, the full evidence is
+    injected, and the issuer JWT is signed last (``sign_sd_jwt``), all in one
+    pass.
+  * Credentials without batch evidence (delegated-signing receipts, out of
+    scope here) are issued as plain dc+sd-jwt with their claims passed
+    through.
 
 Output per credential:
   - ``<name>.sd-jwt``       — the dc+sd-jwt wire credential
@@ -241,6 +247,27 @@ def _resolve_key(
     return fallback
 
 
+def _proof_key(
+    issuer_did: str,
+    keyring: RoleKeyring | None,
+    fallback: tuple[PrivateKey, str],
+) -> tuple[PrivateKey, str]:
+    """Signing Service key + ``kid`` for a credential proof (ADR-006).
+
+    The Signing Service executes every proof: as itself (``#controller``) on
+    its own artifacts, and through the assertion-only ``#delegate-1`` mandate
+    in the issuer's DID document for sovereign issuers.
+    """
+    if keyring:
+        ss_did = keyring.role_dids.get("haven")
+        resolved = keyring.resolve(ss_did) if ss_did else None
+        if resolved:
+            ss_key, _ = resolved
+            fragment = "#controller" if issuer_did == ss_did else "#delegate-1"
+            return ss_key, f"{issuer_did}{fragment}"
+    return fallback
+
+
 def process_plain(
     vc: dict,
     output_dir: Path,
@@ -249,11 +276,11 @@ def process_plain(
     fallback: tuple[PrivateKey, str],
 ) -> Path:
     """Issue a credential with no batch evidence as a plain dc+sd-jwt."""
-    issuer_key, _ = _resolve_key(vc.get("issuer", ""), keyring, fallback)
+    proof_key, proof_kid = _proof_key(vc.get("issuer", ""), keyring, fallback)
     payload, disclosures = build_sd_jwt_payload(
         vc, vct=vct_for_credential(vc), disclosable=disclosable_paths(vc)
     )
-    sd_jwt = sign_sd_jwt(payload, disclosures, issuer_key)
+    sd_jwt = sign_sd_jwt(payload, disclosures, proof_key, kid=proof_kid)
     return _write_outputs(output_dir, stem, sd_jwt)
 
 
@@ -265,10 +292,11 @@ def process_batch(
 ) -> list[Path]:
     """Issue a batch of credentials sharing one authorizer with one signature."""
     authorizer_key, authorizer_kid = _resolve_key(authorizer, keyring, fallback)
-    # All credentials in a batch share an issuer (the Signing Service); the
-    # authorization JWT audience is that issuer.
+    # All credentials in a batch share an issuer (usually the authorizer org
+    # itself, ADR-006); the authorization JWT audience is that issuer. Proofs
+    # are executed by the Signing Service via the issuer's mandate key.
     issuer_did = batch[0][1].get("issuer", "")
-    issuer_key, _ = _resolve_key(issuer_did, keyring, fallback)
+    proof_key, proof_kid = _proof_key(issuer_did, keyring, fallback)
 
     # 1. Fix salts: build each issuer payload (evidence stub present, ignored by
     #    the leaf which strips `evidence`).
@@ -294,7 +322,7 @@ def process_batch(
     written: list[Path] = []
     for i, (path, _, output_dir) in enumerate(batch):
         payloads[i]["evidence"] = [evidence_objs[i]]
-        sd_jwt = sign_sd_jwt(payloads[i], disclosures[i], issuer_key)
+        sd_jwt = sign_sd_jwt(payloads[i], disclosures[i], proof_key, kid=proof_kid)
         written.append(_write_outputs(output_dir, path.stem, sd_jwt))
     return written
 

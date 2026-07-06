@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Supports SD-JWT-VC (EUDI/OIDC4VP) + VC-JOSE-COSE (Gaia-X) formats with ES256 (P-256) as the primary algorithm.
 
-The library is validated end-to-end by the **Harbour Credential Lifecycle** (see `examples/README.md`): a 4-actor narrative — Trust Anchor → Signing Service → Legal Person (organization) → Natural Person (employee) — that is signed and verified in *both* runtimes via the **story pipeline** (`make story`), proving interoperability. Understanding this trust model (below) is the fastest way to grasp the codebase.
+The library is validated end-to-end by the **Harbour Credential Lifecycle** (see `examples/README.md`): a 4-actor narrative — Trust Anchor → Legal Person (organization) → Natural Person (employee), with the Signing Service executing all proofs under a per-issuer mandate (ADR-006) — that is signed and verified in *both* runtimes via the **story pipeline** (`make story`), proving interoperability. Understanding this trust model (below) is the fastest way to grasp the codebase.
 
 ## Essential Commands
 
@@ -87,14 +87,14 @@ The `examples/` directory is the authoritative end-to-end narrative, not just te
 - **`examples/gaiax_external/`** — Third-party Gaia-X credentials *not* produced by our pipeline.
 - **`examples/signed/`, `examples/gaiax/signed/`** — Story-pipeline output (`.jwt`, `.decoded.json`, `.evidence-vp.jwt`); **gitignored**.
 
-The trust chain each credential's evidence VP proves:
+The trust chain (ADR-006, sovereign issuers — each credential's `issuer` is the vouching party's own DID; the Signing Service only executes proofs via an assertion-only mandate key in the issuer's DID document):
 
 | Actor | Identity | Role |
 |-------|----------|------|
-| Trust Anchor | did:ethr | Root of trust; self-signed authority |
-| Signing Service | did:ethr | Issues all credentials; `#controller` key for issuance, `#delegate-1` for delegated transactions |
-| Legal Person | did:ethr | Organization authorized by the Trust Anchor; authorizes employees |
-| Natural Person | did:ethr | Employee, linked to the org via `memberOf` |
+| Trust Anchor | did:ethr | Root of trust; **issues all LegalPersonCredentials**, incl. its own (`issuer == subject`); a TA admin signs batch evidence |
+| Signing Service | did:ethr | Executes every proof via per-issuer `#delegate-1` mandate keys (kid names the issuer's method); signs its own artifacts with `#controller` |
+| Legal Person | did:ethr | Organization; **issues its employees' NaturalPersonCredentials**; an org admin signs batch evidence |
+| Natural Person | did:ethr | Employee; `memberOf` MUST equal `issuer` (the org) |
 
 The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, haven, company, employee, ascs).
 
