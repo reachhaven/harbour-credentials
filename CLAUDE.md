@@ -100,7 +100,7 @@ The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, hav
 
 ### Test Layout
 
-- `tests/fixtures/` — shared `keys/`, `tokens/`, `credentials/`, `sample-vc.json`
+- `tests/fixtures/` — shared `keys/`, `tokens/`, `sample-vc.json`, `batched-evidence-vectors.json`
 - `tests/conftest.py` — root fixtures: session-scoped Ed25519 + P-256 keypairs, sample VC/VP
 - `tests/python/credentials/conftest.py` — parametrized fixtures over `examples/` credentials + pre-signed JWTs
 - `tests/python/harbour/` — per-module tests (sign, verify, keys, sd_jwt, kb_jwt, sd_jwt_vp, x509, delegation, tamper)

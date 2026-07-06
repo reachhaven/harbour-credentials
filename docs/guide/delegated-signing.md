@@ -125,11 +125,14 @@ This repository verifies signatures and hash bindings, but it does **not** host 
 - Naming policy in examples:
   - All identifiers use UUID-based path segments (no real names or organization names in DID paths).
 
-Current integration hooks and TODOs:
+Current integration hooks:
 
 - `issue_sd_jwt_vp(..., holder_did=...)` allows the wallet DID to be embedded in the consent VP.
 - `verify_sd_jwt_vp(..., holder_public_key=...)` accepts the DID-resolved public key from your resolver stack.
-- TODO: Add optional resolver callback adapters for `did:ethr` so verification can resolve custom P-256 controller keys in-process.
+
+**Known limitation**: the library does not resolve `did:ethr` documents
+itself — callers must supply the resolved public key. In-process resolver
+callback adapters are a candidate future extension.
 
 ## OID4VP Transaction Data
 
