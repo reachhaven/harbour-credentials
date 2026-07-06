@@ -445,11 +445,34 @@ lint:
 		*) echo "ERROR: Unknown lint subcommand '$$subcommand'"; echo "Run 'make lint help' for available options."; exit 1 ;; \
 	esac
 
-_lint_default:
+_lint_default: _lint_stale_refs
 	$(call check_dev_setup)
 	@echo "Running pre-commit checks..."
 	@"$(PYTHON)" -m pre_commit run --all-files
 	@echo "OK: Pre-commit checks complete"
+
+# Fail on references to evidence-class IRIs that no longer exist in the
+# schema. Half-applied renames rot silently in docs (this caught an entire
+# guide describing a removed model, and a wrong wire IRI in another, on its
+# first run); grep is cheap insurance. Scoped to docs/examples/schema — code
+# may deliberately carry historical aliases (DELEGATED_EVIDENCE_TYPES).
+# Excludes vendored spec copies, generated API docs, and gitignored outputs.
+STALE_IRIS := harbour:CredentialEvidence harbour:DelegatedSignatureEvidence
+_lint_stale_refs:
+	@echo "Checking for stale evidence-class references..."
+	@found=0; \
+	for iri in $(STALE_IRIS); do \
+		if grep -rn --fixed-strings "$$iri" \
+			docs/ examples/ linkml/ README.md CLAUDE.md AGENTS.md \
+			--include='*.md' --include='*.json' --include='*.yaml' \
+			--exclude-dir='references' --exclude-dir='api' \
+			--exclude-dir='signed' 2>/dev/null; then \
+			echo "ERROR: stale reference to removed class IRI '$$iri' (see above)" >&2; \
+			found=1; \
+		fi; \
+	done; \
+	[ $$found -eq 0 ]
+	@echo "OK: No stale evidence-class references"
 
 # Lint Markdown files
 _lint_md: ## Lint Markdown files with markdownlint-cli2

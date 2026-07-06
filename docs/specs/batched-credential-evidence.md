@@ -428,12 +428,13 @@ closed.
 - **`harbour:MerklePathElement`** — `hash` (base64url SHA-256 string) and
   `position` (enumeration: `left` | `right`).
 - **`harbour:CRSetEntry`** (existing) — `statusServiceOperator`, `statusIndex`.
-  A credential carries two of these (§7): one with the Signing Service as operator,
-  one with the organization. No revocation-specific class is added by this spec.
+  A credential carries one of these with the issuer as operator (§7). No
+  revocation-specific class is added by this spec.
 
-`harbour:CredentialEvidence` is removed; `harbour:BatchCredentialEvidence` is the
-sole credential-issuance evidence type (a batch of size 1 is a degenerate batch
-with an empty `merkleProof.path`).
+The previous inline-VP evidence class is removed;
+`harbour:BatchCredentialEvidence` is the sole credential-issuance evidence
+type (a batch of size 1 is a degenerate batch with an empty
+`merkleProof.path`).
 
 ---
 

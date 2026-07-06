@@ -23,7 +23,21 @@ KEYS_DIR = FIXTURES_DIR / "keys"
 TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
 
-_YARN = shutil.which("yarn") or "yarn"
+def _yarn_command() -> list[str]:
+    """Resolve the yarn invocation, falling back to corepack.
+
+    The repo mandates `corepack yarn`; on corepack-only machines there is no
+    bare `yarn` on PATH, and probing only for it made this whole suite skip
+    silently.
+    """
+    if shutil.which("yarn"):
+        return ["yarn"]
+    if shutil.which("corepack"):
+        return ["corepack", "yarn"]
+    return ["yarn"]
+
+
+_YARN = _yarn_command()
 
 
 def _run_node(script: str) -> str:
@@ -38,7 +52,7 @@ def _run_node(script: str) -> str:
         tmp = Path(f.name)
     try:
         result = subprocess.run(
-            [_YARN, "node", str(tmp)],
+            [*_YARN, "node", str(tmp)],
             capture_output=True,
             text=True,
             cwd=str(TS_DIR),

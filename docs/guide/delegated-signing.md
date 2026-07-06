@@ -268,7 +268,7 @@ After executing the transaction, the signing service issues a **receipt credenti
   "type": ["VerifiableCredential", "harbour:DelegatedSigningReceipt"],
   "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "evidence": [{
-    "type": "harbour:DelegatedSignatureEvidence",
+    "type": "harbour:SignatureEvidence",
     "verifiablePresentation": "<consent VP with PII redacted>",
     "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
     "transaction_data": { "..." }
