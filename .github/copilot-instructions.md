@@ -1,128 +1,25 @@
-# Harbour Credentials - AI Assistant Instructions
+# Harbour Credentials — AI Assistant Instructions
 
-This repository contains cryptographic libraries for signing and verifying verifiable credentials (Python + TypeScript).
+**[CLAUDE.md](../CLAUDE.md) is the single canonical instruction file for this
+repository.** Read it before making changes — it covers the trust model
+(ADR-006), commands, architecture, dual-runtime parity rules, standards
+compliance, coding conventions, and the commit/PR workflow. This file and
+`AGENTS.md` are intentionally thin pointers so the guidance cannot drift
+apart.
 
-## Build, Test, and Lint Commands
+Non-negotiables (duplicated here so no tool can miss them — full detail in
+CLAUDE.md):
 
-```bash
-# Install dev dependencies
-make setup
-make install dev
-
-# Run all tests (Python + TypeScript)
-make test full
-
-# Run Python tests only
-make test
-
-# Run TypeScript tests only
-make test ts
-
-# Build TypeScript
-make build
-
-# Lint and format
-make lint
-make format
-
-# Run with coverage
-make test cov
-```
-
-## Instruction Files
-
-Read these BEFORE making changes:
-
-| Topic              | File                                      |
-| ------------------ | ----------------------------------------- |
-| Agent instructions | [AGENTS.md](../AGENTS.md)                 |
-| Claude guidance    | [CLAUDE.md](../CLAUDE.md)                 |
-| Documentation      | [README.md](../README.md)                 |
-| Architecture       | [architecture.md](../docs/architecture.md)|
-
-## Core Principles
-
-1. **Dual Runtime**: Python and TypeScript implementations with feature parity
-2. **CLI Required**: All Python modules must have `main()` with `argparse` and `--help`
-3. **Type Safety**: Full type hints (Python) and strict mode (TypeScript)
-
-## Project Structure
-
-```text
-src/
-├── python/
-│   ├── harbour/        # Crypto library (keys, sign, verify, sd-jwt, kb-jwt, x509)
-│   └── credentials/    # Credential processing pipeline
-└── typescript/
-    └── harbour/        # TypeScript port of crypto library
-
-tests/
-├── fixtures/           # Shared test fixtures (credentials, keys, tokens)
-├── interop/            # Cross-runtime interoperability tests
-├── python/
-│   ├── harbour/        # Harbour Python tests
-│   └── credentials/    # Credentials Python tests
-└── typescript/harbour/ # Harbour TypeScript tests
-```
-
-## Key Conventions
-
-- **Python**: Use `pathlib.Path`, type hints, `argparse` CLI with `--help`
-- **TypeScript**: Use `async/await`, strict mode, export types with functions
-- **Both**: Consistent API naming between runtimes
-- **Tests**: Cover happy path, edge cases, and error cases
-
-## CLI Module Template
-
-All Python modules must follow this pattern:
-
-```python
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Module description")
-    # Add arguments...
-    args = parser.parse_args()
-    # Implementation...
-
-if __name__ == "__main__":
-    main()
-```
-
-## Git Commit Policy
-
-**STRICT REQUIREMENTS:**
-
-- ✅ **Always sign commits** with `-s -S` flags (Signed-off-by + GPG signature)
-- ❌ **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or similar headers mentioning AI assistants (Claude, Copilot, ChatGPT, etc.)
-- ❌ **Never mention AI tools in commit messages** — do not reference that code was AI-generated or AI-assisted
-- ✅ **Author must be the human developer** — use official company email
-
-```bash
-# Correct commit command
-git commit -s -S -m "feat(harbour): add KB-JWT support"
-```
-
-## Preparing Commits and Pull Requests
-
-When instructed to prepare a commit or PR, default to preparing the `.playground`
-files first. After **explicit human confirmation in the current session**, the
-agent may directly create the signed commit, push the branch, and open the PR
-using the prepared `.playground` content. Otherwise:
-
-1. Create files in the `.playground/` directory (already in `.gitignore`)
-2. Generate two markdown files:
-   - `.playground/commit-message.md` — Conventional commit message(s)
-   - `.playground/pr-description.md` — PR description
-
-The human operator will review these files and either:
-
-- Use them to manually commit/push and create a PR,
-- Ask the agent to perform the signed commit/push/PR flow directly after explicit confirmation, or
-- Use automated tooling with signed commits (`git commit -s -S`)
-
-## Common Mistakes to Avoid
-
-- ❌ **Don't use `os.path`** — Use `pathlib.Path` instead
-- ❌ **Don't forget CLI** — All Python modules need `main()` with `--help`
-- ❌ **Don't break parity** — Keep Python and TypeScript APIs consistent
-- ❌ **Don't commit without signing** — Always use `-s -S`
-- ❌ **Don't skip tests** — Run `make test full` before committing
+1. **Commits**: sign with `-s -S` (Signed-off-by + GPG); conventional-commit
+   format; **never any AI attribution or mention of AI tools** in commit
+   messages; author is a human developer with their official email.
+2. **Commit/PR preparation**: write `.playground/commit-message.md` and
+   `.playground/pr-description.md` first; only commit/push/open a PR after
+   explicit human confirmation in the current session.
+3. **Standards compliance**: schemas, examples, and DID documents must align
+   with the specs in `docs/specs/references/` (LinkML files carry bracketed
+   citation tags); **never use `range: Any` in LinkML**; run
+   `make validate shacl` and `make story` before committing schema or
+   example changes.
+4. **Dual runtime parity**: a change to one runtime almost always needs the
+   mirror change in the other, plus an interop test.

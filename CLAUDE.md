@@ -73,8 +73,11 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `delegation` | `delegation.py` | `delegation.ts` | Delegated signing evidence (OID4VP transaction_data) |
 | `sd_jwt_vp` / `sd-jwt-vp` | `sd_jwt_vp.py` | `sd-jwt-vp.ts` | SD-JWT VP issue/verify with evidence |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates / x5c chains |
+| `merkle` | `merkle.py` | `merkle.ts` | Merkle tree construction/inclusion proofs (batched evidence) |
+| `batch_evidence` | `batch_evidence.py` | `batch-evidence.ts` | Batched credential evidence build/verify (authorization JWS + Merkle proof) |
+| `digest_sri` | `digest_sri.py` | `digest-sri.ts` | W3C SRI digests over RFC 8785 (JCS) canonical JSON |
 | `generate_artifacts` | `generate_artifacts.py` | — | LinkML → OWL/SHACL/JSON-LD artifact generation |
-| credential pipeline | `credentials/` (CLI) | `story-sign.ts` / `story-verify.ts` (CLI) | End-to-end example signing/verification (see below) |
+| credential pipeline | `credentials/` (CLI) | `story-sign.ts` / `story-verify.ts` / `story-digests.ts` (CLI) | End-to-end example signing/verification (see below) |
 
 **Credential pipeline is CLI-only, not a library export** in either runtime. Python keeps it as a separate package `src/python/credentials/` (`example_signer.py` signs example credentials with role-based keys + evidence VPs; `verify_signed_examples.py` verifies them). TypeScript has functionally-equivalent `story-sign.ts` / `story-verify.ts` (run via `yarn story:sign` / `yarn story:verify`, excluded from the `tsc` build). Do not try to export these as library functions.
 
@@ -96,7 +99,15 @@ The trust chain (ADR-006, sovereign issuers — each credential's `issuer` is th
 | Legal Person | did:ethr | Organization; **issues its employees' NaturalPersonCredentials**; an org admin signs batch evidence |
 | Natural Person | did:ethr | Employee; `memberOf` MUST equal `issuer` (the org) |
 
-The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, haven, company, employee, ascs).
+**Role-key glossary** — code/fixtures use short role names (`tests/fixtures/keys/`, `role-did-mapping.json`); docs use actor names. They map 1:1:
+
+| Role key | Actor | Example identity |
+|----------|-------|------------------|
+| `trust-anchor` | Trust Anchor / Steward | vDL Digital Ventures GmbH |
+| `haven` | Signing Service (operated by Haven) | — |
+| `company` | Legal Person (organization) | Example Corporation GmbH |
+| `employee` | Natural Person (employee) | Alice Smith |
+| `ascs` | External anchor org (reserved; not part of the gaiax story) | ASCS e.V. |
 
 ### Test Layout
 
@@ -202,7 +213,7 @@ Every harbour module has an argparse `main()` with `--help`: `python -m harbour.
 **STRICT REQUIREMENTS:**
 
 - Always sign commits with `-s -S` (Signed-off-by + GPG signature)
-- **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or any mention of AI tools in commit messages
+- **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or any mention of AI tools in commit messages; the author is a human developer with their official email
 - Use conventional commit format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`, `ci:`); a `!` marks breaking changes (e.g. `feat(linkml)!: ...`). These feed the git-cliff changelog.
 - Run `make all` (or at least `make test full` + `make lint`) before committing
 
@@ -227,8 +238,8 @@ When asked to prepare a commit or PR, default to writing these gitignored files 
 
 | Topic | File |
 |-------|------|
-| Agent instructions (authoritative for LinkML/standards rules) | [AGENTS.md](AGENTS.md) |
-| Copilot instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
+| Agent instructions (thin pointer to this file) | [AGENTS.md](AGENTS.md) |
+| Copilot instructions (thin pointer to this file) | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
 | Architecture | [docs/architecture.md](docs/architecture.md) |
 | ADRs | [docs/decisions/](docs/decisions/) |
 
