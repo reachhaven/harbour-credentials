@@ -246,9 +246,10 @@ Each issued credential carries one evidence object of the
 
   // This credential's inclusion proof against the root signed in `authorization`.
   "merkleProof": {
+    "type": "harbour:MerkleProof",
     "path": [
-      { "hash": "<base64url-sha256>", "position": "left"  },
-      { "hash": "<base64url-sha256>", "position": "right" }
+      { "type": "harbour:MerklePathElement", "hash": "<base64url-sha256>", "position": "left"  },
+      { "type": "harbour:MerklePathElement", "hash": "<base64url-sha256>", "position": "right" }
     ]
   }
 }]
@@ -263,6 +264,11 @@ Each issued credential carries one evidence object of the
   `node(L, R)` at that level. A level at which the leaf's ancestor was promoted
   (no sibling, §4.2) has no entry. The path carries no leaf index: `position`
   alone fully determines the fold.
+- Every nested object carries its JSON-LD `type`
+  (`harbour:MerkleProof` / `harbour:MerklePathElement`) so the evidence
+  validates against the closed SHACL shapes ([VCDM2] §5.6: each evidence
+  object MUST carry a type). Verifiers MUST ignore unknown members and MUST
+  NOT require the `type` members for the cryptographic fold (§6).
 
 The Merkle root itself is **not** repeated in the evidence object — it is the
 signed `nonce` inside `authorization`, and the verifier reads it from there

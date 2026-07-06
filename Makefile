@@ -100,6 +100,12 @@ endef
 LINKML_SCHEMAS := $(wildcard linkml/*.yaml)
 DOMAINS := harbour-core-credential harbour-gx-credential harbour-core-delegation
 HARBOUR_EXAMPLE_FILES := $(wildcard examples/*.json) $(wildcard examples/gaiax/*.json)
+# Resolved (fully disclosed) claims of the signed story output, dumped by
+# verify_signed_examples --dump-resolved. Present only after `make story
+# sign`+`verify`; empty on a clean tree, so standalone `make validate shacl`
+# is unaffected. Validating these closes the gap where SHACL only ever saw
+# hand-authored examples, never what the library actually emits.
+HARBOUR_RESOLVED_FILES := $(wildcard examples/signed/resolved/*.json) $(wildcard examples/gaiax/signed/resolved/*.json)
 HARBOUR_VALIDATE_PATH ?=
 HARBOUR_VALIDATE_ALLOW_ONLINE ?= 1
 HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES ?= $(if $(strip $(HARBOUR_VALIDATE_PATH)),0,1)
@@ -397,7 +403,7 @@ _validate_shacl:
 				--run check-data-conformance \
 				--per-resource \
 				$$allow_online_flag \
-				--data-paths $(addprefix ../../,$(HARBOUR_EXAMPLE_FILES)) ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
+				--data-paths $(addprefix ../../,$(HARBOUR_EXAMPLE_FILES)) $(addprefix ../../,$(HARBOUR_RESOLVED_FILES)) ../../examples/did-ethr/ ../../tests/validation-probe/ontology-loading-probe.json \
 				--artifacts ../../artifacts > $$tmp_output 2>&1 ; \
 		fi ; \
 		status=$$? ; \
@@ -578,7 +584,7 @@ _story_sign:
 _story_verify:
 	$(call check_dev_setup)
 	@echo "Verifying Harbour signed example storylines..."
-	@PYTHONIOENCODING=utf-8 PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.verify_signed_examples
+	@PYTHONIOENCODING=utf-8 PYTHONPATH="src/python$(PYTHONPATH_SEP)$$PYTHONPATH" "$(PYTHON)" -m credentials.verify_signed_examples --dump-resolved
 	@echo "OK: Signed Harbour example artifacts verified"
 
 _story_digests:

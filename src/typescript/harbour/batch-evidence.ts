@@ -27,7 +27,10 @@ export interface BatchEvidence {
   type: string[];
   authorizer: string;
   authorization: string;
-  merkleProof: { path: MerkleProofStep[] };
+  merkleProof: {
+    type: string;
+    path: (MerkleProofStep & { type: string })[];
+  };
 }
 
 export interface AuthorizationOptions {
@@ -121,7 +124,16 @@ export async function buildBatchEvidence(
     type: [EVIDENCE_TYPE],
     authorizer: options.authorizerDid,
     authorization,
-    merkleProof: { path: inclusionProof(leaves, i) },
+    // Each nested object carries its JSON-LD type so the evidence remains a
+    // valid harbour:MerkleProof / harbour:MerklePathElement under the closed
+    // SHACL shapes (spec §5).
+    merkleProof: {
+      type: "harbour:MerkleProof",
+      path: inclusionProof(leaves, i).map((step) => ({
+        type: "harbour:MerklePathElement",
+        ...step,
+      })),
+    },
   }));
 }
 

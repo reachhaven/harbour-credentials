@@ -19,10 +19,16 @@ For every ``<name>.sd-jwt`` under ``examples/signed/`` and
 This is the verifier side of ``docs/specs/batched-credential-evidence.md`` §6
 (the on-chain status checks of §7 are out of scope for the local story).
 
+With ``--dump-resolved``, the fully disclosed claims of every verified
+credential are written to ``<signed>/resolved/<name>.resolved.json`` (JWT-only
+members like ``vct`` stripped), so the SHACL suite can validate what the
+library actually emits — not just the hand-authored examples.
+
 CLI Usage::
-    python -m credentials.verify_signed_examples
+    python -m credentials.verify_signed_examples [--dump-resolved]
 """
 
+import argparse
 import base64
 import json
 import sys
@@ -46,6 +52,22 @@ from harbour.sd_jwt import verify_sd_jwt_vc
 from harbour.verifier import VerificationError
 
 _MEMBER_OF_KEYS = ("harbour.gx:memberOf", "memberOf")
+
+# JWT / SD-JWT registered members that are not part of the VC JSON-LD model;
+# stripped from --dump-resolved output before SHACL validation.
+_JWT_ONLY_MEMBERS = (
+    "vct",
+    "_sd",
+    "_sd_alg",
+    "iss",
+    "sub",
+    "jti",
+    "iat",
+    "nbf",
+    "exp",
+    "cnf",
+    "status",
+)
 
 
 @dataclass
@@ -126,13 +148,30 @@ def _member_of(claims: dict) -> str | None:
     return None
 
 
+def _dump_resolved(signed_dir: Path, stem: str, claims: dict) -> None:
+    """Write the fully disclosed claims (JWT-only members stripped) for SHACL."""
+    resolved = {k: v for k, v in claims.items() if k not in _JWT_ONLY_MEMBERS}
+    out_dir = signed_dir / "resolved"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{stem}.resolved.json"
+    out_path.write_text(
+        json.dumps(resolved, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+
 def verify_signed_dir(
     signed_dir: Path,
     did_to_pub: dict[str, object],
     vm_keys: dict[str, object],
     fallback_pub: object,
+    dump_resolved: bool = False,
 ) -> VerificationCounts:
     counts = VerificationCounts()
+    if dump_resolved:
+        resolved_dir = signed_dir / "resolved"
+        if resolved_dir.is_dir():
+            for stale in resolved_dir.glob("*.json"):
+                stale.unlink()
     for sd_jwt_path in sorted(signed_dir.glob("*.sd-jwt")):
         sd_jwt = sd_jwt_path.read_text(encoding="utf-8").strip()
         raw = _raw_issuer_payload(sd_jwt)
@@ -158,6 +197,8 @@ def verify_signed_dir(
             counts.errors.append(f"{sd_jwt_path.name}: issuer signature: {e}")
             continue
         counts.credentials += 1
+        if dump_resolved:
+            _dump_resolved(signed_dir, sd_jwt_path.stem, claims)
 
         member_of = _member_of(claims)
         if member_of is not None and member_of != issuer_did:
@@ -196,6 +237,24 @@ def verify_signed_dir(
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="credentials.verify_signed_examples",
+        description=(
+            "Verify the signed dc+sd-jwt example artifacts produced by "
+            "example_signer (proof via issuer DID-document kid, batch "
+            "evidence, memberOf == issuer)."
+        ),
+    )
+    parser.add_argument(
+        "--dump-resolved",
+        action="store_true",
+        help=(
+            "Write each verified credential's fully disclosed claims to "
+            "<signed>/resolved/ for SHACL validation of the pipeline output"
+        ),
+    )
+    args = parser.parse_args()
+
     repo_root = _find_repo_root()
     signed_dirs = _discover_signed_dirs(repo_root)
     if not signed_dirs:
@@ -213,7 +272,9 @@ def main() -> None:
     total = VerificationCounts()
     for signed_dir in signed_dirs:
         print(f"Verifying {signed_dir.relative_to(repo_root)}/ ...")
-        counts = verify_signed_dir(signed_dir, did_to_pub, vm_keys, fb_pub)
+        counts = verify_signed_dir(
+            signed_dir, did_to_pub, vm_keys, fb_pub, dump_resolved=args.dump_resolved
+        )
         total.credentials += counts.credentials
         total.batch_evidence += counts.batch_evidence
         total.plain += counts.plain

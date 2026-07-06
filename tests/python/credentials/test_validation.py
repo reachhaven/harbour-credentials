@@ -1,9 +1,11 @@
-"""Validate credential fixtures against generated JSON-LD context and SHACL shapes.
+"""Structural validation of credential fixtures against generated artifacts.
 
-Tests:
-1. JSON-LD syntax: all fixtures parse as valid JSON with required VC structure
+Tests (no pyshacl here — these are Python dict checks plus substring checks
+on the generated Turtle; real SHACL conformance runs via `make validate
+shacl` and tests/python/credentials/test_shacl_failures.py):
+1. JSON syntax: all fixtures parse as valid JSON with required VC structure
 2. Context consistency: fixture property names match the generated contexts
-3. SHACL conformance: credential structure conforms to generated SHACL shapes
+3. Shape presence: the generated SHACL text contains the expected constraints
 
 Harbour base artifacts live in artifacts/harbour-core-credential/.
 Gaia-X domain artifacts live in artifacts/harbour-gx-credential/.

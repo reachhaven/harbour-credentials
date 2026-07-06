@@ -672,3 +672,80 @@ class TestCardinalityViolations:
             "Two labelLevel values should violate maxCount "
             f"but SHACL said it conforms.\nFull report:\n{text}"
         )
+
+
+# ---------------------------------------------------------------------------
+# C5: DID-format violations  (sh:PatternConstraintComponent)
+# ---------------------------------------------------------------------------
+# JSON-LD @id coercion turns ANY string into an IRI, so sh:nodeKind sh:IRI
+# alone cannot reject a malformed DID. These cases prove the `pattern:
+# "^did:"` constraints (ADR-006 profile) actually fire.
+
+_DID_PATTERN_CASES = [
+    # A perfectly valid IRI that is not a DID — nodeKind passes, pattern must catch it.
+    (
+        "legal-person-credential.json",
+        lambda d: _set_field(d, "https://example.com/issuer", "issuer"),
+        "PatternConstraintComponent",
+        "LegalPersonCredential-issuer-not-a-did",
+    ),
+    (
+        "legal-person-credential.json",
+        lambda d: _set_field(
+            d, "garbage", "credentialStatus", 0, "statusServiceOperator"
+        ),
+        "PatternConstraintComponent",
+        "CRSetEntry-statusServiceOperator-not-a-did",
+    ),
+    (
+        "legal-person-credential.json",
+        lambda d: _set_field(d, "urn:uuid:not-a-did", "evidence", 0, "authorizer"),
+        "PatternConstraintComponent",
+        "BatchCredentialEvidence-authorizer-not-a-did",
+    ),
+    (
+        "natural-person-credential.json",
+        lambda d: _set_field(
+            d,
+            "https://example.org/org",
+            "credentialSubject",
+            "memberOf",
+        ),
+        "PatternConstraintComponent",
+        "NaturalPerson-memberOf-not-a-did",
+    ),
+]
+
+
+class TestDidPatternViolations:
+    """Non-DID values in DID-valued slots must trigger sh:pattern violations."""
+
+    @pytest.mark.parametrize(
+        "example_file, mutate_fn, expected_constraint, test_id",
+        _DID_PATTERN_CASES,
+        ids=[c[3] for c in _DID_PATTERN_CASES],
+    )
+    def test_did_pattern_violation_detected(
+        self,
+        example_file,
+        mutate_fn,
+        expected_constraint,
+        test_id,
+        shacl_validator,
+    ):
+        cred = _load_example(example_file)
+        mutated = mutate_fn(cred)
+
+        conforms, violations, text = _validate(mutated, shacl_validator)
+
+        assert not conforms, (
+            f"[{test_id}] Credential with a non-DID value should FAIL "
+            f"but SHACL said it conforms."
+        )
+
+        matching = [v for v in violations if v.constraint == expected_constraint]
+        assert matching, (
+            f"[{test_id}] Expected {expected_constraint} violation but got:\n"
+            f"{_format_violations(violations)}\n\n"
+            f"Full SHACL report:\n{text}"
+        )

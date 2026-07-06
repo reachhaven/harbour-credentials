@@ -194,12 +194,19 @@ def build_batch_evidence(
     )
     evidence: list[dict[str, Any]] = []
     for i in range(len(payloads)):
+        # Each nested object carries its JSON-LD type so the evidence remains
+        # a valid harbour:MerkleProof / harbour:MerklePathElement under the
+        # closed SHACL shapes (spec §5).
+        path = [
+            {"type": "harbour:MerklePathElement", **step}
+            for step in inclusion_proof(leaves, i)
+        ]
         evidence.append(
             {
                 "type": [EVIDENCE_TYPE],
                 "authorizer": authorizer_did,
                 "authorization": authorization,
-                "merkleProof": {"path": inclusion_proof(leaves, i)},
+                "merkleProof": {"type": "harbour:MerkleProof", "path": path},
             }
         )
     return evidence
