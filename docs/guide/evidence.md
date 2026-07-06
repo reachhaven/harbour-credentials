@@ -1,63 +1,62 @@
 # Evidence in Harbour Credentials
 
-Evidence is a W3C VC Data Model concept that provides cryptographic proof of **how** an issuer verified claims or **why** a holder is authorized to perform an action.
+Evidence is a W3C VC Data Model concept ([VCDM 2.0 §5.6](https://www.w3.org/TR/vc-data-model-2.0/#evidence)) that provides cryptographic proof of **how** an issuer verified claims or **why** an action was authorized.
 
-## What is Evidence?
+## The Two-Signature Model
 
-When a credential is issued or a presentation is made, the `evidence` field can contain supporting proof that:
+Under the sovereign-issuer model ([ADR-006](../decisions/006-sovereign-issuers.md)), every Harbour credential carries two distinct signatures with a deliberate separation of powers:
 
-1. **For issuance**: Shows what the issuer relied upon to verify claims
-2. **For presentations**: Shows why the holder is authorized to perform an action
+- **Evidence** — the *authorization*, signed by a **human admin** whose wallet key is authorized on the issuing organization's `did:ethr`. A person decided this credential should exist; the evidence is the durable, non-repudiable record of that decision.
+- **Proof** — the SD-JWT signature that makes the credential verifiable, produced by the **Signing Service** under an assertion-only mandate key in the issuer's DID document. It executes; it decides nothing.
 
-Evidence creates an **audit trail** — allowing third parties to verify not just *that* something happened, but *how* it was validated.
+Because every verifier checks the evidence, a Signing Service that minted a credential nobody authorized is detectable: it cannot forge an admin's signature.
 
 ## Harbour Evidence Types
 
-### CredentialEvidence
+### BatchCredentialEvidence
 
-Proves that an authorizing party approved the credential issuance via OID4VP. The embedded VP carries the authorization proof — a Verifiable Presentation containing the authorizer's credential.
+Proves that an authorizing party approved this credential's issuance as part of a **Merkle-committed batch** with a **single signature** — one admin signature covers all credentials issued in the batch, and each credential independently proves its own inclusion. The full construction is specified in [batched-credential-evidence.md](../specs/batched-credential-evidence.md).
 
-The Harbour Signing Service is the **sole issuer** of all credentials. Evidence VPs establish the chain of authorization:
-
-**Use case 1 — Trust Anchor authorizes org (LegalPersonCredential)**: The Trust Anchor presents a VP containing its **self-signed LinkedCredentialService credential** (service endpoint proof, root of trust — analogous to a root CA certificate). The Signing Service verifies this VP and issues the org's credential with it as evidence.
-
-**Use case 2 — Org authorizes employee (NaturalPersonCredential)**: The organization presents a VP containing its **LegalPersonCredential** (SD-JWT with sensitive fields redacted — registration number and addresses hidden, compliance status disclosed). The Signing Service verifies this VP and issues the employee's credential with it as evidence.
+Wire form (from the signed `legal-person-credential.decoded.json` story output):
 
 ```json
 {
-  "type": "harbour:CredentialEvidence",
-  "verifiablePresentation": {
-    "@context": ["https://www.w3.org/ns/credentials/v2"],
-    "type": ["VerifiablePresentation", "harbour:VerifiablePresentation"],
-    "holder": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
-    "verifiableCredential": [
-      {
-        "@context": ["https://www.w3.org/ns/credentials/v2", "https://w3id.org/reachhaven/harbour/core/v1/"],
-        "type": ["VerifiableCredential"],
-        "issuer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
-        "validFrom": "2024-01-01T00:00:00Z",
-        "credentialSubject": {
-          "id": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
-          "type": "harbour:LinkedCredentialService",
-          "didcore:serviceEndpoint": {"id": "https://resolver.harbour.id/credentials/did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"}
-        }
-      }
+  "type": ["harbour:BatchCredentialEvidence"],
+  "authorizer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+  "authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImhhcmJvdXIt...",
+  "merkleProof": {
+    "path": [
+      { "hash": "ANLV12CRfKcCFPzo_lkAC1DDzHy9Le22opPgTp6x51s", "position": "left" },
+      { "hash": "droQfyi3wLC3_tDEOHtk6B9_NP_UbCBe_GKTIZDsE0o", "position": "right" }
     ]
   }
 }
 ```
 
-**What it proves**: The authorizing party (Trust Anchor or org) approved the Signing Service to issue a credential for the target subject. The chain of trust flows: Trust Anchor (LinkedCredentialService) → org (LegalPersonCredential) → employee (NaturalPersonCredential).
+| Slot | Meaning |
+|------|---------|
+| `authorizer` | The issuing organization's `did:ethr`; the authorization JWT is signed by an admin key listed in that DID document. Required — the only slot present on the human-readable source examples. |
+| `authorization` | Compact ES256 JWS signed by the admin; its `nonce` is the base64url batch Merkle root, its `aud` the credential's `issuer`. Generated at batch-signing time. |
+| `merkleProof` | Ordered sibling digests (`hash` + `position`) folding this credential's leaf to the signed root. A batch of size 1 has an empty `path`. |
 
-### DelegatedSignatureEvidence
+**What it proves**: a human admin of the authorizer organization approved exactly this credential's payload — its leaf folds to the root the admin signed. Authorizer and issuer usually coincide at the DID level (the Trust Anchor authorizes and issues LegalPersonCredentials; an organization authorizes and issues its members' NaturalPersonCredentials).
+
+**Who authorizes what** (ADR-006):
+
+- **LegalPersonCredential** — issued by the Trust Anchor; a Trust Anchor admin signs the batch evidence.
+- **NaturalPersonCredential** — issued by the organization (`memberOf` MUST equal `issuer`); an org admin signs the batch evidence.
+
+### DelegatedSignatureEvidence (`harbour:SignatureEvidence` on the wire)
 
 Evidence on a **receipt credential** (SD-JWT-VC) that a signing service executed a transaction with the user's explicit consent. The consent VP uses SD-JWT with PII redacted. Transaction data is a disclosable claim enabling three-layer privacy (public / authorized / full audit).
+
+> **Naming note**: the LinkML class is named `DelegatedSignatureEvidence` for clarity, but its canonical IRI — the `type` value on the wire — is **`harbour:SignatureEvidence`**. All code, tests, and examples use `harbour:SignatureEvidence`; the IRI is stable and must not be renamed.
 
 **Use case**: A signing service issues a receipt credential after executing a blockchain purchase on behalf of a user.
 
 ```json
 {
-  "type": "harbour:DelegatedSignatureEvidence",
+  "type": "harbour:SignatureEvidence",
   "verifiablePresentation": "<SD-JWT VP with redacted PII>",
   "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "transaction_data": {
@@ -93,78 +92,61 @@ The receipt credential is an **SD-JWT-VC**. Transaction data and identity detail
 
 ## When to Use Each Type
 
-| Evidence Type | Use When | Example Scenario |
-|--------------|----------|------------------|
-| `CredentialEvidence` | Issuing credential after authorization from a trusted party | Trust Anchor authorizes org issuance; org authorizes employee issuance |
-| `DelegatedSignatureEvidence` | Issuing receipt after delegated action | Blockchain purchase, contract signing, access delegation |
+| Evidence Type | Wire `type` | Use When |
+|--------------|-------------|----------|
+| `BatchCredentialEvidence` | `harbour:BatchCredentialEvidence` | Issuing credentials after a human admin's authorization — one signature per batch (Trust Anchor batches LegalPersonCredentials; an org batches its employees' NaturalPersonCredentials) |
+| `DelegatedSignatureEvidence` | `harbour:SignatureEvidence` | Issuing a receipt after a delegated action — blockchain purchase, contract signing, access delegation |
 
-## Evidence Structure
+## Verifying Batch Evidence
 
-All evidence types inherit from the abstract `Evidence` class and share:
+A verifier holding **one** credential checks it in isolation (spec [§6](../specs/batched-credential-evidence.md#6-verification)):
 
-```yaml
-Evidence:
-  abstract: true
-  class_uri: cred:Evidence
-  slots:
-    - type  # Required: identifies the evidence type
-```
-
-Most evidence types include a `verifiablePresentation` slot containing a signed VP as proof.
-
-## Privacy Considerations
-
-Evidence often contains sensitive information. For privacy-preserving audit:
-
-1. **Use SD-JWT VPs**: Selectively disclose only necessary claims
-2. **Redact PII**: Names, emails, etc. can be hidden while keeping DID visible
-3. **Three-layer disclosure**:
-   - Public: CRSet + transaction hash + signature validity
-   - Authorized: Transaction details (asset, price)
-   - Full audit: Identity details (name, email, organization)
-
-## Verification
-
-When verifying credentials or presentations with evidence:
-
-1. **Verify the outer signature** (credential or VP)
-2. **Verify each evidence VP signature**
-3. **Check evidence issuer trust** (is the evidence issuer trusted?)
-4. **Validate evidence freshness** (timestamps, nonces)
-5. **Check revocation status** of evidence credentials
+1. **Verify the proof** against the verification method the `kid` names in the **issuer's** DID document (the Signing Service's assertion-only `#delegate-1` mandate key).
+2. **Recompute the leaf** from the raw issuer payload with `evidence` removed (RFC 8785 canonicalization, `0x00` domain prefix, SHA-256). The leaf is over the salted `_sd` digests, so it is invariant under selective disclosure.
+3. **Fold the `merkleProof`** to a root and compare it with the `nonce` inside the `authorization` JWT.
+4. **Verify the `authorization` JWS** against the admin key the JWT `kid` names in the authorizer's DID document; check `iss` = `authorizer` and `aud` = the credential's `issuer`.
 
 ```python
-from harbour.verifier import verify_vc_jose
+from harbour.sd_jwt import verify_sd_jwt_vc
+from harbour.batch_evidence import verify_batch_evidence
 
-# Verify outer credential
-result = verify_vc_jose(credential_jwt, issuer_public_key)
+claims = verify_sd_jwt_vc(sd_jwt, proof_public_key)      # step 1
+verify_batch_evidence(                                    # steps 2-4
+    raw_payload,                # issuer payload with _sd digests
+    raw_payload["evidence"][0],
+    authorizer_public_key,
+    expected_audience=raw_payload["issuer"],
+)
+```
 
-# Verify evidence VP
-for evidence in result.get("evidence", []):
-    if "verifiablePresentation" in evidence:
-        vp = evidence["verifiablePresentation"]
-        # Verify VP signature...
+```typescript
+import { verifySdJwtVc, verifyBatchEvidence } from "@reachhaven/harbour-credentials";
+
+const claims = await verifySdJwtVc(sdJwt, proofPublicKey);
+await verifyBatchEvidence(rawPayload, rawPayload.evidence[0], authorizerPublicKey, {
+  expectedAudience: rawPayload.issuer,
+});
 ```
 
 ## Adding Evidence to Credentials
 
-When issuing a credential with evidence:
+Source credentials carry only the `authorizer`; `authorization` and `merkleProof` are generated at batch-signing time:
 
 ```python
-credential = {
-    "@context": [...],
-    "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
-    "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-    "credentialSubject": {...},
-    "evidence": [
-        {
-            "type": "harbour:CredentialEvidence",
-            "verifiablePresentation": authorization_vp_jwt
-        }
-    ]
-}
+from harbour.sd_jwt import build_sd_jwt_payload, sign_sd_jwt
+from harbour.batch_evidence import build_batch_evidence
 
-signed_vc = sign_vc_jose(credential, issuer_private_key)
+# 1. Fix salts for every credential in the batch first.
+payload, disclosures = build_sd_jwt_payload(credential, vct=vct)
+
+# 2. One admin signature over the batch Merkle root; per-credential proofs.
+evidence = build_batch_evidence(
+    [payload], admin_key, authorizer_did=org_did, audience=issuer_did
+)
+
+# 3. Inject the evidence, then sign the proof with the issuer's mandate key.
+payload["evidence"] = [evidence[0]]
+sd_jwt = sign_sd_jwt(payload, disclosures, ss_key, kid=f"{issuer_did}#delegate-1")
 ```
 
 ## Schema Definition
@@ -174,37 +156,33 @@ Evidence types are defined in `linkml/harbour-core-credential.yaml`:
 ```yaml
 Evidence:
   abstract: true
-  class_uri: cred:Evidence
-  slots:
-    - type
+  class_uri: harbour:Evidence
 
-CredentialEvidence:
+BatchCredentialEvidence:
   is_a: Evidence
-  class_uri: harbour:CredentialEvidence
+  class_uri: harbour:BatchCredentialEvidence
   slots:
-    - verifiablePresentation
-  slot_usage:
-    verifiablePresentation:
-      required: true
+    - authorizer      # required; org did:ethr
+    - authorization   # compact JWS, nonce = batch Merkle root
+    - merkleProof     # MerkleProof: path of {hash, position}
+
+MerkleProof:
+  class_uri: harbour:MerkleProof
+  # path: ordered MerklePathElement list ({hash, position: left|right})
 
 DelegatedSignatureEvidence:
   is_a: Evidence
-  class_uri: harbour:DelegatedSignatureEvidence
+  class_uri: harbour:SignatureEvidence   # canonical wire IRI — do not rename
   slots:
-    - verifiablePresentation
-    - delegatedTo
-    - transaction_data
-  slot_usage:
-    verifiablePresentation:
-      required: true
-    delegatedTo:
-      required: true
-    transaction_data:
-      required: true
+    - verifiablePresentation  # required
+    - delegatedTo             # required
+    - transaction_data        # required
+    - challenge               # required
 ```
 
 ## Related Documentation
 
+- [ADR-006 — Sovereign issuers with a Signing-Service mandate](../decisions/006-sovereign-issuers.md)
+- [Batched Credential Evidence Specification](../specs/batched-credential-evidence.md)
 - [Delegated Signing](delegated-signing.md) — Full delegated signing flow
-- [SD-JWT-VC](../api/python/index.md) — Selective disclosure credentials
 - [W3C VC Data Model — Evidence](https://www.w3.org/TR/vc-data-model-2.0/#evidence)

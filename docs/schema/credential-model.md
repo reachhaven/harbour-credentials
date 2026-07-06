@@ -99,11 +99,12 @@ The W3C VC Data Model v2.0 defines most envelope fields as optional.
 | `credentialStatus` | optional | **required** (range: `CRSetEntry`) | **required** |
 
 !!! note "Evidence requirement"
-    Evidence is optional at the base `HarbourCredential` level (e.g. the
-    Trust Anchor's self-signed `LinkedCredentialService` credential has no
-    evidence — it is the root of trust). Domain-specific types
-    (`ComplianceCredential`, `NaturalPersonCredential`) make evidence
-    **required** via `slot_usage` overrides.
+    Evidence is optional at the base `HarbourCredential` level. The Gaia-X
+    domain types (`LegalPersonCredential`, `NaturalPersonCredential`) make
+    evidence **required** via `slot_usage` overrides — including the Trust
+    Anchor's own credential, which is a normal `LegalPersonCredential` with
+    `issuer == credentialSubject.id` authorized by a Trust Anchor admin
+    ([ADR-006](../decisions/006-sovereign-issuers.md)).
 
 !!! note "Downstream overrides"
     Consumers like SimpulseID may loosen these constraints via `slot_usage`.
@@ -114,7 +115,7 @@ The W3C VC Data Model v2.0 defines most envelope fields as optional.
 
 ## Evidence Hierarchy
 
-Evidence documents how a credential's claims were verified. Harbour defines
+Evidence documents who authorized a credential's issuance. Harbour defines
 an abstract base with two concrete types:
 
 ```mermaid
@@ -124,29 +125,45 @@ classDiagram
         type : string ⟨required⟩
     }
 
-    class CredentialEvidence {
-        verifiablePresentation : VP ⟨required⟩
+    class BatchCredentialEvidence {
+        authorizer : uri ⟨required⟩
+        authorization : string ⟨compact JWS⟩
+        merkleProof : MerkleProof
+    }
+
+    class MerkleProof {
+        path : MerklePathElement[]
+    }
+
+    class MerklePathElement {
+        hash : string ⟨required⟩
+        position : left | right ⟨required⟩
     }
 
     class DelegatedSignatureEvidence {
         verifiablePresentation : VP ⟨required⟩
         delegatedTo : uri ⟨required⟩
         transaction_data : object ⟨required⟩
-        challenge : string
+        challenge : string ⟨required⟩
     }
 
-    Evidence <|-- CredentialEvidence
+    Evidence <|-- BatchCredentialEvidence
     Evidence <|-- DelegatedSignatureEvidence
+    BatchCredentialEvidence --> MerkleProof
+    MerkleProof --> MerklePathElement
 ```
 
-**`CredentialEvidence`** — attests that an authorizing party approved the
-credential issuance via OID4VP. The embedded VP contains the authorizer's
-credential (Trust Anchor's LinkedCredentialService for org issuance, or
-org's LegalPersonCredential for employee issuance).
+**`BatchCredentialEvidence`** — attests that a human admin of the
+`authorizer` organization approved this credential's issuance as part of a
+Merkle-committed batch with a single signature; the credential's
+`merkleProof` binds its payload to the signed root. See the
+[batched-credential-evidence spec](../specs/batched-credential-evidence.md)
+and [ADR-006](../decisions/006-sovereign-issuers.md).
 
-**`DelegatedSignatureEvidence`** — attests that the subject authorized a
-signing service to act on their behalf via an OID4VP challenge-response
-flow. See [Delegated Signing](../guide/delegated-signing.md).
+**`DelegatedSignatureEvidence`** (canonical IRI `harbour:SignatureEvidence`)
+— attests that the subject authorized a signing service to act on their
+behalf via an OID4VP challenge-response flow. See
+[Delegated Signing](../guide/delegated-signing.md).
 
 ---
 
@@ -386,8 +403,10 @@ For quick reference, every class defined across all three schema files:
 |-------|-------------|----------|--------|--------|
 | `HarbourCredential` | core | ✅ | *(W3C VC envelope)* | Core |
 | `Evidence` | core | ✅ | — | Core |
-| `CredentialEvidence` | core | — | `Evidence` | Core |
-| `DelegatedSignatureEvidence` | core | — | `Evidence` | Core |
+| `BatchCredentialEvidence` | core | — | `Evidence` | Core |
+| `MerkleProof` | core | — | — | Core |
+| `MerklePathElement` | core | — | — | Core |
+| `DelegatedSignatureEvidence` (IRI `harbour:SignatureEvidence`) | core | — | `Evidence` | Core |
 | `CRSetEntry` | core | — | — | Core |
 | `DIDDocument` | core | — | — | Core |
 | `VerificationMethod` | core | — | — | Core |

@@ -122,8 +122,8 @@ resolved DID document.
 |-------|------|-----------------------|--------------|
 | **Harbour Trust Anchor** | Root of trust, authorizes orgs | `did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774` | [`harbour-trust-anchor.did.json`](did-ethr/harbour-trust-anchor.did.json) |
 | **Harbour Signing Service** | Executes all proofs via per-issuer mandate keys (ADR-006); signs delegated txns (`#delegate-1`) | `did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202` | [`harbour-signing-service.did.json`](did-ethr/harbour-signing-service.did.json) |
-| **Example Corporation GmbH** | Legal person (organization) | `did:ethr:0x14a34:0xf7ef...dab` | [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
-| **Alice Smith** | Natural person (employee) | `did:ethr:0x14a34:0x26e4...16c9` | [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
+| **Example Corporation GmbH** | Legal person (organization); issues its employees' credentials | `did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93` | [`legal-person-0aa6d7ea-...did.json`](did-ethr/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.did.json) |
+| **Alice Smith** | Natural person (employee) | `did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129` | [`natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) |
 | **ENVITED Marketplace** | Data marketplace (external) | `did:ethr:0x14a34:0x89fe5e7f506d992f76bcba309773c0ee3ee6039c` | — |
 
 > **Privacy note**: All `did:ethr` identifiers use opaque chain/address segments — never
@@ -257,9 +257,8 @@ credential itself leaking PII.
 | File | Description |
 |------|-------------|
 | [`gaiax/natural-person-credential.json`](gaiax/natural-person-credential.json) | Unsigned credential (expanded JSON-LD) |
-| [`gaiax/signed/natural-person-credential.jwt`](gaiax/signed/natural-person-credential.jwt) | Signed credential (VC-JOSE-COSE wire format) |
-| [`gaiax/signed/natural-person-credential.decoded.json`](gaiax/signed/natural-person-credential.decoded.json) | Decoded JWT (header + payload) |
-| [`gaiax/signed/natural-person-credential.evidence-vp.jwt`](gaiax/signed/natural-person-credential.evidence-vp.jwt) | Evidence VP (org authorization) |
+| `gaiax/signed/natural-person-credential.sd-jwt` | Signed credential (dc+sd-jwt wire format, gitignored) |
+| `gaiax/signed/natural-person-credential.decoded.json` | Decoded SD-JWT (header + payload + disclosures, gitignored) |
 | [`did-ethr/natural-person-550e8400-...did.json`](did-ethr/natural-person-550e8400-e29b-41d4-a716-446655440000.did.json) | Alice's DID document |
 
 ### Code
@@ -412,9 +411,8 @@ layers of information:
 | File | Description |
 |------|-------------|
 | [`gaiax/delegated-signing-receipt.json`](gaiax/delegated-signing-receipt.json) | Unsigned receipt (expanded JSON-LD) |
-| [`gaiax/signed/delegated-signing-receipt.jwt`](gaiax/signed/delegated-signing-receipt.jwt) | Signed receipt (VC-JOSE-COSE wire format) |
-| [`gaiax/signed/delegated-signing-receipt.decoded.json`](gaiax/signed/delegated-signing-receipt.decoded.json) | Decoded JWT (header + payload) |
-| [`gaiax/signed/delegated-signing-receipt.evidence-vp.jwt`](gaiax/signed/delegated-signing-receipt.evidence-vp.jwt) | Evidence VP (consent proof, signed) |
+| `gaiax/signed/delegated-signing-receipt.sd-jwt` | Signed receipt (dc+sd-jwt wire format, gitignored) |
+| `gaiax/signed/delegated-signing-receipt.decoded.json` | Decoded SD-JWT (header + payload + disclosures, gitignored) |
 
 ### Code
 
@@ -465,10 +463,8 @@ For each credential, the signer produces:
 
 | Suffix | Content |
 |--------|---------|
-| `.jwt` | Signed VC-JOSE-COSE compact JWS (wire format) |
-| `.decoded.json` | Human-readable decoded header + payload |
-| `.evidence-vp.jwt` | Evidence VP as signed JWS (if credential has evidence) |
-| `.evidence-vp.decoded.json` | Decoded evidence VP |
+| `.sd-jwt` | Signed dc+sd-jwt compact credential (wire format) |
+| `.decoded.json` | Human-readable decoded header + payload (with `_sd` digests and full batch evidence) + decoded disclosures |
 
 ### DID documents (`did-ethr/`)
 

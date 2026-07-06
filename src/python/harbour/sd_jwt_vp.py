@@ -185,8 +185,10 @@ def issue_sd_jwt_vp(
                      If None, includes all available disclosures.
                      If empty list [], includes no disclosures (max privacy).
         evidence: Evidence objects to include in the VP. Supported types:
-                  - CredentialEvidence: prior credential/VP the issuer relied upon
-                  - DelegatedSignatureEvidence: consent proof with transaction_data
+                  - BatchCredentialEvidence: issuance authorization
+                    (authorizer / authorization JWS / merkleProof)
+                  - SignatureEvidence (DelegatedSignatureEvidence):
+                    consent proof with transaction_data
         nonce: Challenge nonce for replay protection.
         audience: Intended verifier (DID or URL).
         holder_did: Holder's DID for the VP. If not provided, will not be included.
