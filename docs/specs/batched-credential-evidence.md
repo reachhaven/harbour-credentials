@@ -1,6 +1,6 @@
 # Harbour Batched Credential Evidence Specification
 
-**Version**: 1.0.0-draft
+**Version**: 1.1.0-draft
 **Status**: Draft
 **Namespace**: `https://harbour.reachhaven.io/evidence/v1`
 
@@ -19,11 +19,11 @@ Credentials, [SD-JWT-VC]). No other credential format is in scope.
 
 ### 1.1 Motivating scenario
 
-The Harbour Signing Service is the sole issuer of credentials in a dataspace, and
-authorization flows up a trust chain (Trust Anchor → organization → employee). A
-common operation is an organization authorizing the issuance of credentials for
-_all of its employees at once_. The authorizer should sign **once**, not once per
-employee.
+The Harbour Signing Service executes all credential proofs in a dataspace on the
+issuers' behalf (ADR-006), and authorization flows up a trust chain (Trust Anchor
+→ organization → employee). A common operation is an organization authorizing the
+issuance of credentials for _all of its employees at once_. The authorizing admin
+should sign **once**, not once per employee.
 
 ### 1.2 The two constraints in tension
 
@@ -49,32 +49,37 @@ tree construction.
 
 ## 2. Trust Model
 
-The dataspace **Signing Service** is the **sole issuer** of all NaturalPerson and
-LegalPerson credentials and the sole party able to issue them. A Harbour
-credential is **dataspace-branded**: it asserts "this person acts for this
-organization _as part of this dataspace_", so the credential is inherently bound
-to the dataspace and its Signing Service. The Signing Service is therefore the
-authority for the credential's existence and routine lifecycle.
+Issuers are **sovereign** (ADR-006). The `issuer` of every credential is the
+vouching party's own `did:ethr`: the **Trust Anchor** issues LegalPerson
+credentials (including its own — `issuer == credentialSubject.id`, the
+self-signed-root shape), and each **organization** issues the NaturalPerson
+credentials of its members (`memberOf == issuer`).
 
-Organizations and natural persons are **sovereign over their identifiers** — their
-`did:ethr` identities and the keys behind them (managed on-chain via the
-`IdentityController`, see `docs/did-identity-system.md`) — and over **disclosure**
-(selective disclosure when presenting). They do **not** own the credentials
-themselves. This split — _sovereignty over identifiers and disclosure;
-issuer-authority over credential lifecycle_ — is the orthodox reading of the W3C
-model, where a credential is the issuer's signed assertion, not the subject's
-property.
+The **Signing Service** produces every credential proof, but never as itself:
+its key is listed as an **assertion-only** verification method inside the
+issuer's `did:ethr` document (an opt-in mandate via the `IdentityController`,
+see `docs/did-identity-system.md`), and the proof's `kid` names that method in
+the **issuer's** document. The issuer can revoke the mandate unilaterally at
+any time by editing its DID document, so the Signing Service executes the
+credential lifecycle without ever owning it.
 
-In this model the **evidence is an accountability artifact**, not a live source of
-authority. Its purpose is to prove that the Signing Service did **not** fabricate
-an authorization — i.e. that the organization genuinely approved the issuance.
-Because every verifier in the ecosystem checks the evidence (§1 of the
-verification flow), a Signing Service that minted a credential no organization
-authorized would be detectable: it cannot forge the organization's signature.
+Organizations and natural persons are thus sovereign over their identifiers,
+their credentials, **and** disclosure (selective disclosure when presenting).
+The separation of powers is between **human authorization and automated proof
+execution**, not between two organizations:
 
-Revocation authority is split deliberately (§7): the Signing Service performs
-routine, per-credential revocation; the organization holds a sovereign,
-org-wide kill switch so it is **never trapped** unable to sever its credentials.
+- The **evidence** (this spec) is signed by a _human admin_ whose wallet key
+  is authorized on the issuing organization's `did:ethr`. It is the actual
+  authorization decision and a durable, non-repudiable record of who approved
+  the issuance.
+- The **proof** is produced by the Signing Service under the mandate above.
+  It makes the credential verifiable; it decides nothing.
+
+Because every verifier checks the evidence, a Signing Service that minted a
+credential nobody authorized is detectable: it cannot forge an admin's
+signature. Revocation follows issuance (§7): the revocation pointer lives in
+the issuer's own DID document, while the Signing Service maintains the
+revocation data as an operational service.
 
 ---
 
@@ -82,13 +87,16 @@ org-wide kill switch so it is **never trapped** unable to sever its credentials.
 
 | Role           | Identity                                                                    | Action                                                                                                                            |
 | -------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Authorizer** | The party one level up the trust chain (organization, or Trust Anchor), identified by its `did:ethr` | Computes the Merkle root over the batch and signs **one** authorization JWT over that root with a key in its DID document. |
-| **Issuer**     | Signing Service                                                             | Assembles the batch, obtains the authorizer's single signature, embeds each credential's inclusion proof, and issues (signs) each `dc+sd-jwt` credential. Performs routine revocation. |
+| **Authorizer** | The issuing organization's `did:ethr`; the signature is made by a **human admin's key** authorized on that DID | Computes the Merkle root over the batch and signs **one** authorization JWT over that root with an admin key in the org's DID document. |
+| **Issuer**     | The vouching party's `did:ethr` (Trust Anchor for LegalPerson credentials, the organization for NaturalPerson credentials — ADR-006) | Named in each credential's `issuer`. Its proofs are executed by the **Signing Service** under the assertion-only mandate key in the issuer's DID document. |
+| **Signing Service** | Haven-operated proof executor | Assembles the batch, obtains the admin's single authorization signature, embeds each credential's inclusion proof, and signs each `dc+sd-jwt` proof with its mandate key. Maintains revocation data (§7). |
 | **Verifier**   | Any relying party                                                           | Verifies one issued credential and its evidence in isolation.                                                                   |
 
-The authorizer and issuer are distinct: the organization **authorizes**, the
-Signing Service **issues**. The authorizer commits to the full content of each
-credential in the batch (§4.1).
+Authorizer and issuer usually coincide at the DID level (the organization both
+authorizes and issues); the real separation is between the **human admin** who
+signs the evidence and the **automated Signing Service** that signs the proof.
+The authorizer commits to the full content of each credential in the batch
+(§4.1).
 
 ---
 
@@ -154,7 +162,7 @@ claims are:
 | Claim   | Value                                                                          |
 | ------- | ------------------------------------------------------------------------------ |
 | `iss`   | The authorizer's `did:ethr`.                                                   |
-| `aud`   | The Signing Service's DID (the issuer requesting authorization).               |
+| `aud`   | The credential `issuer`'s DID — the identity under which the batch will be issued (ADR-006). |
 | `iat`   | Issued-at (Unix seconds). Used for historical key resolution (§6).             |
 | `nonce` | The base64url Merkle root over the batch.                                      |
 
@@ -198,7 +206,7 @@ credential.
 ### 4.5 Issuance flow
 
 1. The Signing Service assembles the batch of fully-formed credential payloads
-   (each already carrying its `credentialStatus` entries, §7, validity, claims).
+   (each already carrying its `credentialStatus` entry, §7, validity, claims).
 2. It computes each `leaf_i` (§4.1) and builds the tree (§4.2), yielding the root.
 3. It sends the batch (or the root, if the authorizer reconstructs leaves
    independently) to the authorizer, who signs one authorization JWT with
@@ -266,8 +274,10 @@ signed `nonce` inside `authorization`, and the verifier reads it from there
 
 A verifier holding **one** issued credential MUST:
 
-1. **Verify the issued credential** — the Signing Service's SD-JWT issuer
-   signature over credential _i_.
+1. **Verify the issued credential** — the SD-JWT proof over credential _i_,
+   against the verification method its `kid` names in the **issuer's** DID
+   document (in practice the Signing Service's assertion-only mandate key,
+   §2).
 2. **Recompute the leaf** — take the issued credential's issuer-signed claims set,
    remove the `evidence` member, apply `JCS`, prepend `0x00`, and SHA-256 →
    `leaf_i` (§4.1). Because the leaf is over `_sd` digests, this succeeds even if
@@ -277,14 +287,14 @@ A verifier holding **one** issued credential MUST:
 4. **Verify the authorization** — resolve the `authorizer` `did:ethr` **as of the
    authorization JWT's `iat`** (historical resolution — see below), find the
    verification method named by the JWT `kid`, and verify the ES256 signature.
-   Check `iss` = `authorizer` and `aud` = the Signing Service.
+   Check `iss` = `authorizer` and `aud` = the credential's `issuer`.
 5. **Compare** — base64url-decode the JWT `nonce` and require it to equal
    `computed_root`. This proves, from this credential alone, that its payload was
    covered by the authorizer's single signature.
-6. **Check status** — evaluate both `harbour:CRSetEntry` entries under the AND rule
-   of §7: the credential is valid only if **every** entry resolves and none reports
-   it revoked. The organization's entry being unresolvable (its CRSet service
-   deleted) fail-closes to revoked.
+6. **Check status** — evaluate the `harbour:CRSetEntry` under §7: the
+   credential is valid only if the entry resolves and does not report it
+   revoked. The entry being unresolvable (the issuer's CRSet service deleted)
+   fail-closes to revoked.
 
 **Historical vs current resolution.** Step 4 resolves the authorizer DID _as of
 `iat`_ (via `did:ethr` `versionTime`), so the authorization is an immutable
@@ -298,14 +308,16 @@ two separate: signing authority is historical; revocation is current.
 ## 7. Revocation
 
 Revocation uses the existing Harbour **CRSet** mechanism — there is **no new
-status type**. A credential carries **two `harbour:CRSetEntry` entries**, and its
-validity is the logical **AND** over them:
+status type**. A credential carries **one `harbour:CRSetEntry`** whose
+`statusServiceOperator` is the **issuer's DID** (ADR-006: revocation authority
+follows issuance authority):
 
-> **valid ⟺ every `CRSetEntry` resolves AND none reports the credential revoked**
+> **valid ⟺ the `CRSetEntry` resolves AND does not report the credential revoked**
 
 An entry that cannot be resolved (its operator DID has no CRSet service) is
-**fail-closed**, i.e. treated as revoked (§7.3). The second entry being
-unresolvable is exactly what gives the organization its kill switch (§7.2).
+**fail-closed**, i.e. treated as revoked (§7.3). That the resolution path runs
+through the issuer's own DID document is exactly what gives the issuer its
+kill switch (§7.2).
 
 ### 7.1 The CRSet mechanism and its storage
 
@@ -320,7 +332,7 @@ from the paper's Ethereum-blob storage.** Instead:
   the revocation data is off-chain (IPFS), the choice of chain is decoupled from
   storage.
 
-Resolution is uniform for both entries and reuses the existing CRSet verifier:
+Resolution reuses the existing CRSet verifier:
 
 ```text
 CRSetEntry.statusServiceOperator (a DID)
@@ -336,41 +348,42 @@ CRSetEntry.statusServiceOperator (a DID)
 test. The privacy properties (padding, scheduled republish) are unchanged from the
 paper.
 
-### 7.2 The two entries
+### 7.2 The entry: issuer-controlled pointer, Signing-Service-maintained data
 
-**Entry #1 — Signing Service (per-credential).** `statusServiceOperator` is the
-Signing Service's DID; its CRSet service resolves to the IPNS of the
-**Signing-Service-controlled** revocation data. The batch's N revocation IDs join
-this single dataspace-wide cascade. The Signing Service performs routine,
-per-credential revocation (key compromise, issuance error, a single employee
-leaving) by adding the ID to its set; latency is bounded by the publish interval.
+`statusServiceOperator` is the **issuer's DID**. The issuer's DID document
+carries a CRSet service entry that points to the IPNS of the revocation data
+the **Signing Service maintains** as an operational service. The two halves of
+revocation authority split along the same line as issuance itself (§2):
 
-**Entry #2 — Organization (org-wide kill switch).** `statusServiceOperator` is the
-**organization's DID**. The organization's DID document carries a CRSet service
-entry that **points to the same Signing-Service IPNS revocation data**, with the
-**same `statusIndex`**. So while present, entry #2 simply mirrors entry #1 (it
-defers to the Signing Service's cascade and adds nothing). Its _sole_ independent
-function is the resolution path: it depends on the organization's own DID service
-entry.
+**Routine, per-credential revocation — Signing Service.** The batch's N
+revocation IDs join the cascade the Signing Service maintains. It performs
+routine revocation (key compromise, issuance error, a single employee leaving)
+by adding the ID to the set; latency is bounded by the publish interval.
 
-To revoke **all** of its credentials at once, the organization **deletes that
-CRSet service entry from its DID document** (for `did:ethr`, a `revokeAttribute`
-authorized by its key via the `IdentityController` — serverless, immediate, and
-impossible for the Signing Service to block). The existing CRSet verifier then
-resolves entry #2's operator DID, finds no CRSet service, and fail-closes →
-revoked → the AND is false for every credential the organization backs.
+**Issuer-wide kill switch — issuer.** The resolution path depends on the
+issuer's own DID service entry. To revoke **all** of its issued credentials at
+once — or to sever the Signing Service entirely — the issuer **deletes or
+redirects that CRSet service entry in its DID document** (for `did:ethr`, a
+`revokeAttribute` authorized by its key via the `IdentityController` —
+serverless, immediate, and impossible for the Signing Service to block). The
+CRSet verifier then resolves the operator DID, finds no CRSet service, and
+fail-closes → revoked for every credential the issuer backs.
 
-This lever is deliberately **coarse**: it severs the whole organization, not one
-employee. A per-employee variant is impossible without leaking — distinct
-per-employee service entries would publish an on-chain roster and make every firing
-a public event, defeating the CRSet's metadata privacy. So the kill switch covers
-organization-wide cases (ecosystem exit, key compromise, dispute with the Signing
-Service) and **backstops** the routine path: because the organization always holds
-the org-wide veto, the Signing Service can never keep an organization's credentials
-alive against its will. Organization-driven _single-employee_ revocation is a
-private request to the Signing Service (honored by adding the ID to the cascade);
-making it enforceable without trust in the Signing Service needs a zero-knowledge
-non-membership construction and is **out of scope** for this version.
+This lever is deliberately **coarse**: it severs everything the issuer has
+issued, not one employee. A per-employee variant is impossible without
+leaking — distinct per-employee service entries would publish an on-chain
+roster and make every firing a public event, defeating the CRSet's metadata
+privacy. So the kill switch covers issuer-wide cases (ecosystem exit, key
+compromise, dispute with the Signing Service) and **backstops** the routine
+path: because the issuer always holds the pointer, the Signing Service can
+never keep an issuer's credentials alive against its will. Note the converse
+also holds by design: since the issuer owns the credential lifecycle
+(ADR-006), an issuer that redirects its service entry to stale data can
+resurrect credentials the Signing Service revoked — routine revocation is an
+operational service the issuer delegates, not an authority held against the
+issuer. Single-employee revocation driven by the organization is simply a
+request to the Signing Service (honored by adding the ID to the cascade),
+which is unproblematic because organization and issuer are the same party.
 
 ### 7.3 Verifier rules (normative)
 
@@ -382,14 +395,15 @@ non-membership construction and is **out of scope** for this version.
    or IPFS unavailable) MUST NOT be treated as valid, nor as revoked; verification
    cannot complete until a finalized view is obtained. Only a confirmed, finalized
    _absence_ of the CRSet service counts as revoked.
-3. **Dedicated entry.** In the organization's DID document, the CRSet service used
+3. **Dedicated entry.** In the issuer's DID document, the CRSet service used
    for this kill switch MUST serve no other purpose, so that deleting it does
-   exactly one thing (no blast radius onto the organization's other services).
-4. **Toggle vs monotonicity.** Re-adding the organization's CRSet service restores
-   org-level liveness, but because validity is the AND over all entries, any
-   credential whose `statusIndex` is in the cascade (§7.2, entry #1) stays revoked.
-   Per-credential revocations are thus monotonic even though the org-level lever
-   may toggle.
+   exactly one thing (no blast radius onto the issuer's other services).
+4. **Toggle vs monotonicity.** Re-adding the issuer's CRSet service restores
+   issuer-level liveness, and any credential whose `statusIndex` is in the
+   cascade (§7.2) stays revoked for as long as the entry points at that
+   cascade. Per-credential revocations are monotonic under an honest pointer;
+   §7.2 notes the issuer's power to redirect it, which is intentional
+   (revocation authority follows issuance authority).
 
 ---
 
@@ -519,4 +533,5 @@ inconclusive ≠ valid, §7.3).
 
 | Version     | Date       | Changes                                                                                       |
 | ----------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1.1.0-draft | 2026-07-06 | Sovereign-issuer trust model (ADR-006): issuer = vouching party's `did:ethr`, Signing Service signs under an assertion-only mandate key in the issuer's DID document; evidence signed by a human admin key on the org DID; single issuer-operated `CRSetEntry` replaces the dual-entry model; authorization JWT `aud` = credential issuer. |
 | 1.0.0-draft | 2026-06-22 | Initial draft: Merkle-batched `BatchCredentialEvidence` for `dc+sd-jwt`; Model B trust model; DID-resolved authorization JWT; dual-entry revocation (CRSet + org-wide did:ethr kill switch). |
