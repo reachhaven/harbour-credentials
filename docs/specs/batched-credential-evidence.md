@@ -162,7 +162,7 @@ claims are:
 | Claim   | Value                                                                          |
 | ------- | ------------------------------------------------------------------------------ |
 | `iss`   | The authorizer's `did:ethr`.                                                   |
-| `aud`   | The credential `issuer`'s DID — the identity under which the batch will be issued (ADR-006). |
+| `aud`   | The **Signing Service's DID** — the executor the authorization is addressed to. The Signing Service MUST reject an authorization whose `aud` is not its own DID, so an authorization cannot be replayed to a different executor (§9.6). |
 | `iat`   | Issued-at (Unix seconds). Used for historical key resolution (§6).             |
 | `nonce` | The base64url Merkle root over the batch.                                      |
 
@@ -293,7 +293,9 @@ A verifier holding **one** issued credential MUST:
 4. **Verify the authorization** — resolve the `authorizedBy` `did:ethr` **as of the
    authorization JWT's `iat`** (historical resolution — see below), find the
    verification method named by the JWT `kid`, and verify the ES256 signature.
-   Check `iss` = `authorizedBy` and `aud` = the credential's `issuer`.
+   Check `iss` = `authorizedBy`; a verifier that knows the executor's
+   identity SHOULD also check `aud` = the Signing Service's DID (the
+   executor itself MUST, before acting on the authorization).
 5. **Compare** — base64url-decode the JWT `nonce` and require it to equal
    `computed_root`. This proves, from this credential alone, that its payload was
    covered by the authorizer's single signature.
@@ -540,5 +542,5 @@ inconclusive ≠ valid, §7.3).
 
 | Version     | Date       | Changes                                                                                       |
 | ----------- | ---------- | --------------------------------------------------------------------------------------------- |
-| 1.1.0-draft | 2026-07-06 | Sovereign-issuer trust model (ADR-006): issuer = vouching party's `did:ethr`, Signing Service signs under an assertion-only mandate key in the issuer's DID document; evidence signed by a human admin key on the org DID; single issuer-operated `CRSetEntry` replaces the dual-entry model; authorization JWT `aud` = credential issuer. |
+| 1.1.0-draft | 2026-07-06 | Sovereign-issuer trust model (ADR-006): issuer = vouching party's `did:ethr`, Signing Service signs under an assertion-only mandate key in the issuer's DID document; evidence signed by a human admin key on the org DID; single issuer-operated `CRSetEntry` replaces the dual-entry model; evidence field `authorizer` renamed to `authorizedBy`; authorization JWT `aud` = the executing Signing Service. |
 | 1.0.0-draft | 2026-06-22 | Initial draft: Merkle-batched `BatchCredentialEvidence` for `dc+sd-jwt`; Model B trust model; DID-resolved authorization JWT; dual-entry revocation (CRSet + org-wide did:ethr kill switch). |

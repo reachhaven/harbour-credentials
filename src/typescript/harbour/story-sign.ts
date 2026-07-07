@@ -247,9 +247,12 @@ async function processBatch(
   const authorizerKey = resolveKey(authorizer, keyring.byDID, fallback);
   // All credentials in a batch share an issuer (usually the authorizer org
   // itself, ADR-006); proofs are executed by the Signing Service via the
-  // issuer's mandate key.
+  // issuer's mandate key. The authorization JWT is addressed (`aud`) to the
+  // Signing Service — the executor acting on it — so an authorization cannot
+  // be replayed to a different executor (spec §4.3, §9.6).
   const issuerDid = (batch[0].vc.issuer as string) ?? "";
   const proof = proofKey(issuerDid, keyring, fallback);
+  const audience = keyring.roleDids.get("haven") ?? issuerDid;
 
   // 1. Fix salts.
   const payloads: Record<string, unknown>[] = [];
@@ -266,7 +269,7 @@ async function processBatch(
   // 2. One signature over the batch Merkle root; per-credential proof.
   const evidenceObjs = await buildBatchEvidence(payloads, authorizerKey.privateKey, {
     authorizerDid: authorizer,
-    audience: issuerDid,
+    audience,
     kid: authorizerKey.kid,
   });
 

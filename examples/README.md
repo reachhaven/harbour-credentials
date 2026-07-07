@@ -199,7 +199,7 @@ from harbour.sd_jwt import build_sd_jwt_payload, sign_sd_jwt
 from harbour.batch_evidence import build_batch_evidence
 
 payload, disclosures = build_sd_jwt_payload(credential, vct=vct)
-evidence = build_batch_evidence([payload], admin_key, authorizer_did=ta_did, audience=ta_did)
+evidence = build_batch_evidence([payload], admin_key, authorizer_did=ta_did, audience=ss_did)
 payload["evidence"] = [evidence[0]]
 sd_jwt = sign_sd_jwt(payload, disclosures, ss_key, kid=f"{ta_did}#delegate-1")
 ```
@@ -209,7 +209,7 @@ sd_jwt = sign_sd_jwt(payload, disclosures, ss_key, kid=f"{ta_did}#delegate-1")
 import { buildSdJwtPayload, signSdJwt, buildBatchEvidence } from '@reachhaven/harbour-credentials';
 
 const { payload, disclosures } = buildSdJwtPayload(credential, { vct });
-const evidence = await buildBatchEvidence([payload], adminKey, { authorizerDid: taDid, audience: taDid });
+const evidence = await buildBatchEvidence([payload], adminKey, { authorizerDid: taDid, audience: ssDid });
 payload.evidence = [evidence[0]];
 const sdJwt = await signSdJwt(payload, disclosures, ssKey, { kid: `${taDid}#delegate-1` });
 ```

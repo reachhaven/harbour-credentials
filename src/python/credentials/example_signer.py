@@ -293,10 +293,14 @@ def process_batch(
     """Issue a batch of credentials sharing one authorizer with one signature."""
     authorizer_key, authorizer_kid = _resolve_key(authorizer, keyring, fallback)
     # All credentials in a batch share an issuer (usually the authorizer org
-    # itself, ADR-006); the authorization JWT audience is that issuer. Proofs
-    # are executed by the Signing Service via the issuer's mandate key.
+    # itself, ADR-006); proofs are executed by the Signing Service via the
+    # issuer's mandate key. The authorization JWT is addressed (`aud`) to the
+    # Signing Service — the executor acting on it — so an authorization cannot
+    # be replayed to a different executor (spec §4.3, §9.6).
     issuer_did = batch[0][1].get("issuer", "")
     proof_key, proof_kid = _proof_key(issuer_did, keyring, fallback)
+    ss_did = keyring.role_dids.get("haven") if keyring else None
+    audience = ss_did or issuer_did
 
     # 1. Fix salts: build each issuer payload (evidence stub present, ignored by
     #    the leaf which strips `evidence`).
@@ -314,7 +318,7 @@ def process_batch(
         payloads,
         authorizer_key,
         authorizer_did=authorizer,
-        audience=issuer_did,
+        audience=audience,
         kid=authorizer_kid,
     )
 

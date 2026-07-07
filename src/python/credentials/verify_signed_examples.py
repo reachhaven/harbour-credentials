@@ -165,6 +165,7 @@ def verify_signed_dir(
     vm_keys: dict[str, object],
     fallback_pub: object,
     dump_resolved: bool = False,
+    expected_audience: str | None = None,
 ) -> VerificationCounts:
     counts = VerificationCounts()
     if dump_resolved:
@@ -220,11 +221,13 @@ def verify_signed_dir(
             )
             continue
         try:
+            # The authorization JWT is addressed to the executor (the Signing
+            # Service), not the issuer — spec §4.3 / §9.6.
             verify_batch_evidence(
                 raw,
                 raw["evidence"][0],
                 authorizer_pub,
-                expected_audience=issuer_did,
+                expected_audience=expected_audience,
             )
         except VerificationError as e:
             counts.errors.append(f"{sd_jwt_path.name}: batch evidence: {e}")
@@ -268,12 +271,18 @@ def main() -> None:
     _, fb_pub = load_test_p256_keypair()
     did_to_pub = _build_did_to_pub(keyring)
     vm_keys = _load_did_vm_keys(repo_root)
+    ss_did = keyring.role_dids.get("haven") if keyring else None
 
     total = VerificationCounts()
     for signed_dir in signed_dirs:
         print(f"Verifying {signed_dir.relative_to(repo_root)}/ ...")
         counts = verify_signed_dir(
-            signed_dir, did_to_pub, vm_keys, fb_pub, dump_resolved=args.dump_resolved
+            signed_dir,
+            did_to_pub,
+            vm_keys,
+            fb_pub,
+            dump_resolved=args.dump_resolved,
+            expected_audience=ss_did,
         )
         total.credentials += counts.credentials
         total.batch_evidence += counts.batch_evidence

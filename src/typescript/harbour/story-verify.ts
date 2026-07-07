@@ -112,6 +112,14 @@ async function loadDidVmKeys(): Promise<Map<string, CryptoKey>> {
   return keys;
 }
 
+/** The Signing Service DID — the expected authorization-JWT audience (§4.3). */
+function loadSigningServiceDid(): string | null {
+  const mapping = JSON.parse(
+    readFileSync(join(KEYS_DIR, "role-did-mapping.json"), "utf-8"),
+  ) as Record<string, { did_ethr?: string }>;
+  return mapping.haven?.did_ethr ?? null;
+}
+
 const MEMBER_OF_KEYS = ["harbour.gx:memberOf", "memberOf"];
 
 function memberOf(claims: Record<string, unknown>): string | null {
@@ -152,6 +160,7 @@ async function main(): Promise<void> {
   const didToPub = await loadDidToPub();
   const fallbackPub = await loadFallbackPub();
   const vmKeys = await loadDidVmKeys();
+  const ssDid = loadSigningServiceDid();
 
   let credentials = 0;
   let batch = 0;
@@ -214,8 +223,10 @@ async function main(): Promise<void> {
         continue;
       }
       try {
+        // The authorization JWT is addressed to the executor (the Signing
+        // Service), not the issuer — spec §4.3 / §9.6.
         await verifyBatchEvidence(raw, evidence, authorizerPub, {
-          expectedAudience: issuerDid,
+          expectedAudience: ssDid ?? undefined,
         });
       } catch (e) {
         errors.push(`${file}: batch evidence: ${e instanceof Error ? e.message : e}`);

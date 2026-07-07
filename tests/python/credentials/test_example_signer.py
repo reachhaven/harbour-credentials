@@ -156,7 +156,10 @@ def test_process_batch_one_signature_and_proofs(
         assert _issuer_header(sd)["kid"] == f"{vc['issuer']}#delegate-1"
         verify_sd_jwt_vc(sd, ss_pub)
         verify_batch_evidence(
-            raw, raw["evidence"][0], authorizer_pub, expected_audience=vc["issuer"]
+            raw,
+            raw["evidence"][0],
+            authorizer_pub,
+            expected_audience=keyring.role_dids["haven"],
         )
 
     # One signature shared across the whole batch.

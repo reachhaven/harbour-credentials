@@ -36,7 +36,7 @@ Wire form (from the signed `legal-person-credential.decoded.json` story output):
 | Slot | Meaning |
 |------|---------|
 | `authorizedBy` | The issuing organization's `did:ethr`; the authorization JWT is signed by an admin key listed in that DID document. Required — the only slot present on the human-readable source examples. |
-| `authorization` | Compact ES256 JWS signed by the admin; its `nonce` is the base64url batch Merkle root, its `aud` the credential's `issuer`. Generated at batch-signing time. |
+| `authorization` | Compact ES256 JWS signed by the admin; its `nonce` is the base64url batch Merkle root, its `aud` the **Signing Service** (the executor being authorized). Generated at batch-signing time. |
 | `merkleProof` | Ordered sibling digests (`hash` + `position`) folding this credential's leaf to the signed root. A batch of size 1 has an empty `path`. |
 
 **What it proves**: a human admin of the authorizer organization approved exactly this credential's payload — its leaf folds to the root the admin signed. Authorizer and issuer usually coincide at the DID level (the Trust Anchor authorizes and issues LegalPersonCredentials; an organization authorizes and issues its members' NaturalPersonCredentials).
@@ -104,7 +104,7 @@ A verifier holding **one** credential checks it in isolation (spec [§6](../spec
 1. **Verify the proof** against the verification method the `kid` names in the **issuer's** DID document (the Signing Service's assertion-only `#delegate-1` mandate key).
 2. **Recompute the leaf** from the raw issuer payload with `evidence` removed (RFC 8785 canonicalization, `0x00` domain prefix, SHA-256). The leaf is over the salted `_sd` digests, so it is invariant under selective disclosure.
 3. **Fold the `merkleProof`** to a root and compare it with the `nonce` inside the `authorization` JWT.
-4. **Verify the `authorization` JWS** against the admin key the JWT `kid` names in the authorizer's DID document; check `iss` = `authorizedBy` and `aud` = the credential's `issuer`.
+4. **Verify the `authorization` JWS** against the admin key the JWT `kid` names in the authorizer's DID document; check `iss` = `authorizedBy` (the executor additionally checks `aud` = its own DID before acting).
 
 ```python
 from harbour.sd_jwt import verify_sd_jwt_vc
@@ -115,7 +115,7 @@ verify_batch_evidence(                                    # steps 2-4
     raw_payload,                # issuer payload with _sd digests
     raw_payload["evidence"][0],
     authorizer_public_key,
-    expected_audience=raw_payload["issuer"],
+    expected_audience=signing_service_did,
 )
 ```
 
@@ -124,7 +124,7 @@ import { verifySdJwtVc, verifyBatchEvidence } from "@reachhaven/harbour-credenti
 
 const claims = await verifySdJwtVc(sdJwt, proofPublicKey);
 await verifyBatchEvidence(rawPayload, rawPayload.evidence[0], authorizerPublicKey, {
-  expectedAudience: rawPayload.issuer,
+  expectedAudience: signingServiceDid,
 });
 ```
 
@@ -141,7 +141,7 @@ payload, disclosures = build_sd_jwt_payload(credential, vct=vct)
 
 # 2. One admin signature over the batch Merkle root; per-credential proofs.
 evidence = build_batch_evidence(
-    [payload], admin_key, authorizer_did=org_did, audience=issuer_did
+    [payload], admin_key, authorizer_did=org_did, audience=signing_service_did
 )
 
 # 3. Inject the evidence, then sign the proof with the issuer's mandate key.
