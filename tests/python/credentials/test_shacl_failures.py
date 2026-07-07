@@ -699,9 +699,9 @@ _DID_PATTERN_CASES = [
     ),
     (
         "legal-person-credential.json",
-        lambda d: _set_field(d, "urn:uuid:not-a-did", "evidence", 0, "authorizer"),
+        lambda d: _set_field(d, "urn:uuid:not-a-did", "evidence", 0, "authorizedBy"),
         "PatternConstraintComponent",
-        "BatchCredentialEvidence-authorizer-not-a-did",
+        "BatchCredentialEvidence-authorizedBy-not-a-did",
     ),
     (
         "natural-person-credential.json",

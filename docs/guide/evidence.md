@@ -22,7 +22,7 @@ Wire form (from the signed `legal-person-credential.decoded.json` story output):
 ```json
 {
   "type": ["harbour:BatchCredentialEvidence"],
-  "authorizer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+  "authorizedBy": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
   "authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImhhcmJvdXIt...",
   "merkleProof": {
     "path": [
@@ -35,7 +35,7 @@ Wire form (from the signed `legal-person-credential.decoded.json` story output):
 
 | Slot | Meaning |
 |------|---------|
-| `authorizer` | The issuing organization's `did:ethr`; the authorization JWT is signed by an admin key listed in that DID document. Required — the only slot present on the human-readable source examples. |
+| `authorizedBy` | The issuing organization's `did:ethr`; the authorization JWT is signed by an admin key listed in that DID document. Required — the only slot present on the human-readable source examples. |
 | `authorization` | Compact ES256 JWS signed by the admin; its `nonce` is the base64url batch Merkle root, its `aud` the credential's `issuer`. Generated at batch-signing time. |
 | `merkleProof` | Ordered sibling digests (`hash` + `position`) folding this credential's leaf to the signed root. A batch of size 1 has an empty `path`. |
 
@@ -104,7 +104,7 @@ A verifier holding **one** credential checks it in isolation (spec [§6](../spec
 1. **Verify the proof** against the verification method the `kid` names in the **issuer's** DID document (the Signing Service's assertion-only `#delegate-1` mandate key).
 2. **Recompute the leaf** from the raw issuer payload with `evidence` removed (RFC 8785 canonicalization, `0x00` domain prefix, SHA-256). The leaf is over the salted `_sd` digests, so it is invariant under selective disclosure.
 3. **Fold the `merkleProof`** to a root and compare it with the `nonce` inside the `authorization` JWT.
-4. **Verify the `authorization` JWS** against the admin key the JWT `kid` names in the authorizer's DID document; check `iss` = `authorizer` and `aud` = the credential's `issuer`.
+4. **Verify the `authorization` JWS** against the admin key the JWT `kid` names in the authorizer's DID document; check `iss` = `authorizedBy` and `aud` = the credential's `issuer`.
 
 ```python
 from harbour.sd_jwt import verify_sd_jwt_vc
@@ -130,7 +130,7 @@ await verifyBatchEvidence(rawPayload, rawPayload.evidence[0], authorizerPublicKe
 
 ## Adding Evidence to Credentials
 
-Source credentials carry only the `authorizer`; `authorization` and `merkleProof` are generated at batch-signing time:
+Source credentials carry only the `authorizedBy` DID; `authorization` and `merkleProof` are generated at batch-signing time:
 
 ```python
 from harbour.sd_jwt import build_sd_jwt_payload, sign_sd_jwt
@@ -162,7 +162,7 @@ BatchCredentialEvidence:
   is_a: Evidence
   class_uri: harbour:BatchCredentialEvidence
   slots:
-    - authorizer      # required; org did:ethr
+    - authorizedBy    # required; org did:ethr
     - authorization   # compact JWS, nonce = batch Merkle root
     - merkleProof     # MerkleProof: path of {hash, position}
 

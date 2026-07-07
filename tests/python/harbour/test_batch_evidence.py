@@ -71,7 +71,7 @@ def test_build_and_verify_batch(keypair):
     assert len({e["authorization"] for e in evidence}) == 1
     for payload, ev in zip(payloads, evidence):
         assert ev["type"] == [EVIDENCE_TYPE]
-        assert ev["authorizer"] == AUTHORIZER
+        assert ev["authorizedBy"] == AUTHORIZER
         full = {**payload, "evidence": [ev]}  # evidence attached as it would be issued
         auth = verify_batch_evidence(full, ev, pub, expected_audience=AUDIENCE)
         assert auth["aud"] == AUDIENCE

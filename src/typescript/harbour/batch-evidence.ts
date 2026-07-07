@@ -25,7 +25,7 @@ export const EVIDENCE_TYPE = "harbour:BatchCredentialEvidence";
 
 export interface BatchEvidence {
   type: string[];
-  authorizer: string;
+  authorizedBy: string;
   authorization: string;
   merkleProof: {
     type: string;
@@ -122,7 +122,7 @@ export async function buildBatchEvidence(
   const authorization = await signAuthorization(root, authorizerKey, options);
   return payloads.map((_, i) => ({
     type: [EVIDENCE_TYPE],
-    authorizer: options.authorizerDid,
+    authorizedBy: options.authorizerDid,
     authorization,
     // Each nested object carries its JSON-LD type so the evidence remains a
     // valid harbour:MerkleProof / harbour:MerklePathElement under the closed
@@ -148,7 +148,7 @@ export async function verifyBatchEvidence(
   if (typeof auth !== "string") {
     throw new VerificationError("BatchCredentialEvidence missing authorization JWT");
   }
-  const authorizer = evidence.authorizer;
+  const authorizer = evidence.authorizedBy;
   const authPayload = await verifyAuthorization(auth, authorizerPublicKey, {
     expectedAudience: options.expectedAudience,
     expectedAuthorizer: typeof authorizer === "string" ? authorizer : undefined,

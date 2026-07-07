@@ -126,7 +126,7 @@ classDiagram
     }
 
     class BatchCredentialEvidence {
-        authorizer : uri ⟨required⟩
+        authorizedBy : uri ⟨required⟩
         authorization : string ⟨compact JWS⟩
         merkleProof : MerkleProof
     }
@@ -154,7 +154,7 @@ classDiagram
 ```
 
 **`BatchCredentialEvidence`** — attests that a human admin of the
-`authorizer` organization approved this credential's issuance as part of a
+`authorizedBy` organization approved this credential's issuance as part of a
 Merkle-committed batch with a single signature; the credential's
 `merkleProof` binds its payload to the signed root. See the
 [batched-credential-evidence spec](../specs/batched-credential-evidence.md)

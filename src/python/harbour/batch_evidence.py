@@ -204,7 +204,7 @@ def build_batch_evidence(
         evidence.append(
             {
                 "type": [EVIDENCE_TYPE],
-                "authorizer": authorizer_did,
+                "authorizedBy": authorizer_did,
                 "authorization": authorization,
                 "merkleProof": {"type": "harbour:MerkleProof", "path": path},
             }
@@ -242,7 +242,7 @@ def verify_batch_evidence(
     if not isinstance(auth, str):
         raise VerificationError("BatchCredentialEvidence missing authorization JWT")
 
-    authorizer = evidence.get("authorizer")
+    authorizer = evidence.get("authorizedBy")
     auth_payload = verify_authorization(
         auth,
         authorizer_public_key,

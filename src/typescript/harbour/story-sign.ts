@@ -151,7 +151,7 @@ function batchAuthorizer(vc: Record<string, unknown>): string | null {
     Array.isArray(types) &&
     types.some((t) => typeof t === "string" && t.endsWith("BatchCredentialEvidence"))
   ) {
-    const authorizer = (ev as Record<string, unknown>).authorizer;
+    const authorizer = (ev as Record<string, unknown>).authorizedBy;
     return typeof authorizer === "string" ? authorizer : null;
   }
   return null;

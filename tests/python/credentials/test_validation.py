@@ -308,13 +308,13 @@ class TestHarbourShaclShapes:
     def test_evidence_shapes_require_their_mandatory_slot(self):
         """Each evidence shape must require its mandatory slot.
 
-        BatchCredentialEvidence requires ``harbour:authorizer`` (the batched
+        BatchCredentialEvidence requires ``harbour:authorizedBy`` (the batched
         issuance-authorization model); DelegatedSignatureEvidence (canonical IRI
         ``harbour:SignatureEvidence``) still requires ``harbour:verifiablePresentation``.
         """
         content = HARBOUR_SHACL_PATH.read_text()
         for ev_type, required_slot in [
-            ("BatchCredentialEvidence", "harbour:authorizer"),
+            ("BatchCredentialEvidence", "harbour:authorizedBy"),
             ("SignatureEvidence", "harbour:verifiablePresentation"),
         ]:
             marker = f"harbour:{ev_type} a sh:NodeShape"

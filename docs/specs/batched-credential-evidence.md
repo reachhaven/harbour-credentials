@@ -238,7 +238,7 @@ Each issued credential carries one evidence object of the
   "type": ["harbour:BatchCredentialEvidence"],
 
   // The authorizer's did:ethr. MUST equal the authorization JWT's `iss`.
-  "authorizer": "did:ethr:...",
+  "authorizedBy": "did:ethr:...",
 
   // The ONE authorization JWT over the batch root (typ: harbour-batch-auth+jwt,
   // nonce = base64url Merkle root). Identical across all credentials in the batch.
@@ -255,7 +255,7 @@ Each issued credential carries one evidence object of the
 }]
 ```
 
-- `authorizer` — the authorizing party's `did:ethr`, surfaced so the evidence is
+- `authorizedBy` — the authorizing party's `did:ethr`, surfaced so the evidence is
   self-describing without decoding the JWT. MUST equal the JWT's `iss`.
 - `authorization` — the single ES256 JWS (§4.3), byte-identical in every
   credential of the batch.
@@ -290,10 +290,10 @@ A verifier holding **one** issued credential MUST:
    the credential is presented with claims redacted.
 3. **Fold the proof** — combine `leaf_i` with each entry of `merkleProof.path`
    using `node(L, R)` and the stated `position` at each level → `computed_root`.
-4. **Verify the authorization** — resolve the `authorizer` `did:ethr` **as of the
+4. **Verify the authorization** — resolve the `authorizedBy` `did:ethr` **as of the
    authorization JWT's `iat`** (historical resolution — see below), find the
    verification method named by the JWT `kid`, and verify the ES256 signature.
-   Check `iss` = `authorizer` and `aud` = the credential's `issuer`.
+   Check `iss` = `authorizedBy` and `aud` = the credential's `issuer`.
 5. **Compare** — base64url-decode the JWT `nonce` and require it to equal
    `computed_root`. This proves, from this credential alone, that its payload was
    covered by the authorizer's single signature.
@@ -421,7 +421,7 @@ typed scalars — **never `range: Any`** — so the generated SHACL shapes stay
 closed.
 
 - **`harbour:BatchCredentialEvidence`** (subtype of `harbour:Evidence`) —
-  `authorizer` (a DID, `range: uri`), `authorization` (the compact JWS string),
+  `authorizedBy` (a DID, `range: uri`), `authorization` (the compact JWS string),
   and `merkleProof`.
 - **`harbour:MerkleProof`** — `path` (ordered list of
   `harbour:MerklePathElement`).

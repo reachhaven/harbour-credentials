@@ -207,7 +207,7 @@ async function main(): Promise<void> {
         console.log(`  OK (plain): ${file}`);
         continue;
       }
-      const authorizer = evidence.authorizer as string;
+      const authorizer = evidence.authorizedBy as string;
       const authorizerPub = didToPub.get(authorizer);
       if (!authorizerPub) {
         errors.push(`${file}: no key for authorizer ${authorizer}`);

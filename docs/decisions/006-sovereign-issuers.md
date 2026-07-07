@@ -76,7 +76,7 @@ verification method **inside the issuer's own `did:ethr` document**:
 The `harbour:BatchCredentialEvidence` authorization JWT is signed by a
 **human admin's key that is authorized on the issuing organization's
 `did:ethr`** (the IdentityController maps 1..n admin wallet keys to the org
-DID). The evidence `authorizer` is the organization's DID; the JWT `kid`
+DID). The evidence `authorizedBy` value is the organization's DID; the JWT `kid`
 names the admin's verification method within it. In the repository examples
 the org's `#controller` key stands in for "an org admin's wallet key".
 

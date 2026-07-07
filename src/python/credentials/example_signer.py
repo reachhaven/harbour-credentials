@@ -203,7 +203,7 @@ def batch_authorizer(vc: dict) -> str | None:
     if isinstance(types, str):
         types = [types]
     if any(isinstance(t, str) and t.endswith("BatchCredentialEvidence") for t in types):
-        authorizer = ev.get("authorizer")
+        authorizer = ev.get("authorizedBy")
         return authorizer if isinstance(authorizer, str) else None
     return None
 
