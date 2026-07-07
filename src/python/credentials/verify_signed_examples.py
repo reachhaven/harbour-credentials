@@ -43,11 +43,13 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
 from credentials.example_signer import (
     RoleKeyring,
     _find_repo_root,
+    _intake_client_id,
     batch_authorizer,
     load_role_keyring,
     load_test_p256_keypair,
 )
 from harbour.batch_evidence import verify_batch_evidence
+from harbour.keys import p256_public_key_to_did_key
 from harbour.sd_jwt import verify_sd_jwt_vc
 from harbour.verifier import VerificationError
 
@@ -221,8 +223,9 @@ def verify_signed_dir(
             )
             continue
         try:
-            # The authorization JWT is addressed to the executor (the Signing
-            # Service), not the issuer — spec §4.3 / §9.6.
+            # The authorization KB-JWT is addressed to the OID4VP intake
+            # verifier (gatehouse did:key) — spec §4.3 / §9.6. authorizer_pub
+            # is the admin wallet key from the authorizedBy DID document.
             verify_batch_evidence(
                 raw,
                 raw["evidence"][0],
@@ -268,10 +271,12 @@ def main() -> None:
         sys.exit(1)
 
     keyring = load_role_keyring()
-    _, fb_pub = load_test_p256_keypair()
+    fb_priv, fb_pub = load_test_p256_keypair()
     did_to_pub = _build_did_to_pub(keyring)
     vm_keys = _load_did_vm_keys(repo_root)
-    ss_did = keyring.role_dids.get("haven") if keyring else None
+    intake_id = _intake_client_id(
+        keyring, (fb_priv, p256_public_key_to_did_key(fb_pub))
+    )
 
     total = VerificationCounts()
     for signed_dir in signed_dirs:
@@ -282,7 +287,7 @@ def main() -> None:
             vm_keys,
             fb_pub,
             dump_resolved=args.dump_resolved,
-            expected_audience=ss_did,
+            expected_audience=intake_id,
         )
         total.credentials += counts.credentials
         total.batch_evidence += counts.batch_evidence

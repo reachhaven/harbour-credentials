@@ -16,11 +16,12 @@ Issuance model (see ``docs/specs/batched-credential-evidence.md`` and ADR-006):
     assertion-only ``#delegate-1`` mandate in the issuer's DID document for
     all sovereign issuers. The proof ``kid`` names that verification method.
   * Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
-    **batch per (output dir, authorizer)**. The authorizer's admin key signs
-    **one** authorization JWT over the batch Merkle root; each credential gets
-    its own inclusion proof. The leaf is the issuer SD-JWT payload
-    (``evidence`` removed) — so salts are fixed first
-    (``build_sd_jwt_payload``), the root is signed, the full evidence is
+    **batch per (output dir, authorizer)**. The authorizer's admin wallet key
+    signs **one** KB-JWT over an authorization message committing to the
+    batch Merkle root (simulating the OID4VP ceremony, spec §4.3); each
+    credential gets its own inclusion proof. The leaf is the issuer SD-JWT
+    payload (``evidence`` removed) — so salts are fixed first
+    (``build_sd_jwt_payload``), the message is signed, the full evidence is
     injected, and the issuer JWT is signed last (``sign_sd_jwt``), all in one
     pass.
   * Credentials without batch evidence (delegated-signing receipts, out of
@@ -247,6 +248,24 @@ def _resolve_key(
     return fallback
 
 
+def _intake_client_id(
+    keyring: RoleKeyring | None,
+    fallback: tuple[PrivateKey, str],
+) -> str:
+    """The OID4VP intake verifier's client id (spec §4.3).
+
+    In production this is the gatehouse ``did:key``; the Signing Service
+    role's ``did:key`` stands in for it in the examples.
+    """
+    if keyring:
+        ss_did = keyring.role_dids.get("haven")
+        resolved = keyring.resolve(ss_did) if ss_did else None
+        if resolved:
+            priv, _ = resolved
+            return p256_public_key_to_did_key(priv.public_key())
+    return fallback[1]
+
+
 def _proof_key(
     issuer_did: str,
     keyring: RoleKeyring | None,
@@ -291,16 +310,16 @@ def process_batch(
     fallback: tuple[PrivateKey, str],
 ) -> list[Path]:
     """Issue a batch of credentials sharing one authorizer with one signature."""
-    authorizer_key, authorizer_kid = _resolve_key(authorizer, keyring, fallback)
+    # The admin wallet key stands in via the org's controller key (ADR-006 §3).
+    wallet_key, _ = _resolve_key(authorizer, keyring, fallback)
     # All credentials in a batch share an issuer (usually the authorizer org
     # itself, ADR-006); proofs are executed by the Signing Service via the
-    # issuer's mandate key. The authorization JWT is addressed (`aud`) to the
-    # Signing Service — the executor acting on it — so an authorization cannot
-    # be replayed to a different executor (spec §4.3, §9.6).
+    # issuer's mandate key. The authorization KB-JWT is addressed (`aud`) to
+    # the OID4VP intake verifier — the gatehouse acting for the Signing
+    # Service, identified by its did:key (spec §4.3, §9.6).
     issuer_did = batch[0][1].get("issuer", "")
     proof_key, proof_kid = _proof_key(issuer_did, keyring, fallback)
-    ss_did = keyring.role_dids.get("haven") if keyring else None
-    audience = ss_did or issuer_did
+    audience = _intake_client_id(keyring, fallback)
 
     # 1. Fix salts: build each issuer payload (evidence stub present, ignored by
     #    the leaf which strips `evidence`).
@@ -313,13 +332,14 @@ def process_batch(
         payloads.append(payload)
         disclosures.append(disc)
 
-    # 2. One signature over the batch Merkle root; per-credential inclusion proof.
+    # 2. One wallet signature over the authorization message committing to the
+    #    batch Merkle root; per-credential inclusion proof.
     evidence_objs = build_batch_evidence(
         payloads,
-        authorizer_key,
-        authorizer_did=authorizer,
+        wallet_key,
+        authorized_by=authorizer,
         audience=audience,
-        kid=authorizer_kid,
+        domain="harbour.local",
     )
 
     # 3. Inject the full evidence and sign each issuer JWT.

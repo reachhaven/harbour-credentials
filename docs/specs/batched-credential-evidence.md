@@ -1,6 +1,6 @@
 # Harbour Batched Credential Evidence Specification
 
-**Version**: 1.1.0-draft
+**Version**: 1.2.0-draft
 **Status**: Draft
 **Namespace**: `https://harbour.reachhaven.io/evidence/v1`
 
@@ -33,9 +33,9 @@ should sign **once**, not once per employee.
 | **Self-contained verification** | Each issued credential must, on its own, prove that _it_ is covered by that one commitment. |
 
 The resolution is a **cryptographic commitment with per-item inclusion proofs**:
-the authorizer signs a single **Merkle root** over the batch, and each issued
-credential carries a **Merkle inclusion proof** binding its own payload to that
-root.
+the authorizing admin signs (via their wallet, §4.3) a message committing to a
+single **Merkle root** over the batch, and each issued credential carries a
+**Merkle inclusion proof** binding its own payload to that root.
 
 ### 1.3 Why a Merkle tree
 
@@ -87,9 +87,9 @@ revocation data as an operational service.
 
 | Role           | Identity                                                                    | Action                                                                                                                            |
 | -------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Authorizer** | The issuing organization's `did:ethr`; the signature is made by a **human admin's key** authorized on that DID | Computes the Merkle root over the batch and signs **one** authorization JWT over that root with an admin key in the org's DID document. |
+| **Authorizer** | The issuing organization's `did:ethr`; the signature is made by a **human admin's wallet key** authorized on that DID | Reviews the authorization message (which commits to the batch Merkle root) on their wallet and signs **one** KB-JWT over it via the OID4VP ceremony (§4.3). |
 | **Issuer**     | The vouching party's `did:ethr` (Trust Anchor for LegalPerson credentials, the organization for NaturalPerson credentials — ADR-006) | Named in each credential's `issuer`. Its proofs are executed by the **Signing Service** under the assertion-only mandate key in the issuer's DID document. |
-| **Signing Service** | Haven-operated proof executor | Assembles the batch, obtains the admin's single authorization signature, embeds each credential's inclusion proof, and signs each `dc+sd-jwt` proof with its mandate key. Maintains revocation data (§7). |
+| **Signing Service** | Haven-operated proof executor | Assembles the batch, composes the authorization message, obtains the admin's single wallet signature through the intake verifier (gatehouse), embeds each credential's inclusion proof, and signs each `dc+sd-jwt` proof with its mandate key. Maintains revocation data (§7). |
 | **Verifier**   | Any relying party                                                           | Verifies one issued credential and its evidence in isolation.                                                                   |
 
 Authorizer and issuer usually coincide at the DID level (the organization both
@@ -152,55 +152,101 @@ node(L, R) = SHA-256( 0x01 ‖ L ‖ R )
 
 The **Merkle root** is the single root node, encoded base64url without padding.
 
-### 4.3 The single signature
+### 4.3 The single signature — a wallet KB-JWT over an authorization message
 
-The authorizer signs **one** compact JWS — the **authorization JWT** — over the
-batch root. This is a plain ES256 JWS, **not** an SD-JWT KB-JWT: the authorizer
-presents no credential, so there is nothing for a KB-JWT `sd_hash` to bind. Its
-claims are:
+The admin's signature comes from an **identity wallet**, and wallets do not
+produce arbitrary JWS signatures: the only signature obtainable from a wallet
+is the **KB-JWT** of an OID4VP presentation. The authorization is therefore
+produced through a presentation ceremony (in Haven: the gatehouse `/signature`
+API) rather than by signing the root directly:
 
-| Claim   | Value                                                                          |
-| ------- | ------------------------------------------------------------------------------ |
-| `iss`   | The authorizer's `did:ethr`.                                                   |
-| `aud`   | The **Signing Service's DID** — the executor the authorization is addressed to. The Signing Service MUST reject an authorization whose `aud` is not its own DID, so an authorization cannot be replayed to a different executor (§9.6). |
-| `iat`   | Issued-at (Unix seconds). Used for historical key resolution (§6).             |
-| `nonce` | The base64url Merkle root over the batch.                                      |
+1. The requesting service composes a human-readable, SIWE-style
+   **authorization message** whose statement carries the batch Merkle root
+   (§4.3.1) and computes `message_hash = SHA-256(message)` (lowercase hex).
+2. The wallet receives an OID4VP presentation request whose challenge/nonce is
+   `message_hash`, displays the message for consent, and responds by
+   presenting the **organization's LegalPersonCredential** with a **KB-JWT**
+   signed by the admin's wallet key.
+3. That KB-JWT — **not** the full `vp_token` — is what the evidence carries as
+   `authorization`, alongside the exact `authorizationMessage` string (§5).
 
-Header: `alg: ES256`, `typ: harbour-batch-auth+jwt`, and `kid` referencing the
-verification method in the authorizer's DID document used to sign.
+KB-JWT claims ([SD-JWT] RFC 9901 §4.3; header `alg: ES256`, `typ: kb+jwt`, no
+`kid`):
 
-Carrying the commitment in `nonce` mirrors the established Harbour pattern, where
-a `did:ethr` key signs an instruction "as the nonce inside a JWT" (the
-`IdentityController` flow, `docs/did-identity-system.md`). The signing key is a
-verification method of the authorizer's `did:ethr`, so any verifier can confirm
-the signer's authority by **resolving the DID** — no embedded credential is
-needed (§4.4).
+| Claim     | Value                                                                          |
+| --------- | ------------------------------------------------------------------------------ |
+| `iat`     | Issued-at (Unix seconds). Used for historical key resolution (§6).             |
+| `aud`     | The OID4VP verifier's client identifier — the intake endpoint acting for the Signing Service (in Haven: the gatehouse `did:key`). The intake MUST reject an authorization whose `aud` is not its own identifier (§9.6); downstream verifiers treat it as opaque. |
+| `nonce`   | `SHA-256(authorizationMessage)`, lowercase hex — the commitment (§4.3.1).      |
+| `sd_hash` | Binds the KB-JWT to the LegalPersonCredential presented at intake. Opaque to downstream verifiers (the presentation is not carried in the evidence, §4.4); they MUST ignore it. |
+
+There is **no `iss`**: a KB-JWT identifies its signer by key, not by claim. The
+signing key is the admin's wallet key, which is a **verification method of the
+authorizer organization's `did:ethr`** (registered via the `IdentityController`
+— identity wallets co-manage the org DID). Authority is verified by resolving
+`authorizedBy` and checking the KB-JWT signature against that document's
+verification methods (§6) — no embedded credential is needed (§4.4). At
+intake, the OID4VP verifier additionally checks the KB-JWT against the
+presented credential's `cnf` per [SD-JWT]; the DID-document check is the
+durable, third-party-verifiable form of the same authority.
+
+#### 4.3.1 The authorization message
+
+The message is a human-readable string, composed by the requesting service and
+shown verbatim on the wallet's consent screen. It is carried **byte-exact** in
+the evidence (`authorizationMessage`) and hashed **as received** — verifiers
+MUST NOT re-render or normalize it (re-rendering is canonicalization, with all
+its cross-implementation fragility; cf. ADR-003).
+
+Normative grammar — the message MUST contain **exactly one** statement line
+matching:
+
+```text
+I authorize the issuance of <N> credential(s) committed to by Merkle root <root>.
+```
+
+where `<N>` is the decimal batch size and `<root>` is the base64url (unpadded,
+43 characters) batch Merkle root. Verifiers extract the root **only** via this
+template. All other message content (domain, address, ceremony nonce,
+timestamps) is opaque ceremony metadata; the ceremony nonce and timestamp
+riding inside the hashed string make every ceremony's `message_hash` unique,
+so a KB-JWT can never be replayed across batches even for an identical root
+(§9.6).
+
+Carrying the commitment in `nonce` mirrors the established Harbour pattern,
+where a wallet key signs an instruction "as the nonce inside a JWT" (the
+`IdentityController` flow, `docs/did-identity-system.md`).
 
 > **Future direction.** The cleaner long-term binding is the OID4VP
 > `transaction_data` mechanism ([OID4VP] §8.4), carrying the root in a dedicated
-> `transaction_data` object bound via `transaction_data_hashes` and separating a
-> replay nonce from the content commitment. No known deployed wallet currently
-> supports `transaction_data`, so this version uses the `nonce` field and reserves
-> migration for later.
+> `transaction_data` object bound via `transaction_data_hashes` and separating
+> the replay nonce from the content commitment. No known deployed wallet
+> currently supports `transaction_data`, so this version binds through the
+> message hash in `nonce` and reserves migration for later.
 
-### 4.4 Why no embedded credential
+### 4.4 Why no embedded credential (and no embedded `vp_token`)
 
-An earlier design embedded the authorizer's full `dc+sd-jwt` presentation in every
-issued credential. Under the trust model of §2 this is unnecessary, and it is
-dropped:
+An earlier design embedded the authorizer's full `dc+sd-jwt` presentation in
+every issued credential. Even though the authorization is _obtained_ through a
+presentation ceremony (§4.3), the evidence carries only the KB-JWT and the
+message — never the `vp_token`:
 
-- **Verifiability** of the signature comes from resolving the authorizer's
-  `did:ethr` and checking the signing key is one of its verification methods —
-  not from an embedded `cnf` key.
-- **Authority** to authorize is established by the Signing Service's act of
-  issuing plus the on-chain trust graph (Trust Anchor endorses organizations),
-  not by embedded credential claims.
-- **Revocation** is handled by the dual status entries of §7, not by an embedded
+- **Verifiability** of the signature comes from resolving `authorizedBy`'s
+  `did:ethr` and checking the KB-JWT signing key is one of its verification
+  methods — not from the presented credential's `cnf`.
+- **Authority** does not need the presented LegalPersonCredential embedded:
+  under ADR-006 the LPVC is **published** — any verifier resolves the org's
+  DID document, follows its `LinkedCredentialService`, and fetches it (which
+  the verifier already does to reconstruct the trust path).
+- **Privacy** — the presentation's disclosures would replicate org claims into
+  every credential of the batch; the message and KB-JWT disclose nothing
+  beyond the root and the ceremony metadata.
+- **Revocation** is handled by the status entry of §7, not by an embedded
   credential's status.
 
 Dropping the embedded presentation also removes the recursion in which an
-authorizer credential carries its own evidence containing further credentials, and
-removes the `O(batch)` replication of a presentation across every issued
+authorizer credential carries its own evidence containing further credentials,
+and removes the `O(batch)` replication of a presentation across every issued
 credential.
 
 ### 4.5 Issuance flow
@@ -208,11 +254,12 @@ credential.
 1. The Signing Service assembles the batch of fully-formed credential payloads
    (each already carrying its `credentialStatus` entry, §7, validity, claims).
 2. It computes each `leaf_i` (§4.1) and builds the tree (§4.2), yielding the root.
-3. It sends the batch (or the root, if the authorizer reconstructs leaves
-   independently) to the authorizer, who signs one authorization JWT with
-   `nonce` = root (§4.3).
-4. The Signing Service embeds `(authorizer, authorization, merkleProof)` into each
-   credential's evidence (§5) and issues (envelopes / signs) each `dc+sd-jwt`.
+3. It composes the authorization message around the root (§4.3.1) and starts
+   the presentation ceremony; the admin reviews the message in their wallet
+   and responds with the KB-JWT whose `nonce` = `SHA-256(message)` (§4.3).
+4. The Signing Service embeds `(authorizedBy, authorization,
+   authorizationMessage, merkleProof)` into each credential's evidence (§5)
+   and issues (envelopes / signs) each `dc+sd-jwt`.
 
 > **No signature in the commitment.** Everything the authorizer signs is computed
 > from **unsigned** canonical payloads, with no dependency on any envelope
@@ -237,14 +284,21 @@ Each issued credential carries one evidence object of the
 "evidence": [{
   "type": ["harbour:BatchCredentialEvidence"],
 
-  // The authorizer's did:ethr. MUST equal the authorization JWT's `iss`.
+  // The authorizer organization's did:ethr. The KB-JWT signing key MUST be a
+  // verification method of this DID's document (as of the KB-JWT `iat`).
   "authorizedBy": "did:ethr:...",
 
-  // The ONE authorization JWT over the batch root (typ: harbour-batch-auth+jwt,
-  // nonce = base64url Merkle root). Identical across all credentials in the batch.
-  "authorization": "<compact JWS>",
+  // The ONE wallet KB-JWT (typ: kb+jwt, nonce = SHA-256 hex of
+  // authorizationMessage). Identical across all credentials in the batch.
+  "authorization": "<compact KB-JWT>",
 
-  // This credential's inclusion proof against the root signed in `authorization`.
+  // The exact SIWE-style message the admin's wallet displayed and signed,
+  // byte-for-byte (§4.3.1). Contains the batch Merkle root in its statement
+  // line. Identical across all credentials in the batch.
+  "authorizationMessage": "<verbatim message string>",
+
+  // This credential's inclusion proof against the root committed in
+  // `authorizationMessage`.
   "merkleProof": {
     "type": "harbour:MerkleProof",
     "path": [
@@ -255,10 +309,14 @@ Each issued credential carries one evidence object of the
 }]
 ```
 
-- `authorizedBy` — the authorizing party's `did:ethr`, surfaced so the evidence is
-  self-describing without decoding the JWT. MUST equal the JWT's `iss`.
-- `authorization` — the single ES256 JWS (§4.3), byte-identical in every
+- `authorizedBy` — the authorizing organization's `did:ethr`. The KB-JWT has
+  no `iss`; this field names whose DID document the signing key must appear in
+  (§6, step 5).
+- `authorization` — the single wallet KB-JWT (§4.3), byte-identical in every
   credential of the batch.
+- `authorizationMessage` — the exact signed message (§4.3.1), byte-identical
+  in every credential of the batch. Required to recompute the KB-JWT `nonce`
+  and to extract the batch root; hashed as received, never re-rendered.
 - `merkleProof.path` — the ordered sibling digests from the leaf up to the root.
   `position` states whether the sibling is the **left** or **right** input to
   `node(L, R)` at that level. A level at which the leaf's ancestor was promoted
@@ -270,9 +328,12 @@ Each issued credential carries one evidence object of the
   object MUST carry a type). Verifiers MUST ignore unknown members and MUST
   NOT require the `type` members for the cryptographic fold (§6).
 
-The Merkle root itself is **not** repeated in the evidence object — it is the
-signed `nonce` inside `authorization`, and the verifier reads it from there
-(§6, step 5).
+The Merkle root itself is **not** repeated as a standalone member — it lives in
+the statement line of `authorizationMessage`, whose hash is the signed KB-JWT
+`nonce`; the verifier extracts it from there (§6, step 4). The credential
+payloads are **not** repeated anywhere: the message commits to them only
+through the root, and the verifier re-derives each payload's leaf from the
+credential it already holds.
 
 ---
 
@@ -290,26 +351,31 @@ A verifier holding **one** issued credential MUST:
    the credential is presented with claims redacted.
 3. **Fold the proof** — combine `leaf_i` with each entry of `merkleProof.path`
    using `node(L, R)` and the stated `position` at each level → `computed_root`.
-4. **Verify the authorization** — resolve the `authorizedBy` `did:ethr` **as of the
-   authorization JWT's `iat`** (historical resolution — see below), find the
-   verification method named by the JWT `kid`, and verify the ES256 signature.
-   Check `iss` = `authorizedBy`; a verifier that knows the executor's
-   identity SHOULD also check `aud` = the Signing Service's DID (the
-   executor itself MUST, before acting on the authorization).
-5. **Compare** — base64url-decode the JWT `nonce` and require it to equal
-   `computed_root`. This proves, from this credential alone, that its payload was
-   covered by the authorizer's single signature.
+4. **Check the message commitment** — require
+   `SHA-256(authorizationMessage)` (lowercase hex, over the string **as
+   received**) to equal the KB-JWT `nonce`; extract the batch root from the
+   message's single statement line (§4.3.1) and require it to equal
+   `computed_root`. This proves, from this credential alone, that its payload
+   was covered by the message the admin signed.
+5. **Verify the signature and authority** — resolve the `authorizedBy`
+   `did:ethr` **as of the KB-JWT's `iat`** (historical resolution — see
+   below) and verify the KB-JWT signature against a verification method of
+   that document (the KB-JWT carries no `kid`; implementations try the
+   document's P-256 methods). `aud` and `sd_hash` were checked at intake by
+   the OID4VP verifier (§4.3) and are opaque here — verifiers MUST NOT reject
+   a KB-JWT for carrying them.
 6. **Check status** — evaluate the `harbour:CRSetEntry` under §7: the
    credential is valid only if the entry resolves and does not report it
    revoked. The entry being unresolvable (the issuer's CRSet service deleted)
    fail-closes to revoked.
 
-**Historical vs current resolution.** Step 4 resolves the authorizer DID _as of
+**Historical vs current resolution.** Step 5 resolves the authorizer DID _as of
 `iat`_ (via `did:ethr` `versionTime`), so the authorization is an immutable
-historical fact — "the organization authorized this at time T" — that later key
-rotation cannot break. Step 6's status checks, by contrast, use the **current** DID
-state and current cascade — "the organization still stands behind it now." Keep the
-two separate: signing authority is historical; revocation is current.
+historical fact — "an admin key authorized on the organization's DID signed
+this at time T" — that later key rotation cannot break. Step 6's status
+checks, by contrast, use the **current** DID state and current cascade — "the
+organization still stands behind it now." Keep the two separate: signing
+authority is historical; revocation is current.
 
 ---
 
@@ -423,8 +489,9 @@ typed scalars — **never `range: Any`** — so the generated SHACL shapes stay
 closed.
 
 - **`harbour:BatchCredentialEvidence`** (subtype of `harbour:Evidence`) —
-  `authorizedBy` (a DID, `range: uri`), `authorization` (the compact JWS string),
-  and `merkleProof`.
+  `authorizedBy` (a DID, `range: uri`), `authorization` (the compact KB-JWT
+  string), `authorizationMessage` (the verbatim signed message string), and
+  `merkleProof`.
 - **`harbour:MerkleProof`** — `path` (ordered list of
   `harbour:MerklePathElement`).
 - **`harbour:MerklePathElement`** — `hash` (base64url SHA-256 string) and
@@ -485,10 +552,13 @@ The rule is therefore normative for all CRSet entries, not a special case.
 
 ### 9.6 Nonce as commitment
 
-The authorization JWT's `nonce` carries the Merkle root rather than a random
-replay nonce. Replay resistance rests on `aud` (binding to the Signing Service),
-`iat`, and the content-uniqueness of the root. This is the same property as the
-existing `IdentityController` instruction-binding pattern.
+The KB-JWT `nonce` carries `SHA-256(authorizationMessage)` rather than a
+random replay nonce; the message in turn commits to the Merkle root (§4.3.1).
+Replay resistance rests on three layers: `aud` (binding to the intake
+verifier, checked at intake), `iat` freshness (checked at intake), and the
+ceremony nonce + timestamp **inside the hashed message**, which make each
+ceremony's `nonce` unique even for an identical root. This is the same
+property as the existing `IdentityController` instruction-binding pattern.
 
 ---
 
@@ -501,7 +571,7 @@ implementation in `harbour.merkle`). They cover:
 
 - **N = 4 batch** — four credential payloads, their four leaves, the two
   level-1 internal nodes and the root, and the four inclusion proofs. The root
-  (which is the authorization JWT `nonce`) is
+  (which the authorization message commits to, §4.3.1) is
   `Uz_rIhlrkBdIgpN1mzZe_NlIU6fBJl7gHGLbN31wvKw`.
 - **N = 1 degenerate batch** — root equals the lone leaf
   (`cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No`), `merkleProof.path` is empty.
@@ -513,8 +583,9 @@ implementation in `harbour.merkle`). They cover:
   root all fail to verify. (A duplicated-node forgery is structurally impossible:
   lone nodes are promoted, not duplicated, §9.2.)
 
-Still to be added when the pipeline lands: an authorization-JWT vector (a real
-ES256 JWS whose `nonce` is the N = 4 root, verified against a fixture key) and
+Still to be added when the pipeline lands: an authorization vector (a real
+KB-JWT + message pair whose statement commits to the N = 4 root, verified
+against a fixture key) and
 status-resolution vectors (CRSet revoked; org CRSet service removed → fail-closed;
 inconclusive ≠ valid, §7.3).
 
@@ -542,5 +613,6 @@ inconclusive ≠ valid, §7.3).
 
 | Version     | Date       | Changes                                                                                       |
 | ----------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1.2.0-draft | 2026-07-07 | Wallet-realistic authorization: the plain-JWS authorization profile (custom `typ`) is dropped — wallets sign only via OID4VP, so the authorization is the presentation ceremony's **KB-JWT** (`typ: kb+jwt`, no `iss`, no `kid`) over a SIWE-style **authorization message** whose statement carries the batch root (normative grammar, §4.3.1); new `authorizationMessage` evidence member; downstream authority check = KB-JWT key is a verification method of `authorizedBy`'s DID document as of `iat`; `aud` = the OID4VP intake verifier (checked at intake, opaque downstream). |
 | 1.1.0-draft | 2026-07-06 | Sovereign-issuer trust model (ADR-006): issuer = vouching party's `did:ethr`, Signing Service signs under an assertion-only mandate key in the issuer's DID document; evidence signed by a human admin key on the org DID; single issuer-operated `CRSetEntry` replaces the dual-entry model; evidence field `authorizer` renamed to `authorizedBy`; authorization JWT `aud` = the executing Signing Service. |
 | 1.0.0-draft | 2026-06-22 | Initial draft: Merkle-batched `BatchCredentialEvidence` for `dc+sd-jwt`; Model B trust model; DID-resolved authorization JWT; dual-entry revocation (CRSet + org-wide did:ethr kill switch). |

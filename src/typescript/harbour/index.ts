@@ -51,6 +51,9 @@ export {
 export {
   AUTHORIZATION_JWT_TYP,
   EVIDENCE_TYPE,
+  STATEMENT_TEMPLATE,
+  composeAuthorizationMessage,
+  extractRootFromMessage,
   signAuthorization,
   verifyAuthorization,
   buildBatchEvidence,

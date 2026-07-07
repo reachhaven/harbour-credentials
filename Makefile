@@ -457,7 +457,7 @@ _lint_default: _lint_stale_refs
 # first run); grep is cheap insurance. Scoped to docs/examples/schema — code
 # may deliberately carry historical aliases (DELEGATED_EVIDENCE_TYPES).
 # Excludes vendored spec copies, generated API docs, and gitignored outputs.
-STALE_IRIS := harbour:CredentialEvidence harbour:DelegatedSignatureEvidence
+STALE_IRIS := harbour:CredentialEvidence harbour:DelegatedSignatureEvidence harbour:authorizer harbour-batch-auth+jwt
 _lint_stale_refs:
 	@echo "Checking for stale evidence-class references..."
 	@found=0; \

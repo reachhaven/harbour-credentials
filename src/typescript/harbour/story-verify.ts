@@ -112,12 +112,15 @@ async function loadDidVmKeys(): Promise<Map<string, CryptoKey>> {
   return keys;
 }
 
-/** The Signing Service DID — the expected authorization-JWT audience (§4.3). */
-function loadSigningServiceDid(): string | null {
+/**
+ * The OID4VP intake verifier's client id — the expected KB-JWT audience
+ * (§4.3). The Signing Service role's did:key stands in for the gatehouse.
+ */
+function loadIntakeClientId(): string | null {
   const mapping = JSON.parse(
     readFileSync(join(KEYS_DIR, "role-did-mapping.json"), "utf-8"),
-  ) as Record<string, { did_ethr?: string }>;
-  return mapping.haven?.did_ethr ?? null;
+  ) as Record<string, { did_key?: string }>;
+  return mapping.haven?.did_key ?? null;
 }
 
 const MEMBER_OF_KEYS = ["harbour.gx:memberOf", "memberOf"];
@@ -160,7 +163,7 @@ async function main(): Promise<void> {
   const didToPub = await loadDidToPub();
   const fallbackPub = await loadFallbackPub();
   const vmKeys = await loadDidVmKeys();
-  const ssDid = loadSigningServiceDid();
+  const intakeId = loadIntakeClientId();
 
   let credentials = 0;
   let batch = 0;
@@ -223,10 +226,11 @@ async function main(): Promise<void> {
         continue;
       }
       try {
-        // The authorization JWT is addressed to the executor (the Signing
-        // Service), not the issuer — spec §4.3 / §9.6.
+        // The authorization KB-JWT is addressed to the OID4VP intake verifier
+        // (gatehouse did:key) — spec §4.3 / §9.6. authorizerPub is the admin
+        // wallet key from the authorizedBy DID document.
         await verifyBatchEvidence(raw, evidence, authorizerPub, {
-          expectedAudience: ssDid ?? undefined,
+          expectedAudience: intakeId ?? undefined,
         });
       } catch (e) {
         errors.push(`${file}: batch evidence: ${e instanceof Error ? e.message : e}`);

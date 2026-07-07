@@ -87,14 +87,16 @@ const ROLE_FILES: Record<string, string> = {
 interface RoleKeyring {
   byDID: Map<string, RoleKeyEntry>;
   roleDids: Map<string, string>;
+  roleDidKeys: Map<string, string>;
 }
 
 async function loadRoleKeyring(): Promise<RoleKeyring> {
   const mapping = JSON.parse(
     readFileSync(join(KEYS_DIR, "role-did-mapping.json"), "utf-8"),
-  ) as Record<string, { did_ethr: string }>;
+  ) as Record<string, { did_ethr: string; did_key?: string }>;
   const byDID = new Map<string, RoleKeyEntry>();
   const roleDids = new Map<string, string>();
+  const roleDidKeys = new Map<string, string>();
   for (const [role, filename] of Object.entries(ROLE_FILES)) {
     const jwk: JWK = JSON.parse(readFileSync(join(KEYS_DIR, filename), "utf-8"));
     const did = mapping[role]?.did_ethr;
@@ -104,8 +106,10 @@ async function loadRoleKeyring(): Promise<RoleKeyring> {
       kid: `${did}#controller`,
     });
     roleDids.set(role, did);
+    const didKey = mapping[role]?.did_key;
+    if (didKey) roleDidKeys.set(role, didKey);
   }
-  return { byDID, roleDids };
+  return { byDID, roleDids, roleDidKeys };
 }
 
 async function loadFallbackKey(): Promise<RoleKeyEntry> {
@@ -244,15 +248,16 @@ async function processBatch(
   keyring: RoleKeyring,
   fallback: RoleKeyEntry,
 ): Promise<void> {
-  const authorizerKey = resolveKey(authorizer, keyring.byDID, fallback);
+  // The admin wallet key stands in via the org's controller key (ADR-006 §3).
+  const walletKey = resolveKey(authorizer, keyring.byDID, fallback);
   // All credentials in a batch share an issuer (usually the authorizer org
   // itself, ADR-006); proofs are executed by the Signing Service via the
-  // issuer's mandate key. The authorization JWT is addressed (`aud`) to the
-  // Signing Service — the executor acting on it — so an authorization cannot
-  // be replayed to a different executor (spec §4.3, §9.6).
+  // issuer's mandate key. The authorization KB-JWT is addressed (`aud`) to
+  // the OID4VP intake verifier — the gatehouse acting for the Signing
+  // Service, identified by its did:key (spec §4.3, §9.6).
   const issuerDid = (batch[0].vc.issuer as string) ?? "";
   const proof = proofKey(issuerDid, keyring, fallback);
-  const audience = keyring.roleDids.get("haven") ?? issuerDid;
+  const audience = keyring.roleDidKeys.get("haven") ?? fallback.kid;
 
   // 1. Fix salts.
   const payloads: Record<string, unknown>[] = [];
@@ -266,11 +271,12 @@ async function processBatch(
     disclosures.push(built.disclosures);
   }
 
-  // 2. One signature over the batch Merkle root; per-credential proof.
-  const evidenceObjs = await buildBatchEvidence(payloads, authorizerKey.privateKey, {
-    authorizerDid: authorizer,
+  // 2. One wallet signature over the authorization message committing to the
+  //    batch Merkle root; per-credential proof.
+  const evidenceObjs = await buildBatchEvidence(payloads, walletKey.privateKey, {
+    authorizedBy: authorizer,
     audience,
-    kid: authorizerKey.kid,
+    domain: "harbour.local",
   });
 
   // 3. Inject the full evidence and sign each issuer JWT.

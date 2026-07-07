@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from credentials.example_signer import (
+    _intake_client_id,
     batch_authorizer,
     disclosable_paths,
     load_role_keyring,
@@ -155,11 +156,12 @@ def test_process_batch_one_signature_and_proofs(
         # Proof executed by the Signing Service via the issuer's mandate key.
         assert _issuer_header(sd)["kid"] == f"{vc['issuer']}#delegate-1"
         verify_sd_jwt_vc(sd, ss_pub)
+        # The KB-JWT is addressed to the OID4VP intake verifier (spec §4.3).
         verify_batch_evidence(
             raw,
             raw["evidence"][0],
             authorizer_pub,
-            expected_audience=keyring.role_dids["haven"],
+            expected_audience=_intake_client_id(keyring, fallback),
         )
 
     # One signature shared across the whole batch.

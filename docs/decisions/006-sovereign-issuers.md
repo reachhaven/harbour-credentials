@@ -73,12 +73,15 @@ verification method **inside the issuer's own `did:ethr` document**:
 
 ### 3. Evidence is a human authorization
 
-The `harbour:BatchCredentialEvidence` authorization JWT is signed by a
-**human admin's key that is authorized on the issuing organization's
+The `harbour:BatchCredentialEvidence` authorization is a **KB-JWT signed by
+a human admin's wallet key that is authorized on the issuing organization's
 `did:ethr`** (the IdentityController maps 1..n admin wallet keys to the org
-DID). The evidence `authorizedBy` value is the organization's DID; the JWT `kid`
-names the admin's verification method within it. In the repository examples
-the org's `#controller` key stands in for "an org admin's wallet key".
+DID; wallets sign only via OID4VP presentations — see the batched-evidence
+spec §4.3). The evidence `authorizedBy` value is the organization's DID; the
+KB-JWT carries no `iss` or `kid`, so verifiers establish authority by
+checking its signature against a verification method of that DID document
+(as of the KB-JWT `iat`). In the repository examples the org's `#controller`
+key stands in for "an org admin's wallet key".
 
 Authorizer and issuer therefore usually coincide at the DID level (the org
 authorizes and issues; a human admin signs the evidence, the Signing

@@ -23,7 +23,8 @@ Wire form (from the signed `legal-person-credential.decoded.json` story output):
 {
   "type": ["harbour:BatchCredentialEvidence"],
   "authorizedBy": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
-  "authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImhhcmJvdXIt...",
+  "authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImtiK2p3dCJ9...",
+  "authorizationMessage": "harbour.local wants you to sign this authorization with your wallet:\ndid:ethr:0x14a34:0x4d62...4774\n\nI authorize the issuance of 3 credential(s) committed to by Merkle root ANLV...51s.\n\nVersion: 1\nNonce: 1f60...\nIssued At: 2026-07-07T09:00:00+00:00",
   "merkleProof": {
     "path": [
       { "hash": "ANLV12CRfKcCFPzo_lkAC1DDzHy9Le22opPgTp6x51s", "position": "left" },
@@ -35,11 +36,12 @@ Wire form (from the signed `legal-person-credential.decoded.json` story output):
 
 | Slot | Meaning |
 |------|---------|
-| `authorizedBy` | The issuing organization's `did:ethr`; the authorization JWT is signed by an admin key listed in that DID document. Required — the only slot present on the human-readable source examples. |
-| `authorization` | Compact ES256 JWS signed by the admin; its `nonce` is the base64url batch Merkle root, its `aud` the **Signing Service** (the executor being authorized). Generated at batch-signing time. |
-| `merkleProof` | Ordered sibling digests (`hash` + `position`) folding this credential's leaf to the signed root. A batch of size 1 has an empty `path`. |
+| `authorizedBy` | The issuing organization's `did:ethr`; the KB-JWT is signed by an admin **wallet key** listed in that DID document. Required — the only slot present on the human-readable source examples. |
+| `authorization` | The wallet **KB-JWT** (`typ: kb+jwt`, no `iss`/`kid`) from the OID4VP signing ceremony; its `nonce` is `SHA-256(authorizationMessage)` (hex), its `aud` the intake verifier (gatehouse `did:key`), its `sd_hash` opaque downstream. Generated at batch-signing time. |
+| `authorizationMessage` | The exact SIWE-style message shown on the wallet's consent screen, byte-for-byte; its single statement line commits to the batch Merkle root (spec §4.3.1). Hashed as received — never re-rendered. Generated at batch-signing time. |
+| `merkleProof` | Ordered sibling digests (`hash` + `position`) folding this credential's leaf to the committed root. A batch of size 1 has an empty `path`. |
 
-**What it proves**: a human admin of the authorizer organization approved exactly this credential's payload — its leaf folds to the root the admin signed. Authorizer and issuer usually coincide at the DID level (the Trust Anchor authorizes and issues LegalPersonCredentials; an organization authorizes and issues its members' NaturalPersonCredentials).
+**What it proves**: a human admin of the authorizer organization approved exactly this credential's payload — its leaf folds to the root inside the message the admin signed on their wallet. Authorizer and issuer usually coincide at the DID level (the Trust Anchor authorizes and issues LegalPersonCredentials; an organization authorizes and issues its members' NaturalPersonCredentials).
 
 **Who authorizes what** (ADR-006):
 
@@ -104,7 +106,7 @@ A verifier holding **one** credential checks it in isolation (spec [§6](../spec
 1. **Verify the proof** against the verification method the `kid` names in the **issuer's** DID document (the Signing Service's assertion-only `#delegate-1` mandate key).
 2. **Recompute the leaf** from the raw issuer payload with `evidence` removed (RFC 8785 canonicalization, `0x00` domain prefix, SHA-256). The leaf is over the salted `_sd` digests, so it is invariant under selective disclosure.
 3. **Fold the `merkleProof`** to a root and compare it with the `nonce` inside the `authorization` JWT.
-4. **Verify the `authorization` JWS** against the admin key the JWT `kid` names in the authorizer's DID document; check `iss` = `authorizedBy` (the executor additionally checks `aud` = its own DID before acting).
+4. **Check the message commitment and signature** — `SHA-256(authorizationMessage)` (hex, over the string as received) must equal the KB-JWT `nonce`; the root extracted from the message's statement line must equal the folded root; the KB-JWT signature must verify against an admin wallet key from the `authorizedBy` DID document (resolved as of the KB-JWT `iat` — no `iss`/`kid` on a KB-JWT). `aud`/`sd_hash` were checked at intake and are opaque here.
 
 ```python
 from harbour.sd_jwt import verify_sd_jwt_vc
@@ -114,8 +116,7 @@ claims = verify_sd_jwt_vc(sd_jwt, proof_public_key)      # step 1
 verify_batch_evidence(                                    # steps 2-4
     raw_payload,                # issuer payload with _sd digests
     raw_payload["evidence"][0],
-    authorizer_public_key,
-    expected_audience=signing_service_did,
+    admin_wallet_public_key,    # a VM of the authorizedBy DID document
 )
 ```
 
@@ -123,9 +124,8 @@ verify_batch_evidence(                                    # steps 2-4
 import { verifySdJwtVc, verifyBatchEvidence } from "@reachhaven/harbour-credentials";
 
 const claims = await verifySdJwtVc(sdJwt, proofPublicKey);
-await verifyBatchEvidence(rawPayload, rawPayload.evidence[0], authorizerPublicKey, {
-  expectedAudience: signingServiceDid,
-});
+// adminWalletPublicKey: a VM of the authorizedBy DID document
+await verifyBatchEvidence(rawPayload, rawPayload.evidence[0], adminWalletPublicKey);
 ```
 
 ## Adding Evidence to Credentials
@@ -139,9 +139,11 @@ from harbour.batch_evidence import build_batch_evidence
 # 1. Fix salts for every credential in the batch first.
 payload, disclosures = build_sd_jwt_payload(credential, vct=vct)
 
-# 2. One admin signature over the batch Merkle root; per-credential proofs.
+# 2. One wallet signature over the authorization message (commits to the
+#    batch Merkle root); per-credential proofs. In production the KB-JWT
+#    comes from the admin wallet via the gatehouse OID4VP ceremony.
 evidence = build_batch_evidence(
-    [payload], admin_key, authorizer_did=org_did, audience=signing_service_did
+    [payload], admin_wallet_key, authorized_by=org_did, audience=gatehouse_did_key
 )
 
 # 3. Inject the evidence, then sign the proof with the issuer's mandate key.
