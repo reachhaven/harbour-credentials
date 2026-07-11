@@ -104,10 +104,30 @@ def test_disclosable_paths():
         }
     }
     paths = disclosable_paths(vc)
-    assert "credentialSubject.givenName" in paths
-    assert "credentialSubject.email" in paths
-    assert "credentialSubject.id" not in paths
-    assert "credentialSubject.type" not in paths
+    # Segment lists (not dot-strings) — claim keys may contain dots.
+    assert ["credentialSubject", "givenName"] in paths
+    assert ["credentialSubject", "email"] in paths
+    assert ["credentialSubject", "id"] not in paths
+    assert ["credentialSubject", "type"] not in paths
+
+
+def test_disclosable_paths_dotted_keys_produce_disclosures():
+    """Keys containing dots (harbour.gx:*) must yield working disclosures."""
+    from harbour.sd_jwt import _apply_structured_disclosures
+
+    vc = {
+        "credentialSubject": {
+            "id": "did:x",
+            "harbour.gx:labelLevel": "BL",
+            "harbour.gx:validatedCriteria": ["a"],
+        }
+    }
+    paths = disclosable_paths(vc)
+    assert len(paths) == 2
+    payload, disclosures = _apply_structured_disclosures(vc, paths)
+    assert len(disclosures) == 2
+    assert len(payload["credentialSubject"]["_sd"]) == 2
+    assert "harbour.gx:labelLevel" not in payload["credentialSubject"]
 
 
 def test_batch_authorizer():

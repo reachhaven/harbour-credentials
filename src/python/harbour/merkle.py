@@ -7,8 +7,9 @@ Implements the commitment construction specified in
 - **node**  ``SHA-256( 0x01 ‖ left ‖ right )``
 - a **lone (odd) node is promoted** unchanged to the next level — it is *never*
   duplicated (forbidding last-node duplication closes CVE-2012-2459);
-- the **root** is encoded base64url without padding and carried in the batch
-  authorization JWT ``nonce`` claim.
+- the **root** is encoded base64url without padding and carried in the
+  statement line of the authorization message, whose SHA-256 hex is the
+  KB-JWT ``nonce`` (spec §4.3.1).
 
 The ``0x00`` / ``0x01`` domain-separation prefixes are taken from RFC 6962 §2.1
 (they prevent an internal node from being presented as a leaf). The tree *shape*
@@ -121,7 +122,8 @@ def merkle_root(leaves: list[bytes]) -> bytes:
 
 
 def merkle_root_b64url(leaves: list[bytes]) -> str:
-    """Return the Merkle root base64url-encoded (the JWT ``nonce`` value)."""
+    """Return the Merkle root base64url-encoded (as committed in the
+    authorization message's statement line, spec §4.3.1)."""
     return b64url_encode(merkle_root(leaves))
 
 

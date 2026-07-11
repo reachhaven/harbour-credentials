@@ -142,8 +142,8 @@ def sign_authorization(
     wallet_key: PrivateKey,
     *,
     audience: str,
+    sd_hash: str,
     iat: int | None = None,
-    sd_hash: str | None = None,
     alg: str | None = None,
 ) -> str:
     """Sign the batch authorization KB-JWT over *message* (§4.3).
@@ -159,10 +159,11 @@ def sign_authorization(
             the authorizer organization's ``did:ethr``).
         audience: The OID4VP intake verifier's client identifier (the JWT
             ``aud``; in Haven, the gatehouse ``did:key``).
+        sd_hash: The ``sd_hash`` binding the KB-JWT to the presented
+            credential — REQUIRED in every KB-JWT ([SD-JWT] RFC 9901 §4.3);
+            wallet-produced tokens always carry it, downstream verifiers
+            ignore its value (§6).
         iat: Issued-at (Unix seconds); defaults to now.
-        sd_hash: Optional ``sd_hash`` binding the KB-JWT to the presented
-            credential; wallet-produced tokens carry it, downstream verifiers
-            ignore it (§6).
         alg: Algorithm override (default resolved from the key, e.g. ES256).
 
     Returns:
@@ -174,9 +175,8 @@ def sign_authorization(
         "iat": int(time.time()) if iat is None else int(iat),
         "aud": audience,
         "nonce": _message_hash(message),
+        "sd_hash": sd_hash,
     }
-    if sd_hash is not None:
-        payload["sd_hash"] = sd_hash
     payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     key = _import_private_key(wallet_key, alg)
     return jws.serialize_compact(header, payload_bytes, key, algorithms=[alg])
@@ -223,7 +223,8 @@ def verify_authorization(
         )
     payload = json.loads(result.payload)
 
-    if not isinstance(payload.get("iat"), int):
+    iat = payload.get("iat")
+    if isinstance(iat, bool) or not isinstance(iat, int):
         raise VerificationError("Authorization KB-JWT missing integer iat")
     if expected_audience is not None and payload.get("aud") != expected_audience:
         raise VerificationError(
@@ -244,11 +245,11 @@ def build_batch_evidence(
     *,
     authorized_by: str,
     audience: str,
+    sd_hash: str,
     domain: str = "harbour.local",
     ceremony_nonce: str | None = None,
     issued_at: str | None = None,
     iat: int | None = None,
-    sd_hash: str | None = None,
     alg: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build the ``harbour:BatchCredentialEvidence`` object for each credential.
@@ -267,7 +268,9 @@ def build_batch_evidence(
             the authorizer organization's ``did:ethr``).
         authorized_by: The authorizer organization's ``did:ethr`` (the
             evidence ``authorizedBy``; also used as the message address line).
-        audience / iat / sd_hash / alg: see :func:`sign_authorization`.
+            For the identity credentials it MUST equal each payload's
+            ``issuer`` (spec §6, step 6 — verifiers enforce the equality).
+        audience / sd_hash / iat / alg: see :func:`sign_authorization`.
         domain / ceremony_nonce / issued_at: message ceremony metadata,
             see :func:`compose_authorization_message`.
 
@@ -291,8 +294,8 @@ def build_batch_evidence(
         message,
         wallet_key,
         audience=audience,
-        iat=iat,
         sd_hash=sd_hash,
+        iat=iat,
         alg=alg,
     )
     evidence: list[dict[str, Any]] = []

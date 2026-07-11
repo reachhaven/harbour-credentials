@@ -11,10 +11,14 @@ Issuance model (see ``docs/specs/batched-credential-evidence.md`` and ADR-006):
     Signing Service / Haven, Company, Employee), loaded from
     ``tests/fixtures/keys/``.
   * Issuers are sovereign: a credential's ``issuer`` is the vouching party's
-    own did:ethr. Every **proof** is executed by the Signing Service key —
-    signing as itself (``#controller``) only on its own artifacts, and via the
-    assertion-only ``#delegate-1`` mandate in the issuer's DID document for
-    all sovereign issuers. The proof ``kid`` names that verification method.
+    own did:ethr. Every **proof** is executed by the Signing Service key,
+    with the proof ``kid`` **resolved at signing time** from the issuer's DID
+    document (``examples/did-ethr/``): the assertion method whose
+    ``publicKeyJwk`` matches the Signing Service key. did:ethr fragment ids
+    are generated per update event and change on rotation, so they are never
+    hardcoded (ADR-006; in the current example documents this resolves to
+    ``#controller`` on the Signing Service's own artifacts and the
+    ``#delegate-1`` mandate for sovereign issuers).
   * Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
     **batch per (output dir, authorizer)**. The authorizer's admin wallet key
     signs **one** KB-JWT over an authorization message committing to the
@@ -53,7 +57,7 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePublicNumbers,
 )
 
-from harbour.batch_evidence import build_batch_evidence
+from harbour.batch_evidence import EVIDENCE_TYPE, build_batch_evidence
 from harbour.keys import PrivateKey, p256_public_key_to_did_key
 from harbour.sd_jwt import build_sd_jwt_payload, sign_sd_jwt
 
@@ -80,9 +84,21 @@ def _b64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+# Placeholder KB-JWT `sd_hash` for the simulated wallet ceremony (spec §4.3):
+# every real KB-JWT carries an sd_hash (RFC 9901 §4.3), but the story pipeline
+# has no actual OID4VP presentation to hash, so it uses this fixed value —
+# SHA-256 of "harbour-credentials example ceremony: no real OID4VP
+# presentation". Downstream verifiers ignore the value by spec.
+EXAMPLE_SD_HASH = "s0c-KDj7V3cRdVS9sTSAoiOLY-kvvmMdIk1wO0yt974"
+
+
 def _load_jwk_private_key(jwk_path: Path) -> EllipticCurvePrivateKey:
     """Load a P-256 private key from a JWK file."""
-    jwk = json.loads(jwk_path.read_text())
+    jwk = json.loads(jwk_path.read_text(encoding="utf-8"))
     x = int.from_bytes(_b64url_decode(jwk["x"]), "big")
     y = int.from_bytes(_b64url_decode(jwk["y"]), "big")
     d = int.from_bytes(_b64url_decode(jwk["d"]), "big")
@@ -184,16 +200,19 @@ def vct_for_credential(vc: dict) -> str:
     return _DEFAULT_VCT
 
 
-def disclosable_paths(vc: dict) -> list[str]:
-    """Selectively-disclosable paths: every credentialSubject claim but id/type."""
+def disclosable_paths(vc: dict) -> list[list[str]]:
+    """Selectively-disclosable paths: every credentialSubject claim but id/type.
+
+    Segment lists, not dot-strings — claim keys contain dots (``harbour.gx:*``).
+    """
     cs = vc.get("credentialSubject")
     if not isinstance(cs, dict):
         return []
-    return [f"credentialSubject.{k}" for k in cs if k not in ("id", "type")]
+    return [["credentialSubject", k] for k in cs if k not in ("id", "type")]
 
 
-def batch_authorizer(vc: dict) -> str | None:
-    """Return the authorizer DID iff this credential carries batch evidence."""
+def batch_evidence_entry(vc: dict) -> dict | None:
+    """Return the ``harbour:BatchCredentialEvidence`` object, if any."""
     evidence = vc.get("evidence")
     if not isinstance(evidence, list) or not evidence:
         return None
@@ -203,10 +222,18 @@ def batch_authorizer(vc: dict) -> str | None:
     types = ev.get("type") or []
     if isinstance(types, str):
         types = [types]
-    if any(isinstance(t, str) and t.endswith("BatchCredentialEvidence") for t in types):
-        authorizer = ev.get("authorizedBy")
-        return authorizer if isinstance(authorizer, str) else None
+    if any(t == EVIDENCE_TYPE for t in types if isinstance(t, str)):
+        return ev
     return None
+
+
+def batch_authorizer(vc: dict) -> str | None:
+    """Return the authorizer DID iff this credential carries batch evidence."""
+    ev = batch_evidence_entry(vc)
+    if ev is None:
+        return None
+    authorizer = ev.get("authorizedBy")
+    return authorizer if isinstance(authorizer, str) else None
 
 
 def _decode_sd_jwt(sd_jwt: str) -> dict:
@@ -225,13 +252,13 @@ def _decode_sd_jwt(sd_jwt: str) -> dict:
 def _write_outputs(output_dir: Path, stem: str, sd_jwt: str) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     sd_jwt_path = output_dir / f"{stem}.sd-jwt"
-    sd_jwt_path.write_text(sd_jwt + "\n")
+    sd_jwt_path.write_text(sd_jwt + "\n", encoding="utf-8")
     decoded = {
         "_description": f"Decoded dc+sd-jwt for {stem}",
         **_decode_sd_jwt(sd_jwt),
     }
     (output_dir / f"{stem}.decoded.json").write_text(
-        json.dumps(decoded, indent=2, ensure_ascii=False) + "\n"
+        json.dumps(decoded, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     return sd_jwt_path
 
@@ -266,24 +293,83 @@ def _intake_client_id(
     return fallback[1]
 
 
+def _load_assertion_methods(
+    repo_root: Path | None = None,
+) -> dict[str, list[tuple[str, tuple[str, str]]]]:
+    """Map each example DID to its P-256 assertion methods.
+
+    Reads ``examples/did-ethr/*.did.json`` (standing in for live did:ethr
+    resolution) and returns ``did -> [(vm_id, (jwk_x, jwk_y)), ...]`` for
+    every verification method listed in the document's ``assertionMethod``.
+    """
+    if repo_root is None:
+        repo_root = _find_repo_root()
+    out: dict[str, list[tuple[str, tuple[str, str]]]] = {}
+    for path in sorted((repo_root / "examples" / "did-ethr").glob("*.did.json")):
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        did = doc.get("id")
+        if not isinstance(did, str):
+            continue
+        assertion = set(doc.get("assertionMethod") or [])
+        methods: list[tuple[str, tuple[str, str]]] = []
+        for vm in doc.get("verificationMethod", []):
+            vm_id = vm.get("id")
+            jwk = vm.get("publicKeyJwk")
+            if (
+                vm_id in assertion
+                and isinstance(jwk, dict)
+                and jwk.get("crv") == "P-256"
+                and isinstance(jwk.get("x"), str)
+                and isinstance(jwk.get("y"), str)
+            ):
+                methods.append((vm_id, (jwk["x"], jwk["y"])))
+        out[did] = methods
+    return out
+
+
+def _public_jwk_xy(public_key) -> tuple[str, str]:
+    """The (x, y) base64url coordinates of a P-256 public key."""
+    numbers = public_key.public_numbers()
+    return (
+        _b64url_encode(numbers.x.to_bytes(32, "big")),
+        _b64url_encode(numbers.y.to_bytes(32, "big")),
+    )
+
+
 def _proof_key(
     issuer_did: str,
     keyring: RoleKeyring | None,
     fallback: tuple[PrivateKey, str],
+    assertion_methods: dict[str, list[tuple[str, tuple[str, str]]]] | None = None,
 ) -> tuple[PrivateKey, str]:
     """Signing Service key + ``kid`` for a credential proof (ADR-006).
 
-    The Signing Service executes every proof: as itself (``#controller``) on
-    its own artifacts, and through the assertion-only ``#delegate-1`` mandate
-    in the issuer's DID document for sovereign issuers.
+    The Signing Service executes every proof; the ``kid`` is **resolved at
+    signing time** from the issuer's DID document — the assertion method
+    whose ``publicKeyJwk`` matches the Signing Service key. did:ethr
+    fragments are per-update-event and can never be hardcoded.
+
+    Raises:
+        ValueError: in keyring mode, when the issuer's DID document publishes
+            no assertion method for the Signing Service key (missing mandate —
+            the resulting proof could never verify).
     """
     if keyring:
         ss_did = keyring.role_dids.get("haven")
         resolved = keyring.resolve(ss_did) if ss_did else None
         if resolved:
             ss_key, _ = resolved
-            fragment = "#controller" if issuer_did == ss_did else "#delegate-1"
-            return ss_key, f"{issuer_did}{fragment}"
+            ss_xy = _public_jwk_xy(ss_key.public_key())
+            if assertion_methods is None:
+                assertion_methods = _load_assertion_methods()
+            for vm_id, vm_xy in assertion_methods.get(issuer_did, []):
+                if vm_xy == ss_xy:
+                    return ss_key, vm_id
+            raise ValueError(
+                f"issuer {issuer_did} publishes no assertion method for the "
+                "Signing Service key in its DID document (ADR-006 mandate "
+                "missing) — cannot sign"
+            )
     return fallback
 
 
@@ -293,9 +379,12 @@ def process_plain(
     stem: str,
     keyring: RoleKeyring | None,
     fallback: tuple[PrivateKey, str],
+    assertion_methods: dict[str, list[tuple[str, tuple[str, str]]]] | None = None,
 ) -> Path:
     """Issue a credential with no batch evidence as a plain dc+sd-jwt."""
-    proof_key, proof_kid = _proof_key(vc.get("issuer", ""), keyring, fallback)
+    proof_key, proof_kid = _proof_key(
+        vc.get("issuer", ""), keyring, fallback, assertion_methods
+    )
     payload, disclosures = build_sd_jwt_payload(
         vc, vct=vct_for_credential(vc), disclosable=disclosable_paths(vc)
     )
@@ -308,17 +397,19 @@ def process_batch(
     authorizer: str,
     keyring: RoleKeyring | None,
     fallback: tuple[PrivateKey, str],
+    assertion_methods: dict[str, list[tuple[str, tuple[str, str]]]] | None = None,
 ) -> list[Path]:
     """Issue a batch of credentials sharing one authorizer with one signature."""
     # The admin wallet key stands in via the org's controller key (ADR-006 §3).
     wallet_key, _ = _resolve_key(authorizer, keyring, fallback)
-    # All credentials in a batch share an issuer (usually the authorizer org
-    # itself, ADR-006); proofs are executed by the Signing Service via the
+    # All credentials in a batch share an issuer: for the identity credentials
+    # authorizedBy MUST equal issuer (spec §6, step 6), and batches are grouped
+    # by authorizer. Proofs are executed by the Signing Service via the
     # issuer's mandate key. The authorization KB-JWT is addressed (`aud`) to
     # the OID4VP intake verifier — the gatehouse acting for the Signing
     # Service, identified by its did:key (spec §4.3, §9.6).
     issuer_did = batch[0][1].get("issuer", "")
-    proof_key, proof_kid = _proof_key(issuer_did, keyring, fallback)
+    proof_key, proof_kid = _proof_key(issuer_did, keyring, fallback, assertion_methods)
     audience = _intake_client_id(keyring, fallback)
 
     # 1. Fix salts: build each issuer payload (evidence stub present, ignored by
@@ -339,6 +430,7 @@ def process_batch(
         wallet_key,
         authorized_by=authorizer,
         audience=audience,
+        sd_hash=EXAMPLE_SD_HASH,
         domain="harbour.local",
     )
 
@@ -420,8 +512,9 @@ Examples:
     # Partition into batches (by output dir + authorizer) and plain credentials.
     batches: dict[tuple[str, str], list[tuple[Path, dict, Path]]] = {}
     plain: list[tuple[Path, dict, Path]] = []
+    assertion_methods = _load_assertion_methods()
     for path in example_files:
-        vc = json.loads(path.read_text())
+        vc = json.loads(path.read_text(encoding="utf-8"))
         output_dir = (
             Path(args.output_dir) if args.output_dir else path.parent / "signed"
         )
@@ -437,15 +530,17 @@ Examples:
     for (_, authorizer), batch in batches.items():
         members = ", ".join(p.name for p, _, _ in batch)
         print(f"  batch (authorizer {authorizer[-8:]}, N={len(batch)}): {members}")
-        for jwt_path in process_batch(batch, authorizer, keyring, fallback):
+        for jwt_path in process_batch(
+            batch, authorizer, keyring, fallback, assertion_methods
+        ):
             output_dirs.add(jwt_path.parent)
     for path, vc, output_dir in plain:
-        process_plain(vc, output_dir, path.stem, keyring, fallback)
+        process_plain(vc, output_dir, path.stem, keyring, fallback, assertion_methods)
         output_dirs.add(output_dir)
         print(f"  plain: {path.name}")
 
     for out_dir in sorted(output_dirs):
-        print(f"\nGenerated {len(sorted(out_dir.iterdir()))} files in {out_dir}/")
+        print(f"\nGenerated {len(list(out_dir.iterdir()))} files in {out_dir}/")
     print("Done.")
 
 

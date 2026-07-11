@@ -312,17 +312,46 @@ class TestStructuredDisclosure:
         # Email should NOT be present (disclosure was removed)
         assert "email" not in cs
 
-    def test_nonexistent_path_ignored(self, p256_private_key, p256_public_key):
-        """Disclosable path that doesn't exist in claims is silently skipped."""
+    def test_nonexistent_path_raises(self, p256_private_key):
+        """A declared path that doesn't resolve is a caller bug — silently
+        skipping it would issue the claim in plaintext."""
+        with pytest.raises(ValueError, match="disclosable path not found"):
+            issue_sd_jwt_vc(
+                NESTED_CLAIMS,
+                p256_private_key,
+                vct=NESTED_VCT,
+                disclosable=["credentialSubject.nonexistent"],
+            )
+
+    def test_segment_list_paths_handle_dotted_keys(
+        self, p256_private_key, p256_public_key
+    ):
+        """Segment-list paths disclose claims whose keys contain dots."""
+        claims = {
+            "credentialSubject": {
+                "id": "did:example:1",
+                "harbour.gx:labelLevel": "BL",
+            }
+        }
         sd_jwt = issue_sd_jwt_vc(
-            NESTED_CLAIMS,
+            claims,
             p256_private_key,
             vct=NESTED_VCT,
-            disclosable=["credentialSubject.nonexistent"],
+            disclosable=[["credentialSubject", "harbour.gx:labelLevel"]],
         )
+        # The claim is behind an _sd digest, not plaintext ...
+        import base64
+        import json
+
+        payload_b64 = sd_jwt.split("~")[0].split(".")[1]
+        raw = json.loads(
+            base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4))
+        )
+        assert "harbour.gx:labelLevel" not in raw["credentialSubject"]
+        assert len(raw["credentialSubject"]["_sd"]) == 1
+        # ... and resolves back when the disclosure is presented.
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
-        # No disclosures created, all claims present as always-disclosed
-        assert result["credentialSubject"]["email"] == "imprint@bmw.com"
+        assert result["credentialSubject"]["harbour.gx:labelLevel"] == "BL"
 
     def test_sd_alg_at_root_only(self, p256_private_key, p256_public_key):
         """_sd_alg should appear only at root level, not in nested objects."""

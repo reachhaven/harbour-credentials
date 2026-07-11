@@ -8,8 +8,9 @@
  *   - node  = SHA-256( 0x01 || left || right )
  *   - a lone (odd) node is promoted unchanged (never duplicated, closing
  *     CVE-2012-2459)
- *   - the root is base64url (no padding) and is carried in the authorization
- *     JWT `nonce`.
+ *   - the root is base64url (no padding) and is carried in the statement line
+ *     of the authorization message, whose SHA-256 hex is the KB-JWT `nonce`
+ *     (spec §4.3.1).
  *
  * The `canonicalJson` (RFC 8785 / JCS) used here is byte-identical to the
  * Python `canonical_json`, so leaves and roots match across runtimes.

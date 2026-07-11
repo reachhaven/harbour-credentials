@@ -41,8 +41,6 @@ def test_vectors_match_recomputation(vectors):
     assert fresh["root"] == n4["root"]
     assert fresh["leaves"] == n4["leaves"]
     assert fresh["proofs"] == n4["proofs"]
-    # The nonce carried in the authorization JWT is exactly the root.
-    assert n4["nonce"] == n4["root"]
 
 
 def test_all_proofs_fold_to_root(vectors):

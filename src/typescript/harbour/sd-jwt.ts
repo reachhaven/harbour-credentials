@@ -49,44 +49,53 @@ function createDisclosure(name: string, value: unknown): [string, string] {
 
 /**
  * Apply structured selective disclosure to a (possibly nested) payload.
- * Dot-path entries (e.g. "credentialSubject.email") place `_sd` digests at the
- * right nesting level; simple names are treated as top-level. Mirrors the
- * Python `_apply_structured_disclosures`.
+ * Each entry is either an array of exact key segments (safe for keys that
+ * themselves contain dots, e.g. ["credentialSubject", "harbour.gx:labelLevel"])
+ * or a dot-separated string ("credentialSubject.email"; a simple name is a
+ * top-level claim). `_sd` digests are placed at the right nesting level per
+ * RFC 9901 §6.2. Mirrors the Python `_apply_structured_disclosures`.
+ *
+ * Throws if a declared path does not resolve — a declared-but-missing
+ * disclosure is a caller bug, and skipping it would silently issue the claim
+ * in plaintext.
  */
 function applyStructuredDisclosures(
   payload: Record<string, unknown>,
-  disclosable: string[],
+  disclosable: (string | string[])[],
 ): { payload: Record<string, unknown>; disclosures: string[] } {
   const result = structuredClone(payload);
   const disclosures: string[] = [];
 
   for (const path of disclosable) {
-    const parts = path.split(".");
+    const parts = typeof path === "string" ? path.split(".") : [...path];
+    if (parts.length === 0) throw new Error("empty disclosable path");
     const leafKey = parts[parts.length - 1];
     let parent: unknown = result;
-    let reached = true;
     for (const part of parts.slice(0, -1)) {
       if (parent && typeof parent === "object" && part in (parent as object)) {
         parent = (parent as Record<string, unknown>)[part];
       } else {
-        reached = false;
-        break;
+        throw new Error(
+          `disclosable path not found in claims: ${JSON.stringify(parts)}`,
+        );
       }
     }
     if (
-      reached &&
-      parent &&
-      typeof parent === "object" &&
-      leafKey in (parent as object)
+      !parent ||
+      typeof parent !== "object" ||
+      !(leafKey in (parent as object))
     ) {
-      const obj = parent as Record<string, unknown>;
-      const value = obj[leafKey];
-      delete obj[leafKey];
-      const [discB64, digest] = createDisclosure(leafKey, value);
-      disclosures.push(discB64);
-      if (!Array.isArray(obj._sd)) obj._sd = [];
-      (obj._sd as string[]).push(digest);
+      throw new Error(
+        `disclosable path not found in claims: ${JSON.stringify(parts)}`,
+      );
     }
+    const obj = parent as Record<string, unknown>;
+    const value = obj[leafKey];
+    delete obj[leafKey];
+    const [discB64, digest] = createDisclosure(leafKey, value);
+    disclosures.push(discB64);
+    if (!Array.isArray(obj._sd)) obj._sd = [];
+    (obj._sd as string[]).push(digest);
   }
   return { payload: result, disclosures };
 }
@@ -94,7 +103,11 @@ function applyStructuredDisclosures(
 /** Build the issuer SD-JWT payload (with `_sd` digests) and its disclosures. */
 export function buildSdJwtPayload(
   claims: Record<string, unknown>,
-  options: { vct: string; disclosable?: string[]; cnf?: Record<string, unknown> },
+  options: {
+    vct: string;
+    disclosable?: (string | string[])[];
+    cnf?: Record<string, unknown>;
+  },
 ): { payload: Record<string, unknown>; disclosures: string[] } {
   const { payload, disclosures } = applyStructuredDisclosures(
     { ...claims, vct: options.vct },
@@ -133,7 +146,7 @@ export async function signSdJwt(
 export async function issueSdJwtVc(
   claims: Record<string, unknown>,
   privateKey: CryptoKey,
-  options: { vct: string; disclosable?: string[] } & IssueOptions,
+  options: { vct: string; disclosable?: (string | string[])[] } & IssueOptions,
 ): Promise<string> {
   const { payload, disclosures } = buildSdJwtPayload(claims, {
     vct: options.vct,

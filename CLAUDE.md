@@ -74,21 +74,21 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `sd_jwt_vp` / `sd-jwt-vp` | `sd_jwt_vp.py` | `sd-jwt-vp.ts` | SD-JWT VP issue/verify with evidence |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates / x5c chains |
 | `merkle` | `merkle.py` | `merkle.ts` | Merkle tree construction/inclusion proofs (batched evidence) |
-| `batch_evidence` | `batch_evidence.py` | `batch-evidence.ts` | Batched credential evidence build/verify (authorization JWS + Merkle proof) |
+| `batch_evidence` | `batch_evidence.py` | `batch-evidence.ts` | Batched credential evidence build/verify (wallet KB-JWT + authorization message + Merkle proof) |
 | `digest_sri` | `digest_sri.py` | `digest-sri.ts` | W3C SRI digests over RFC 8785 (JCS) canonical JSON |
 | `generate_artifacts` | `generate_artifacts.py` | — | LinkML → OWL/SHACL/JSON-LD artifact generation |
 | credential pipeline | `credentials/` (CLI) | `story-sign.ts` / `story-verify.ts` / `story-digests.ts` (CLI) | End-to-end example signing/verification (see below) |
 
-**Credential pipeline is CLI-only, not a library export** in either runtime. Python keeps it as a separate package `src/python/credentials/` (`example_signer.py` signs example credentials with role-based keys + evidence VPs; `verify_signed_examples.py` verifies them). TypeScript has functionally-equivalent `story-sign.ts` / `story-verify.ts` (run via `yarn story:sign` / `yarn story:verify`, excluded from the `tsc` build). Do not try to export these as library functions.
+**Credential pipeline is CLI-only, not a library export** in either runtime. Python keeps it as a separate package `src/python/credentials/` (`example_signer.py` issues dc+sd-jwt credentials with batched evidence using role-based keys; `verify_signed_examples.py` verifies them). TypeScript has functionally-equivalent `story-sign.ts` / `story-verify.ts` (run via `yarn story:sign` / `yarn story:verify`, excluded from the `tsc` build). Do not try to export these as library functions.
 
 ### The Credential Lifecycle & Trust Model
 
 The `examples/` directory is the authoritative end-to-end narrative, not just test data (full walkthrough in `examples/README.md`):
 
 - **`examples/*.json`** — Harbour credential skeletons showing the VC envelope and batched evidence structure.
-- **`examples/gaiax/`** — Complete journey with 4 actors and role-based authorization via evidence VPs.
+- **`examples/gaiax/`** — Complete journey with 4 actors and role-based authorization via batched evidence (one admin KB-JWT per batch).
 - **`examples/gaiax_external/`** — Third-party Gaia-X credentials *not* produced by our pipeline.
-- **`examples/signed/`, `examples/gaiax/signed/`** — Story-pipeline output (`.jwt`, `.decoded.json`, `.evidence-vp.jwt`); **gitignored**.
+- **`examples/signed/`, `examples/gaiax/signed/`** — Story-pipeline output (`.sd-jwt`, `.decoded.json`, plus `resolved/` claim dumps from `--dump-resolved`); **gitignored**.
 
 The trust chain (ADR-006, sovereign issuers — each credential's `issuer` is the vouching party's own DID; the Signing Service only executes proofs via an assertion-only mandate key in the issuer's DID document):
 
@@ -114,7 +114,7 @@ The trust chain (ADR-006, sovereign issuers — each credential's `issuer` is th
 - `tests/fixtures/` — shared `keys/`, `tokens/`, `sample-vc.json`, `batched-evidence-vectors.json`
 - `tests/conftest.py` — root fixtures: session-scoped Ed25519 + P-256 keypairs, sample VC/VP
 - `tests/python/credentials/conftest.py` — parametrized fixtures over `examples/` credentials + pre-signed JWTs
-- `tests/python/harbour/` — per-module tests (sign, verify, keys, sd_jwt, kb_jwt, sd_jwt_vp, x509, delegation, tamper)
+- `tests/python/harbour/` — per-module tests (sign, verify, keys, sd_jwt, kb_jwt, sd_jwt_vp, x509, delegation, tamper, merkle, batch_evidence, digest_sri)
 - `tests/python/credentials/` — pipeline + LinkML/SHACL validation tests
 - `tests/typescript/harbour/` — vitest tests (config: `src/typescript/harbour/vitest.config.ts`)
 - `tests/interop/` — cross-runtime tests; **auto-skip** if TS deps are unavailable
@@ -184,7 +184,7 @@ import {
 
 ## CLI Entry Points
 
-Every harbour module has an argparse `main()` with `--help`: `python -m harbour.{keys,signer,verifier,sd_jwt,kb_jwt,delegation,sd_jwt_vp,x509,generate_artifacts} --help`. Pipeline CLIs: `python -m credentials.example_signer --help`, `python -m credentials.verify_signed_examples --help`.
+Every harbour module has an argparse `main()` with `--help`: `python -m harbour.{keys,signer,verifier,sd_jwt,kb_jwt,delegation,sd_jwt_vp,x509,merkle,batch_evidence,generate_artifacts} --help`. Pipeline CLIs: `python -m credentials.example_signer --help`, `python -m credentials.verify_signed_examples --help`.
 
 ## Coding Conventions
 

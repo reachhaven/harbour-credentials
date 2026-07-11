@@ -83,11 +83,17 @@ checking its signature against a verification method of that DID document
 (as of the KB-JWT `iat`). In the repository examples the org's `#controller`
 key stands in for "an org admin's wallet key".
 
-Authorizer and issuer therefore usually coincide at the DID level (the org
+For the identity credentials (LegalPersonCredential,
+NaturalPersonCredential) authorizer and issuer coincide at the DID level
+**normatively**: `authorizedBy` MUST equal the credential's `issuer`, and
+verifiers enforce the equality (batched-evidence spec §6, step 6). The org
 authorizes and issues; a human admin signs the evidence, the Signing
-Service signs the proof) — the separation of powers is between *human
+Service signs the proof — the separation of powers is between *human
 authorization* and *automated proof execution*, not between two
-organizations.
+organizations. Evidence remains an array, and future credential types may
+carry evidence authorized by parties other than the issuer (e.g. multiple
+counterparties evidencing a contract credential); each such type defines
+its own authorizer-binding rule.
 
 ### 4. Credentials are independent; LegalPersonVCs are published
 

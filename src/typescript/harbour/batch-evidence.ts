@@ -50,17 +50,24 @@ export interface BatchEvidence {
 }
 
 export interface AuthorizationOptions {
-  /** The authorizer organization's did:ethr (evidence `authorizedBy`). */
+  /**
+   * The authorizer organization's did:ethr (evidence `authorizedBy`).
+   * For the identity credentials it MUST equal each payload's `issuer`
+   * (spec §6, step 6 — verifiers enforce the equality).
+   */
   authorizedBy: string;
   /** The OID4VP intake verifier's client identifier (the JWT `aud`). */
   audience: string;
+  /**
+   * The sd_hash binding the KB-JWT to the presented credential — REQUIRED
+   * in every KB-JWT (RFC 9901 §4.3); downstream verifiers ignore its value.
+   */
+  sdHash: string;
   /** Message ceremony metadata (§4.3.1). */
   domain?: string;
   ceremonyNonce?: string;
   issuedAt?: string;
   iat?: number;
-  /** Optional sd_hash binding to the presented credential (opaque downstream). */
-  sdHash?: string;
   alg?: string;
 }
 
@@ -131,16 +138,18 @@ export function extractRootFromMessage(message: string): [string, number] {
 export async function signAuthorization(
   message: string,
   walletKey: CryptoKey,
-  options: { audience: string; iat?: number; sdHash?: string; alg?: string },
+  options: { audience: string; sdHash: string; iat?: number; alg?: string },
 ): Promise<string> {
   const alg = options.alg ?? resolveAlg(walletKey);
   const header = { alg, typ: AUTHORIZATION_JWT_TYP };
   const payload: Record<string, unknown> = {
-    iat: options.iat ?? Math.floor(Date.now() / 1000),
+    // Floor a caller-supplied iat too — the Python mirror coerces int(iat),
+    // and a fractional iat would mint a token the other runtime rejects.
+    iat: Math.floor(options.iat ?? Date.now() / 1000),
     aud: options.audience,
     nonce: messageHash(message),
+    sd_hash: options.sdHash,
   };
-  if (options.sdHash !== undefined) payload.sd_hash = options.sdHash;
   const signer = new CompactSign(
     new TextEncoder().encode(JSON.stringify(payload)),
   );
@@ -174,10 +183,15 @@ export async function verifyAuthorization(
     );
   }
   const payload = JSON.parse(new TextDecoder().decode(result.payload));
-  if (typeof payload.iat !== "number") {
+  if (!Number.isInteger(payload.iat)) {
     throw new VerificationError("Authorization KB-JWT missing integer iat");
   }
-  if (options.expectedAudience && payload.aud !== options.expectedAudience) {
+  // `!== undefined`, not falsy: an explicit empty-string audience must still
+  // be enforced (Python mirror checks `is not None`).
+  if (
+    options.expectedAudience !== undefined &&
+    payload.aud !== options.expectedAudience
+  ) {
     throw new VerificationError(
       `Audience mismatch: expected '${options.expectedAudience}', got '${payload.aud}'`,
     );
@@ -209,8 +223,8 @@ export async function buildBatchEvidence(
   });
   const authorization = await signAuthorization(message, walletKey, {
     audience: options.audience,
-    iat: options.iat,
     sdHash: options.sdHash,
+    iat: options.iat,
     alg: options.alg,
   });
   return payloads.map((_, i) => ({

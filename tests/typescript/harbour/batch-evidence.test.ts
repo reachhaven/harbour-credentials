@@ -18,6 +18,8 @@ import {
 const AUTHORIZED_BY = "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93";
 // The OID4VP intake verifier's client id (gatehouse did:key stand-in).
 const AUDIENCE = "did:key:zDnaefrde2MxCJfVoE1Z6RW6Zk6S91ot2w2x1c9Xwm5WiBMo9";
+// Every KB-JWT carries an sd_hash (RFC 9901 §4.3); opaque to these tests.
+const SD_HASH = "c29tZS1oYXNo";
 
 function payload(n: number): Record<string, unknown> {
   return {
@@ -71,6 +73,7 @@ describe("authorization KB-JWT (§4.3)", () => {
     const msg = message(root);
     const token = await signAuthorization(msg, privateKey, {
       audience: AUDIENCE,
+      sdHash: SD_HASH,
       iat: 1_800_000_000,
     });
 
@@ -94,7 +97,10 @@ describe("authorization KB-JWT (§4.3)", () => {
   it("rejects a tampered message (nonce mismatch)", async () => {
     const { privateKey, publicKey } = await generateP256Keypair();
     const msg = message("A".repeat(43));
-    const token = await signAuthorization(msg, privateKey, { audience: AUDIENCE });
+    const token = await signAuthorization(msg, privateKey, {
+      audience: AUDIENCE,
+      sdHash: SD_HASH,
+    });
     await expect(
       verifyAuthorization(token, publicKey, { message: msg + " " }),
     ).rejects.toThrow(VerificationError);
@@ -103,13 +109,64 @@ describe("authorization KB-JWT (§4.3)", () => {
   it("rejects a wrong audience", async () => {
     const { privateKey, publicKey } = await generateP256Keypair();
     const msg = message("A".repeat(43));
-    const token = await signAuthorization(msg, privateKey, { audience: AUDIENCE });
+    const token = await signAuthorization(msg, privateKey, {
+      audience: AUDIENCE,
+      sdHash: SD_HASH,
+    });
     await expect(
       verifyAuthorization(token, publicKey, {
         message: msg,
         expectedAudience: "did:key:zWrong",
       }),
     ).rejects.toThrow(VerificationError);
+  });
+
+  it("enforces an explicit empty-string expectedAudience (parity: not falsy-skipped)", async () => {
+    const { privateKey, publicKey } = await generateP256Keypair();
+    const msg = message("A".repeat(43));
+    const token = await signAuthorization(msg, privateKey, {
+      audience: AUDIENCE,
+      sdHash: SD_HASH,
+    });
+    await expect(
+      verifyAuthorization(token, publicKey, {
+        message: msg,
+        expectedAudience: "",
+      }),
+    ).rejects.toThrow(/Audience mismatch/);
+  });
+
+  it("always carries sd_hash and floors a fractional caller-supplied iat", async () => {
+    const { privateKey, publicKey } = await generateP256Keypair();
+    const msg = message("A".repeat(43));
+    const token = await signAuthorization(msg, privateKey, {
+      audience: AUDIENCE,
+      sdHash: SD_HASH,
+      iat: 1_800_000_000.75,
+    });
+    const verified = await verifyAuthorization(token, publicKey, { message: msg });
+    expect(verified.sd_hash).toBe(SD_HASH);
+    // Parity: Python coerces int(iat); a fractional iat must never be minted.
+    expect(verified.iat).toBe(1_800_000_000);
+  });
+
+  it("rejects a non-integer iat (parity with Python's integer check)", async () => {
+    const { CompactSign } = await import("jose");
+    const { privateKey, publicKey } = await generateP256Keypair();
+    const msg = message("A".repeat(43));
+    const nonce = createHash("sha256").update(msg, "utf-8").digest("hex");
+    for (const badIat of [1_800_000_000.5, true]) {
+      const signer = new CompactSign(
+        new TextEncoder().encode(
+          JSON.stringify({ iat: badIat, aud: AUDIENCE, nonce, sd_hash: SD_HASH }),
+        ),
+      );
+      signer.setProtectedHeader({ alg: "ES256", typ: "kb+jwt" });
+      const token = await signer.sign(privateKey);
+      await expect(
+        verifyAuthorization(token, publicKey, { message: msg }),
+      ).rejects.toThrow(/integer iat/);
+    }
   });
 });
 
@@ -120,6 +177,7 @@ describe("batch evidence (§5, §6)", () => {
     const evidence = await buildBatchEvidence(payloads, privateKey, {
       authorizedBy: AUTHORIZED_BY,
       audience: AUDIENCE,
+      sdHash: SD_HASH,
     });
     expect(evidence).toHaveLength(4);
     expect(new Set(evidence.map((e) => e.authorization)).size).toBe(1);
@@ -147,6 +205,7 @@ describe("batch evidence (§5, §6)", () => {
     const evidence = await buildBatchEvidence(payloads, privateKey, {
       authorizedBy: AUTHORIZED_BY,
       audience: AUDIENCE,
+      sdHash: SD_HASH,
     });
     expect(evidence[0].merkleProof.path).toEqual([]);
     await verifyBatchEvidence(
@@ -162,6 +221,7 @@ describe("batch evidence (§5, §6)", () => {
     const evidence = await buildBatchEvidence(payloads, privateKey, {
       authorizedBy: AUTHORIZED_BY,
       audience: AUDIENCE,
+      sdHash: SD_HASH,
     });
     const tampered = {
       ...payloads[0],
@@ -182,6 +242,7 @@ describe("batch evidence (§5, §6)", () => {
     const evidence = await buildBatchEvidence(payloads, privateKey, {
       authorizedBy: AUTHORIZED_BY,
       audience: AUDIENCE,
+      sdHash: SD_HASH,
     });
     const [realRoot] = extractRootFromMessage(evidence[0].authorizationMessage);
     const ev = {
@@ -206,6 +267,7 @@ describe("batch evidence (§5, §6)", () => {
     const evidence = await buildBatchEvidence(payloads, privateKey, {
       authorizedBy: AUTHORIZED_BY,
       audience: AUDIENCE,
+      sdHash: SD_HASH,
     });
     const { authorizationMessage: _m, ...ev } = evidence[0];
     await expect(
@@ -223,6 +285,7 @@ describe("batch evidence (§5, §6)", () => {
     const evidence = await buildBatchEvidence(payloads, privateKey, {
       authorizedBy: AUTHORIZED_BY,
       audience: AUDIENCE,
+      sdHash: SD_HASH,
     });
     const withEv = { ...payloads[2], evidence: [evidence[2]] };
     expect(computeLeaf(withEv)).toEqual(computeLeaf(payloads[2]));

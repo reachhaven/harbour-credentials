@@ -13,6 +13,7 @@ recomputation, so the vectors cannot silently drift from the implementation.
 
 from __future__ import annotations
 
+import argparse
 import json
 from copy import deepcopy
 from pathlib import Path
@@ -29,11 +30,14 @@ from harbour.merkle import (
 
 OUT = Path(__file__).resolve().parent / "batched-evidence-vectors.json"
 
-# A batch of four employee credentials an organization authorizes at once.
-# Each carries a placeholder ``evidence`` member to demonstrate that the leaf
-# excludes it (leaf invariance to evidence content).
-_SS = "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202"  # signing service
-_ORG = "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"  # authorizer (org)
+# A batch of four employee credentials an organization authorizes at once
+# (ADR-006 sovereign issuers: the org issues its own members' credentials,
+# memberOf == issuer, one issuer-operated CRSetEntry). Each carries a
+# placeholder ``evidence`` member to demonstrate that the leaf excludes it
+# (leaf invariance to evidence content).
+_ORG = (
+    "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"  # issuer + authorizer
+)
 
 
 def _credential(n: int, subject_addr: str, status_index: str) -> dict:
@@ -44,7 +48,7 @@ def _credential(n: int, subject_addr: str, status_index: str) -> dict:
         ],
         "type": ["VerifiableCredential", "harbour:NaturalPersonCredential"],
         "id": f"urn:uuid:00000000-0000-4000-8000-00000000000{n}",
-        "issuer": _SS,
+        "issuer": _ORG,
         "validFrom": "2026-01-01T00:00:00Z",
         "credentialSubject": {
             "id": f"did:ethr:0x14a34:{subject_addr}",
@@ -52,12 +56,6 @@ def _credential(n: int, subject_addr: str, status_index: str) -> dict:
             "harbour:memberOf": _ORG,
         },
         "credentialStatus": [
-            {
-                "type": "harbour:CRSetEntry",
-                "statusPurpose": "revocation",
-                "statusServiceOperator": _SS,
-                "statusIndex": status_index,
-            },
             {
                 "type": "harbour:CRSetEntry",
                 "statusPurpose": "revocation",
@@ -79,6 +77,15 @@ BATCH = [
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        prog="gen_batched_evidence_vectors",
+        description=(
+            "Regenerate tests/fixtures/batched-evidence-vectors.json — the "
+            "canonical Merkle-commitment vectors of "
+            "docs/specs/batched-credential-evidence.md §10."
+        ),
+    ).parse_args()
+
     # --- N = 4 batch ---------------------------------------------------------
     batch = build_batch(BATCH)
     # Sanity: every proof folds to the root.
@@ -141,13 +148,16 @@ def main() -> None:
             "leaf": "SHA-256(0x00 || JCS(credential without evidence/proof))",
             "node": "SHA-256(0x01 || left || right)",
             "lone_node": "promoted unchanged (never duplicated)",
-            "root_encoding": "base64url, no padding (the authorization JWT nonce)",
+            "root_encoding": (
+                "base64url, no padding — committed in the statement line of "
+                "the authorization message, whose SHA-256 hex is the KB-JWT "
+                "nonce (spec §4.3.1)"
+            ),
         },
         "batch_n4": {
             "credentials": BATCH,
             "leaves": batch["leaves"],
             "root": batch["root"],
-            "nonce": batch["root"],  # the root IS the authorization JWT nonce
             "proofs": batch["proofs"],
             "internal_nodes": _internal_nodes(batch["leaves"]),
         },
@@ -160,7 +170,9 @@ def main() -> None:
         "negatives": negatives,
     }
 
-    OUT.write_text(json.dumps(vectors, indent=2, ensure_ascii=False) + "\n")
+    OUT.write_text(
+        json.dumps(vectors, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"wrote {OUT}")
     print(f"  N=4 root: {batch['root']}")
     print(f"  N=1 root: {single['root']}")

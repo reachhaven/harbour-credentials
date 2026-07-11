@@ -57,48 +57,52 @@ def _create_disclosure(claim_name: str, claim_value: Any) -> tuple[str, str]:
 
 
 def _apply_structured_disclosures(
-    payload: dict, disclosable: list[str]
+    payload: dict, disclosable: list[str | list[str]]
 ) -> tuple[dict, list[str]]:
     """Apply structured selective disclosure to a nested payload.
 
-    Processes dot-path disclosable entries (e.g. ``"credentialSubject.email"``)
-    by placing ``_sd`` digests at the correct nesting level per RFC 9901 §6.2.
-
-    Simple (non-dotted) names are treated as top-level disclosable claims
-    for backward compatibility.
+    Places ``_sd`` digests at the correct nesting level per RFC 9901 §6.2.
+    Each disclosable entry is either a **list of key segments** (exact keys,
+    safe for keys that themselves contain dots, e.g.
+    ``["credentialSubject", "harbour.gx:labelLevel"]``) or a **dot-separated
+    string** (``"credentialSubject.email"``; a simple non-dotted name is a
+    top-level claim).
 
     Args:
         payload: The claims dict (will be deep-copied, not mutated).
-        disclosable: List of claim paths (dot-separated for nested).
+        disclosable: Claim paths as segment lists or dot-separated strings.
 
     Returns:
         Tuple of (modified payload with _sd arrays, list of disclosure strings).
+
+    Raises:
+        ValueError: if a declared path does not resolve to an existing claim —
+            a declared-but-missing disclosure is a caller bug, and skipping it
+            would silently issue the claim in plaintext.
     """
     result = copy.deepcopy(payload)
     disclosures: list[str] = []
 
     for path in disclosable:
-        parts = path.split(".")
+        parts = path.split(".") if isinstance(path, str) else list(path)
+        if not parts:
+            raise ValueError("empty disclosable path")
         leaf_key = parts[-1]
-        parent_parts = parts[:-1]
 
         # Navigate to the parent object
         parent = result
-        for part in parent_parts:
+        for part in parts[:-1]:
             if isinstance(parent, dict) and part in parent:
                 parent = parent[part]
             else:
-                break
-        else:
-            # Successfully navigated to parent — check leaf exists
-            if isinstance(parent, dict) and leaf_key in parent:
-                value = parent.pop(leaf_key)
-                disc_b64, digest = _create_disclosure(leaf_key, value)
-                disclosures.append(disc_b64)
-                parent.setdefault("_sd", []).append(digest)
-                continue
+                raise ValueError(f"disclosable path not found in claims: {parts!r}")
+        if not isinstance(parent, dict) or leaf_key not in parent:
+            raise ValueError(f"disclosable path not found in claims: {parts!r}")
 
-        # Path not found — skip silently (claim may not be present)
+        value = parent.pop(leaf_key)
+        disc_b64, digest = _create_disclosure(leaf_key, value)
+        disclosures.append(disc_b64)
+        parent.setdefault("_sd", []).append(digest)
 
     return result, disclosures
 
@@ -107,7 +111,7 @@ def build_sd_jwt_payload(
     claims: dict,
     *,
     vct: str,
-    disclosable: list[str] | None = None,
+    disclosable: list[str | list[str]] | None = None,
     cnf: dict | None = None,
 ) -> tuple[dict, list[str]]:
     """Build the issuer SD-JWT payload (with ``_sd`` digests) and its disclosures.
@@ -123,7 +127,9 @@ def build_sd_jwt_payload(
         claims: Credential claims dict (flat or nested).
         vct: Verifiable Credential Type URI.
         disclosable: Claim names/paths to make selectively disclosable
-            (dot-separated for nested, per RFC 9901 §6).
+            (segment lists for exact keys — required when a key contains a
+            dot — or dot-separated strings; RFC 9901 §6). Every path MUST
+            resolve (ValueError otherwise).
         cnf: Confirmation key (holder's public key JWK for key binding).
 
     Returns:
@@ -179,7 +185,7 @@ def issue_sd_jwt_vc(
     private_key: PrivateKey,
     *,
     vct: str,
-    disclosable: list[str] | None = None,
+    disclosable: list[str | list[str]] | None = None,
     alg: str | None = None,
     x5c: list[str] | None = None,
     cnf: dict | None = None,
@@ -416,7 +422,7 @@ Examples:
     if args.command == "issue":
         from harbour._crypto import load_private_key
 
-        claims_data = json.loads(Path(args.claims).read_text())
+        claims_data = json.loads(Path(args.claims).read_text(encoding="utf-8"))
         private_key, _ = load_private_key(args.key)
 
         sd_jwt_token = issue_sd_jwt_vc(
@@ -427,7 +433,7 @@ Examples:
         )
 
         if args.output:
-            Path(args.output).write_text(sd_jwt_token)
+            Path(args.output).write_text(sd_jwt_token, encoding="utf-8")
             print(f"SD-JWT-VC written to {args.output}", file=sys.stderr)
         else:
             print(sd_jwt_token)
@@ -438,7 +444,7 @@ Examples:
         if args.sd_jwt == "-":
             sd_jwt_token = sys.stdin.read().strip()
         else:
-            sd_jwt_token = Path(args.sd_jwt).read_text().strip()
+            sd_jwt_token = Path(args.sd_jwt).read_text(encoding="utf-8").strip()
 
         public_key = _load_public_key(args.public_key)
 

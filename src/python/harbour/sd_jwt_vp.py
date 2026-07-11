@@ -186,7 +186,8 @@ def issue_sd_jwt_vp(
                      If empty list [], includes no disclosures (max privacy).
         evidence: Evidence objects to include in the VP. Supported types:
                   - BatchCredentialEvidence: issuance authorization
-                    (authorizer / authorization JWS / merkleProof)
+                    (authorizedBy / authorization KB-JWT /
+                    authorizationMessage / merkleProof)
                   - SignatureEvidence (DelegatedSignatureEvidence):
                     consent proof with transaction_data
         nonce: Challenge nonce for replay protection.
@@ -675,7 +676,7 @@ Examples:
 
     if args.command == "issue":
         # Load SD-JWT-VC
-        sd_jwt_vc = Path(args.sd_jwt_vc).read_text().strip()
+        sd_jwt_vc = Path(args.sd_jwt_vc).read_text(encoding="utf-8").strip()
 
         # Load holder private key
         private_key, _ = _load_private_key(args.key)
@@ -683,7 +684,7 @@ Examples:
         # Load evidence if provided
         evidence = None
         if args.evidence:
-            evidence = json.loads(Path(args.evidence).read_text())
+            evidence = json.loads(Path(args.evidence).read_text(encoding="utf-8"))
             if not isinstance(evidence, list):
                 evidence = [evidence]
 
@@ -703,14 +704,14 @@ Examples:
 
         # Output
         if args.output:
-            Path(args.output).write_text(vp + "\n")
+            Path(args.output).write_text(vp + "\n", encoding="utf-8")
             print(f"SD-JWT VP written to {args.output}", file=sys.stderr)
         else:
             print(vp)
 
     elif args.command == "verify":
         # Load SD-JWT VP
-        sd_jwt_vp = Path(args.sd_jwt_vp).read_text().strip()
+        sd_jwt_vp = Path(args.sd_jwt_vp).read_text(encoding="utf-8").strip()
 
         # Load keys
         issuer_public_key = _load_public_key(args.issuer_key)

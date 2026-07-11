@@ -1,6 +1,6 @@
 # Harbour Batched Credential Evidence Specification
 
-**Version**: 1.2.0-draft
+**Version**: 1.3.0-draft
 **Status**: Draft
 **Namespace**: `https://harbour.reachhaven.io/evidence/v1`
 
@@ -92,9 +92,21 @@ revocation data as an operational service.
 | **Signing Service** | Haven-operated proof executor | Assembles the batch, composes the authorization message, obtains the admin's single wallet signature through the intake verifier (gatehouse), embeds each credential's inclusion proof, and signs each `dc+sd-jwt` proof with its mandate key. Maintains revocation data (§7). |
 | **Verifier**   | Any relying party                                                           | Verifies one issued credential and its evidence in isolation.                                                                   |
 
-Authorizer and issuer usually coincide at the DID level (the organization both
-authorizes and issues); the real separation is between the **human admin** who
-signs the evidence and the **automated Signing Service** that signs the proof.
+For the Harbour **identity credentials** (`harbour.gx:LegalPersonCredential`,
+`harbour.gx:NaturalPersonCredential`) the coincidence of authorizer and issuer
+is **normative**: `authorizedBy` MUST equal the credential's `issuer`, and
+verifiers MUST enforce it (§6, step 6). The party vouching for the subject and
+the party whose admin approves the issuance are one and the same DID; the real
+separation is between the **human admin** who signs the evidence and the
+**automated Signing Service** that signs the proof.
+
+`evidence` remains an **array** ([VCDM2] §5.6). Future Harbour credential
+types MAY carry evidence authorized by parties other than the issuer — e.g. a
+contract credential evidenced by several counterparties, each contributing its
+own `harbour:BatchCredentialEvidence` object. Any such type MUST define its
+own normative authorizer-binding rule; the issuer-equality rule above is the
+binding for the identity credentials, not a global invariant.
+
 The authorizer commits to the full content of each credential in the batch
 (§4.1).
 
@@ -178,7 +190,15 @@ KB-JWT claims ([SD-JWT] RFC 9901 §4.3; header `alg: ES256`, `typ: kb+jwt`, no
 | `iat`     | Issued-at (Unix seconds). Used for historical key resolution (§6).             |
 | `aud`     | The OID4VP verifier's client identifier — the intake endpoint acting for the Signing Service (in Haven: the gatehouse `did:key`). The intake MUST reject an authorization whose `aud` is not its own identifier (§9.6); downstream verifiers treat it as opaque. |
 | `nonce`   | `SHA-256(authorizationMessage)`, lowercase hex — the commitment (§4.3.1).      |
-| `sd_hash` | Binds the KB-JWT to the LegalPersonCredential presented at intake. Opaque to downstream verifiers (the presentation is not carried in the evidence, §4.4); they MUST ignore it. |
+| `sd_hash` | REQUIRED ([SD-JWT] RFC 9901 §4.3 — every KB-JWT carries it). Binds the KB-JWT to the LegalPersonCredential presented at intake. Opaque to downstream verifiers (the presentation is not carried in the evidence, §4.4); they MUST ignore its value and MUST NOT base any verification decision on it. |
+
+> **Note (repository examples).** The story pipeline simulates the wallet
+> ceremony without a real OID4VP presentation, so its KB-JWTs carry a
+> **fixed, documented placeholder** `sd_hash` (see
+> `EXAMPLE_SD_HASH` in `src/python/credentials/example_signer.py` /
+> `src/typescript/harbour/story-sign.ts`). This is safe precisely because
+> downstream verifiers ignore the value; production tokens carry the real
+> digest of the presented credential.
 
 There is **no `iss`**: a KB-JWT identifies its signer by key, not by claim. The
 signing key is the admin's wallet key, which is a **verification method of the
@@ -311,7 +331,8 @@ Each issued credential carries one evidence object of the
 
 - `authorizedBy` — the authorizing organization's `did:ethr`. The KB-JWT has
   no `iss`; this field names whose DID document the signing key must appear in
-  (§6, step 5).
+  (§6, step 5). For the identity credentials it MUST equal the credential's
+  `issuer` (§3, §6 step 6).
 - `authorization` — the single wallet KB-JWT (§4.3), byte-identical in every
   credential of the batch.
 - `authorizationMessage` — the exact signed message (§4.3.1), byte-identical
@@ -364,15 +385,24 @@ A verifier holding **one** issued credential MUST:
    document's P-256 methods). `aud` and `sd_hash` were checked at intake by
    the OID4VP verifier (§4.3) and are opaque here — verifiers MUST NOT reject
    a KB-JWT for carrying them.
-6. **Check status** — evaluate the `harbour:CRSetEntry` under §7: the
+6. **Bind the authorizer to the credential** — for the identity credentials
+   (`harbour.gx:LegalPersonCredential`, `harbour.gx:NaturalPersonCredential`),
+   require `authorizedBy` to **equal the credential's `issuer`** (§3). Step 5
+   only proves that _some_ DID's admin signed the batch; this step proves it
+   was the party vouching for this credential. Without it, any DID whose
+   document lists the KB-JWT's signing key would be accepted as authorizer
+   for any issuer's batch. Future credential types define their own binding
+   rule (§3); a verifier MUST reject an identity credential whose
+   `authorizedBy` differs from its `issuer`.
+7. **Check status** — evaluate the `harbour:CRSetEntry` under §7: the
    credential is valid only if the entry resolves and does not report it
    revoked. The entry being unresolvable (the issuer's CRSet service deleted)
-   fail-closes to revoked.
+   fail-closes to invalid (§7.3).
 
 **Historical vs current resolution.** Step 5 resolves the authorizer DID _as of
 `iat`_ (via `did:ethr` `versionTime`), so the authorization is an immutable
 historical fact — "an admin key authorized on the organization's DID signed
-this at time T" — that later key rotation cannot break. Step 6's status
+this at time T" — that later key rotation cannot break. Step 7's status
 checks, by contrast, use the **current** DID state and current cascade — "the
 organization still stands behind it now." Keep the two separate: signing
 authority is historical; revocation is current.
@@ -389,7 +419,7 @@ follows issuance authority):
 > **valid ⟺ the `CRSetEntry` resolves AND does not report the credential revoked**
 
 An entry that cannot be resolved (its operator DID has no CRSet service) is
-**fail-closed**, i.e. treated as revoked (§7.3). That the resolution path runs
+**fail-closed**, i.e. treated as invalid (§7.3). That the resolution path runs
 through the issuer's own DID document is exactly what gives the issuer its
 kill switch (§7.2).
 
@@ -398,13 +428,24 @@ kill switch (§7.2).
 The CRSet ([CRSet]) is a Bloom filter cascade with fixed-size padding and a
 regular publishing schedule, giving metadata privacy: an observer cannot infer how
 many credentials exist or how many are revoked. **This implementation diverges
-from the paper's Ethereum-blob storage.** Instead:
+from the paper's Ethereum-blob storage.** The privacy guarantees (padded,
+fixed-size, fixed-cadence publication) are properties of the **data format**,
+not of the storage layer, so they survive unchanged over plain HTTPS:
 
-- the cascade is published to **IPFS** and addressed by a stable **IPNS** name, so
-  the link is permanent while the content updates on each republish;
-- the identity/registry layer can therefore live on **any Ethereum L2** — because
-  the revocation data is off-chain (IPFS), the choice of chain is decoupled from
-  storage.
+- the cascade is **hosted by the Signing Service at a public HTTPS endpoint**
+  (`registryEndpoint`), exactly like the published LegalPersonVCs — the host
+  only has to be _available_, never _trusted_ (see the snapshot signature
+  below);
+- every published snapshot is a **signed, timestamped VC-JOSE object**
+  (`validFrom` = publication time, `validUntil` = the next scheduled
+  publication), signed by the Signing Service under a verification method of
+  the operator's DID document. A verifier that retains a snapshot can later
+  prove what it was told ("not revoked at time T"), turning equivocation —
+  serving different revocation states to different verifiers — from an
+  invisible attack into a provable, contractually actionable event;
+- the identity/registry layer can therefore live on **any Ethereum L2** —
+  because the revocation data is off-chain, the choice of chain is decoupled
+  from storage.
 
 Resolution reuses the existing CRSet verifier:
 
@@ -412,27 +453,39 @@ Resolution reuses the existing CRSet verifier:
 CRSetEntry.statusServiceOperator (a DID)
   → resolve DID document
   → find the harbour:CRSetRevocationRegistryService (by type)
-  → service endpoint = an IPNS address
-  → resolve IPNS → fetch the cascade from IPFS
+  → service registryEndpoint = an HTTPS URL
+  → fetch the latest snapshot VC (JOSE)
+  → verify the snapshot JWS against the operator DID document's
+    assertion methods; check validFrom/validUntil
   → membership-test statusIndex against the cascade
 ```
 
 `statusIndex` is the credential's random 256-bit revocation ID. Checking is
 **non-interactive for the holder** — the verifier fetches the cascade and runs the
-test. The privacy properties (padding, scheduled republish) are unchanged from the
-paper.
+test, and MAY cache the verified snapshot until its `validUntil` (one fetch per
+publication window, not per verification). The privacy properties (padding,
+scheduled republish) are unchanged from the paper; the **fixed cadence is
+load-bearing** — publish-on-revoke would leak revocation timing, so unchanged
+snapshots are republished on schedule with a fresh signature and `validFrom`.
 
 ### 7.2 The entry: issuer-controlled pointer, Signing-Service-maintained data
 
 `statusServiceOperator` is the **issuer's DID**. The issuer's DID document
-carries a CRSet service entry that points to the IPNS of the revocation data
-the **Signing Service maintains** as an operational service. The two halves of
-revocation authority split along the same line as issuance itself (§2):
+carries a CRSet service entry whose `registryEndpoint` points at the
+revocation data the **Signing Service maintains** as an operational service.
+The two halves of revocation authority split along the same line as issuance
+itself (§2):
 
 **Routine, per-credential revocation — Signing Service.** The batch's N
 revocation IDs join the cascade the Signing Service maintains. It performs
 routine revocation (key compromise, issuance error, a single employee leaving)
 by adding the ID to the set; latency is bounded by the publish interval.
+Revocation is **permanent**: `statusPurpose: revocation` is terminal per the
+W3C status vocabulary, so once an ID enters the cascade it appears in **every
+subsequent snapshot** — there is no un-revoke. A mistaken revocation is
+remedied by issuing a **fresh credential with a new ID**, never by removing
+the old one. Verifiers are entitled to cache a cascade-listed "revoked"
+verdict as a terminal fact.
 
 **Issuer-wide kill switch — issuer.** The resolution path depends on the
 issuer's own DID service entry. To revoke **all** of its issued credentials at
@@ -450,34 +503,48 @@ roster and make every firing a public event, defeating the CRSet's metadata
 privacy. So the kill switch covers issuer-wide cases (ecosystem exit, key
 compromise, dispute with the Signing Service) and **backstops** the routine
 path: because the issuer always holds the pointer, the Signing Service can
-never keep an issuer's credentials alive against its will. Note the converse
-also holds by design: since the issuer owns the credential lifecycle
-(ADR-006), an issuer that redirects its service entry to stale data can
-resurrect credentials the Signing Service revoked — routine revocation is an
-operational service the issuer delegates, not an authority held against the
-issuer. Single-employee revocation driven by the organization is simply a
-request to the Signing Service (honored by adding the ID to the cascade),
-which is unproblematic because organization and issuer are the same party.
+never keep an issuer's credentials alive against its will.
+
+The kill switch is a **pointer-level liveness toggle, not an un-revoke
+mechanism**. An issuer that redirects its service entry at stale data cannot
+resurrect a cascade-listed credential in practice: snapshots are signed and
+timestamped (§7.1), so stale data is visible as stale (`validUntil` expired,
+bounded by each verifier's freshness policy, §7.3), a verifier that has
+already seen the revocation may cache it as terminal, and the retained signed
+snapshots make the divergence provable. Single-employee revocation driven by
+the organization is simply a request to the Signing Service (honored by
+adding the ID to the cascade), which is unproblematic because organization
+and issuer are the same party.
 
 ### 7.3 Verifier rules (normative)
 
 1. **Fail-closed.** If an entry's operator DID resolves but exposes **no** CRSet
-   service, the credential MUST be treated as **revoked**. (This inverts the usual
+   service, the credential MUST be treated as **invalid** (this is the issuer's
+   kill switch firing, §7.2 — a pointer-level state, distinct from the terminal
+   per-credential "revoked" verdict of rule 4). This inverts the usual
    "missing status mechanism = error" default; implementers and third-party
-   verifiers MUST honor it, or the kill switch silently fails.)
-2. **Inconclusive ≠ valid.** A transient resolution failure (DID resolution, IPNS,
-   or IPFS unavailable) MUST NOT be treated as valid, nor as revoked; verification
-   cannot complete until a finalized view is obtained. Only a confirmed, finalized
-   _absence_ of the CRSet service counts as revoked.
+   verifiers MUST honor it, or the kill switch silently fails.
+2. **Inconclusive ≠ valid.** A transient resolution failure (DID resolution
+   or registry endpoint unavailable, snapshot signature invalid) MUST NOT be
+   treated as valid, nor as revoked; verification cannot complete until a
+   finalized view is obtained. Only a confirmed, finalized _absence_ of the
+   CRSet service counts as the kill switch (rule 1). Freshness and downtime
+   handling are deliberately **left to each verifier**: it sets its own
+   maximum snapshot age and decides whether to fail open or closed while the
+   endpoint is unreachable, according to its own risk profile (a cached,
+   signature-verified snapshot within a bounded grace window is the
+   recommended middle ground; cold-start with no cache ⇒ reject).
 3. **Dedicated entry.** In the issuer's DID document, the CRSet service used
    for this kill switch MUST serve no other purpose, so that deleting it does
    exactly one thing (no blast radius onto the issuer's other services).
-4. **Toggle vs monotonicity.** Re-adding the issuer's CRSet service restores
-   issuer-level liveness, and any credential whose `statusIndex` is in the
-   cascade (§7.2) stays revoked for as long as the entry points at that
-   cascade. Per-credential revocations are monotonic under an honest pointer;
-   §7.2 notes the issuer's power to redirect it, which is intentional
-   (revocation authority follows issuance authority).
+4. **Revocation is permanent and monotonic.** A credential whose
+   `statusIndex` is listed in a verified cascade is **revoked**, terminally:
+   the ID appears in every subsequent snapshot (§7.2), there is no un-revoke,
+   and a verifier MAY cache this verdict forever. Re-adding a deleted CRSet
+   service (ending a kill-switch state, rule 1) restores resolvability for
+   the issuer's credentials but cannot resurrect a cascade-listed one — a
+   mistaken revocation is remedied only by issuing a fresh credential with a
+   new `statusIndex`.
 
 ---
 
@@ -538,14 +605,17 @@ either void past authorizations or silently un-revoke credentials.
   leaves hash salted `_sd` digests (§4.1.1), so an observer of one credential
   cannot learn — or guess-and-confirm — the content of sibling credentials.
 - The CRSet (§7.1) hides per-credential revocation status and aggregate counts;
-  the IPFS-stored cascade keeps the same padding/schedule privacy as the paper.
+  the HTTPS-hosted cascade keeps the same padding/schedule privacy as the
+  paper (the guarantees are properties of the data format, not the storage
+  layer), and the fixed publication cadence keeps revocation _timing_ from
+  leaking.
 - The kill switch (§7.2) is an organization-wide action on the organization's own
   DID document; it reveals only that the organization withdrew its CRSet service,
   never per-employee information.
 
 ### 9.5 Fail-open hazard
 
-The fail-closed rule (an unresolvable CRSet service ⇒ revoked, §7.3) is the
+The fail-closed rule (an unresolvable CRSet service ⇒ invalid, §7.3) is the
 opposite of the usual fail-open default. A verifier that treats a missing CRSet
 service as "valid" silently defeats the organization's sovereign revocation lever.
 The rule is therefore normative for all CRSet entries, not a special case.
@@ -569,12 +639,13 @@ generated deterministically by `tests/fixtures/gen_batched_evidence_vectors.py`
 and pinned by `tests/python/harbour/test_merkle.py` (so they cannot drift from the
 implementation in `harbour.merkle`). They cover:
 
-- **N = 4 batch** — four credential payloads, their four leaves, the two
-  level-1 internal nodes and the root, and the four inclusion proofs. The root
-  (which the authorization message commits to, §4.3.1) is
-  `Uz_rIhlrkBdIgpN1mzZe_NlIU6fBJl7gHGLbN31wvKw`.
+- **N = 4 batch** — four credential payloads (ADR-006 shape: org-issued,
+  `memberOf == issuer`, single issuer-operated `CRSetEntry`), their four
+  leaves, the two level-1 internal nodes and the root, and the four inclusion
+  proofs. The root (which the authorization message commits to, §4.3.1) is
+  `hgcP66JtVHzrUW2vTnaZUi5ZyLmwe1z7NcEyx598pPU`.
 - **N = 1 degenerate batch** — root equals the lone leaf
-  (`cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No`), `merkleProof.path` is empty.
+  (`z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo`), `merkleProof.path` is empty.
 - **Evidence invariance (§4.1)** — the leaf is byte-identical whether or not the
   credential carries an `evidence` member (and a `proof` member). For a
   `dc+sd-jwt` credential this extends to selective disclosure, since the leaf is
@@ -603,8 +674,6 @@ inconclusive ≠ valid, §7.3).
 | [CRSet]    | Hoops, Gebele, Matthes — _CRSet: Private Non-Interactive VC Revocation_   | arXiv:2501.17089                    |
 | RFC 8785   | JSON Canonicalization Scheme (JCS)                                        | —                                   |
 | [RFC 6962] | Certificate Transparency — Merkle leaf/node domain separation            | —                                   |
-| [IPFS]     | InterPlanetary File System — content-addressed cascade storage           | —                                   |
-| [IPNS]     | InterPlanetary Naming System — stable mutable pointer to the cascade      | —                                   |
 | —          | Harbour DID Identity System (`IdentityController`, P-256 on-chain)        | `docs/did-identity-system.md`       |
 
 ---
@@ -613,6 +682,7 @@ inconclusive ≠ valid, §7.3).
 
 | Version     | Date       | Changes                                                                                       |
 | ----------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1.3.0-draft | 2026-07-10 | Authorizer binding made normative: for the identity credentials `authorizedBy` MUST equal the credential `issuer` (§3, §6 step 6; future credential types may bind evidence to other parties — evidence stays an array). `sd_hash` marked REQUIRED per RFC 9901 (opaque downstream; examples carry a documented placeholder). §7 storage model corrected to the decided design: the cascade is a **signed, timestamped VC-JOSE snapshot hosted by the Signing Service at an HTTPS `registryEndpoint`** (matching the example DID documents) — IPFS/IPNS dropped; snapshot signature verification and `validFrom`/`validUntil` added to the resolution flow; **revocation is permanent** (no un-revoke; re-issue with a new ID), the issuer kill switch is a pointer-level liveness toggle distinct from the terminal revoked verdict; verifier freshness/downtime policy explicitly verifier-owned. |
 | 1.2.0-draft | 2026-07-07 | Wallet-realistic authorization: the plain-JWS authorization profile (custom `typ`) is dropped — wallets sign only via OID4VP, so the authorization is the presentation ceremony's **KB-JWT** (`typ: kb+jwt`, no `iss`, no `kid`) over a SIWE-style **authorization message** whose statement carries the batch root (normative grammar, §4.3.1); new `authorizationMessage` evidence member; downstream authority check = KB-JWT key is a verification method of `authorizedBy`'s DID document as of `iat`; `aud` = the OID4VP intake verifier (checked at intake, opaque downstream). |
 | 1.1.0-draft | 2026-07-06 | Sovereign-issuer trust model (ADR-006): issuer = vouching party's `did:ethr`, Signing Service signs under an assertion-only mandate key in the issuer's DID document; evidence signed by a human admin key on the org DID; single issuer-operated `CRSetEntry` replaces the dual-entry model; evidence field `authorizer` renamed to `authorizedBy`; authorization JWT `aud` = the executing Signing Service. |
 | 1.0.0-draft | 2026-06-22 | Initial draft: Merkle-batched `BatchCredentialEvidence` for `dc+sd-jwt`; Model B trust model; DID-resolved authorization JWT; dual-entry revocation (CRSet + org-wide did:ethr kill switch). |

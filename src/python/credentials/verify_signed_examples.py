@@ -11,8 +11,11 @@ For every ``<name>.sd-jwt`` under ``examples/signed/`` and
   2. If the credential carries ``harbour:BatchCredentialEvidence``, verify the
      batched evidence (``verify_batch_evidence``): recompute the Merkle leaf from
      the *raw* issuer payload (with ``_sd`` digests, ``evidence`` stripped), fold
-     the inclusion proof, and check it against the root signed in the
-     authorization JWT — verified against the authorizer's admin key.
+     the inclusion proof, and check it against the root committed in the signed
+     ``authorizationMessage`` (whose SHA-256 hex is the KB-JWT ``nonce``) —
+     the KB-JWT verified against the authorizer's admin wallet key. The
+     evidence ``authorizedBy`` MUST equal the credential ``issuer``
+     (spec §6, step 6).
   3. For credentials carrying ``memberOf``, check ``memberOf == issuer``
      (ADR-006: an organization issues its own members' credentials).
 
@@ -44,7 +47,7 @@ from credentials.example_signer import (
     RoleKeyring,
     _find_repo_root,
     _intake_client_id,
-    batch_authorizer,
+    batch_evidence_entry,
     load_role_keyring,
     load_test_p256_keypair,
 )
@@ -175,13 +178,22 @@ def verify_signed_dir(
         if resolved_dir.is_dir():
             for stale in resolved_dir.glob("*.json"):
                 stale.unlink()
-    for sd_jwt_path in sorted(signed_dir.glob("*.sd-jwt")):
+    sd_jwt_paths = sorted(signed_dir.glob("*.sd-jwt"))
+    if not sd_jwt_paths:
+        counts.errors.append(
+            f"{signed_dir}: no signed credentials (*.sd-jwt) found — "
+            "the sign step produced nothing"
+        )
+        return counts
+    for sd_jwt_path in sd_jwt_paths:
         sd_jwt = sd_jwt_path.read_text(encoding="utf-8").strip()
         raw = _raw_issuer_payload(sd_jwt)
         issuer_did = raw.get("issuer", "")
 
         # Resolve the proof key from the issuer's DID document via kid
-        # (ADR-006); the fallback key covers keyring-less environments.
+        # (ADR-006); the fallback key covers keyring-less environments only —
+        # an issuer-prefixed kid that names no published verification method
+        # is an error, never a fallback (it would accept forged mandates).
         kid = _issuer_header(sd_jwt).get("kid")
         if kid is not None and vm_keys:
             if not kid.startswith(f"{issuer_did}#"):
@@ -190,7 +202,13 @@ def verify_signed_dir(
                     f"verification method of issuer {issuer_did}"
                 )
                 continue
-            issuer_pub = vm_keys.get(kid, fallback_pub)
+            issuer_pub = vm_keys.get(kid)
+            if issuer_pub is None:
+                counts.errors.append(
+                    f"{sd_jwt_path.name}: proof kid {kid!r} names no "
+                    "verification method published in the issuer's DID document"
+                )
+                continue
         else:
             issuer_pub = did_to_pub.get(issuer_did, fallback_pub)
 
@@ -210,10 +228,28 @@ def verify_signed_dir(
             )
             continue
 
-        authorizer = batch_authorizer(raw)
-        if authorizer is None:
+        evidence = batch_evidence_entry(raw)
+        if evidence is None:
             counts.plain += 1
             print(f"  OK (plain): {sd_jwt_path.name}")
+            continue
+
+        # Fail closed: typed batch evidence without an authorizer is
+        # malformed, never "plain".
+        authorizer = evidence.get("authorizedBy")
+        if not isinstance(authorizer, str):
+            counts.errors.append(
+                f"{sd_jwt_path.name}: BatchCredentialEvidence missing authorizedBy"
+            )
+            continue
+        # Identity credentials: the authorizing party must be the party
+        # vouching for the credential (spec §6, step 6). Without this, any
+        # DID's admin signature would authorize any issuer's batch.
+        if authorizer != issuer_did:
+            counts.errors.append(
+                f"{sd_jwt_path.name}: evidence authorizedBy {authorizer} != "
+                f"issuer {issuer_did} (spec §6, step 6)"
+            )
             continue
 
         authorizer_pub = did_to_pub.get(authorizer)
@@ -228,7 +264,7 @@ def verify_signed_dir(
             # is the admin wallet key from the authorizedBy DID document.
             verify_batch_evidence(
                 raw,
-                raw["evidence"][0],
+                evidence,
                 authorizer_pub,
                 expected_audience=expected_audience,
             )

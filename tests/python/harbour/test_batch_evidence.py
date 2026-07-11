@@ -31,6 +31,8 @@ from harbour.verifier import VerificationError
 AUTHORIZED_BY = "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
 # The OID4VP intake verifier's client id (gatehouse did:key stand-in).
 AUDIENCE = "did:key:zDnaefrde2MxCJfVoE1Z6RW6Zk6S91ot2w2x1c9Xwm5WiBMo9"
+# Every KB-JWT carries an sd_hash (RFC 9901 §4.3); opaque to these tests.
+SD_HASH = "c29tZS1oYXNo"
 
 
 def _payload(n: int) -> dict:
@@ -91,7 +93,9 @@ def test_authorization_round_trip(keypair):
     priv, pub = keypair
     root = merkle_root_b64url([compute_leaf(_payload(1))])
     message = _message(root)
-    token = sign_authorization(message, priv, audience=AUDIENCE, iat=1_800_000_000)
+    token = sign_authorization(
+        message, priv, audience=AUDIENCE, sd_hash=SD_HASH, iat=1_800_000_000
+    )
     payload = verify_authorization(
         token, pub, message=message, expected_audience=AUDIENCE
     )
@@ -107,7 +111,9 @@ def test_authorization_typ_is_kb_jwt(keypair):
     import json
 
     priv, _ = keypair
-    token = sign_authorization(_message("A" * 43), priv, audience=AUDIENCE)
+    token = sign_authorization(
+        _message("A" * 43), priv, audience=AUDIENCE, sd_hash=SD_HASH
+    )
     header_b64 = token.split(".")[0]
     header = json.loads(
         base64.urlsafe_b64decode(header_b64 + "=" * (-len(header_b64) % 4))
@@ -116,19 +122,51 @@ def test_authorization_typ_is_kb_jwt(keypair):
     assert "kid" not in header
 
 
-def test_authorization_carries_optional_sd_hash(keypair):
+def test_authorization_always_carries_sd_hash(keypair):
+    """Every KB-JWT carries sd_hash (RFC 9901 §4.3); opaque downstream (§6)."""
     priv, pub = keypair
     message = _message("A" * 43)
-    token = sign_authorization(message, priv, audience=AUDIENCE, sd_hash="c29tZS1oYXNo")
+    token = sign_authorization(message, priv, audience=AUDIENCE, sd_hash=SD_HASH)
     payload = verify_authorization(token, pub, message=message)
-    # sd_hash rides along; downstream verifiers treat it as opaque (§6).
-    assert payload["sd_hash"] == "c29tZS1oYXNo"
+    assert payload["sd_hash"] == SD_HASH
+
+
+def test_authorization_rejects_non_integer_iat(keypair):
+    """Fractional and boolean iat are rejected identically in both runtimes."""
+    import base64
+    import json
+
+    from joserfc import jws as _jws
+
+    from harbour._crypto import import_private_key as _imp
+
+    priv, pub = keypair
+    message = _message("A" * 43)
+    for bad_iat in (1_800_000_000.5, True):
+        payload = {
+            "iat": bad_iat,
+            "aud": AUDIENCE,
+            "nonce": hashlib.sha256(message.encode()).hexdigest(),
+            "sd_hash": SD_HASH,
+        }
+        token = _jws.serialize_compact(
+            {"alg": "ES256", "typ": "kb+jwt"},
+            json.dumps(payload).encode(),
+            _imp(priv, "ES256"),
+            algorithms=["ES256"],
+        )
+        # sanity: the crafted token really carries the bad iat
+        p_b64 = token.split(".")[1]
+        crafted = json.loads(base64.urlsafe_b64decode(p_b64 + "=" * (-len(p_b64) % 4)))
+        assert crafted["iat"] == bad_iat
+        with pytest.raises(VerificationError, match="integer iat"):
+            verify_authorization(token, pub, message=message)
 
 
 def test_authorization_audience_mismatch(keypair):
     priv, pub = keypair
     message = _message("A" * 43)
-    token = sign_authorization(message, priv, audience=AUDIENCE)
+    token = sign_authorization(message, priv, audience=AUDIENCE, sd_hash=SD_HASH)
     with pytest.raises(VerificationError):
         verify_authorization(
             token, pub, message=message, expected_audience="did:key:zWrong"
@@ -139,7 +177,7 @@ def test_authorization_message_mismatch(keypair):
     """A tampered message no longer hashes to the signed nonce."""
     priv, pub = keypair
     message = _message("A" * 43)
-    token = sign_authorization(message, priv, audience=AUDIENCE)
+    token = sign_authorization(message, priv, audience=AUDIENCE, sd_hash=SD_HASH)
     with pytest.raises(VerificationError):
         verify_authorization(token, pub, message=message + " ")
 
@@ -151,7 +189,7 @@ def test_build_and_verify_batch(keypair):
     priv, pub = keypair
     payloads = [_payload(i) for i in range(1, 5)]  # N = 4
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     assert len(evidence) == 4
     # One signature and one message shared across the whole batch.
@@ -171,7 +209,7 @@ def test_n1_degenerate_batch(keypair):
     priv, pub = keypair
     payloads = [_payload(1)]
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     assert evidence[0]["merkleProof"]["path"] == []
     verify_batch_evidence({**payloads[0], "evidence": evidence}, evidence[0], pub)
@@ -181,7 +219,7 @@ def test_tampered_payload_fails(keypair):
     priv, pub = keypair
     payloads = [_payload(i) for i in range(1, 5)]
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     tampered = copy.deepcopy(payloads[0])
     tampered["credentialSubject"]["id"] = "did:ethr:0x14a34:0xdeadbeef"
@@ -194,7 +232,7 @@ def test_tampered_message_fails(keypair):
     priv, pub = keypair
     payloads = [_payload(1)]
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     ev = copy.deepcopy(evidence[0])
     real_root, _ = extract_root_from_message(ev["authorizationMessage"])
@@ -207,7 +245,7 @@ def test_missing_message_fails(keypair):
     priv, pub = keypair
     payloads = [_payload(1)]
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     ev = {k: v for k, v in evidence[0].items() if k != "authorizationMessage"}
     with pytest.raises(VerificationError):
@@ -219,7 +257,7 @@ def test_wrong_wallet_key_fails(keypair):
     _, other_pub = generate_p256_keypair()
     payloads = [_payload(1)]
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     with pytest.raises(VerificationError):
         verify_batch_evidence(payloads[0], evidence[0], other_pub)
@@ -230,7 +268,7 @@ def test_evidence_excluded_from_leaf_so_proof_holds_after_attach(keypair):
     priv, pub = keypair
     payloads = [_payload(i) for i in range(1, 4)]
     evidence = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     # The leaf computed with vs without evidence must match (evidence stripped).
     with_ev = {**payloads[2], "evidence": [evidence[2]]}
@@ -243,10 +281,10 @@ def test_kb_jwt_not_replayable_across_ceremonies(keypair):
     priv, _ = keypair
     payloads = [_payload(1)]
     ev_a = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     ev_b = build_batch_evidence(
-        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE
+        payloads, priv, authorized_by=AUTHORIZED_BY, audience=AUDIENCE, sd_hash=SD_HASH
     )
     # The random ceremony nonce inside the hashed message makes each
     # ceremony's commitment unique even for an identical root (§9.6).

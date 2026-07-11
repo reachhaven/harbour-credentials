@@ -486,9 +486,10 @@ This signs all `examples/*.json` and `examples/gaiax/*.json` files, writing
 artifacts to `examples/signed/` and `examples/gaiax/signed/` respectively.
 
 > **Wire format vs JSON-LD**: The `.json` files in this directory show credentials
-> as expanded JSON-LD for readability. On the wire, every credential and VP is
-> encoded as a VC-JOSE-COSE compact JWS (`typ: vc+jwt` or `vp+jwt`)
-> signed with ES256 (P-256). The `.jwt` files contain the actual wire format.
+> as expanded JSON-LD for readability. On the wire, every credential is a
+> `dc+sd-jwt` SD-JWT-VC signed with ES256 (P-256). The `.sd-jwt` files contain
+> the actual wire format; `.decoded.json` files show the decoded issuer JWT
+> and disclosures.
 
 ## Related Documentation
 

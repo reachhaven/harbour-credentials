@@ -10,9 +10,12 @@
  *      #delegate-1 mandate key). The example DID documents under
  *      ``examples/did-ethr/`` stand in for live did:ethr resolution.
  *   2. If the credential carries harbour:BatchCredentialEvidence, verify the
- *      batched evidence (verifyBatchEvidence): recompute the Merkle leaf from the
- *      raw issuer payload, fold the inclusion proof, and check it against the root
- *      signed in the authorization JWT — verified against the authorizer's key.
+ *      batched evidence (verifyBatchEvidence): recompute the Merkle leaf from
+ *      the raw issuer payload, fold the inclusion proof, and check it against
+ *      the root committed in the signed authorizationMessage (whose SHA-256
+ *      hex is the KB-JWT nonce) — the KB-JWT verified against the
+ *      authorizer's admin wallet key. The evidence authorizedBy MUST equal
+ *      the credential issuer (spec §6, step 6).
  *   3. For credentials carrying memberOf, check memberOf == issuer (ADR-006).
  */
 
@@ -21,10 +24,11 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  importP256PrivateKey,
   importP256PublicKey,
   verifySdJwtVc,
   verifyBatchEvidence,
+  p256PublicKeyToDidKey,
+  EVIDENCE_TYPE,
   type JWK,
 } from "./index.js";
 
@@ -73,7 +77,6 @@ async function loadFallbackPub(): Promise<CryptoKey> {
   const jwk: JWK = JSON.parse(
     readFileSync(join(KEYS_DIR, "test-keypair-p256.json"), "utf-8"),
   );
-  await importP256PrivateKey(jwk); // validate keypair loads
   return importP256PublicKey(jwk);
 }
 
@@ -114,13 +117,20 @@ async function loadDidVmKeys(): Promise<Map<string, CryptoKey>> {
 
 /**
  * The OID4VP intake verifier's client id — the expected KB-JWT audience
- * (§4.3). The Signing Service role's did:key stands in for the gatehouse.
+ * (§4.3). The Signing Service role's did:key stands in for the gatehouse;
+ * like the Python mirror, falls back to the fixture key's did:key so the
+ * audience check is ALWAYS enforced (never silently skipped).
  */
-function loadIntakeClientId(): string | null {
+async function loadIntakeClientId(): Promise<string> {
   const mapping = JSON.parse(
     readFileSync(join(KEYS_DIR, "role-did-mapping.json"), "utf-8"),
   ) as Record<string, { did_key?: string }>;
-  return mapping.haven?.did_key ?? null;
+  const fromMapping = mapping.haven?.did_key;
+  if (fromMapping) return fromMapping;
+  const jwk: JWK = JSON.parse(
+    readFileSync(join(KEYS_DIR, "test-keypair-p256.json"), "utf-8"),
+  );
+  return p256PublicKeyToDidKey(await importP256PublicKey(jwk));
 }
 
 const MEMBER_OF_KEYS = ["harbour.gx:memberOf", "memberOf"];
@@ -141,10 +151,7 @@ function batchEvidence(raw: Record<string, unknown>): Record<string, unknown> | 
   const ev = evidence[0] as Record<string, unknown>;
   let types = ev.type;
   if (typeof types === "string") types = [types];
-  if (
-    Array.isArray(types) &&
-    types.some((t) => typeof t === "string" && t.endsWith("BatchCredentialEvidence"))
-  ) {
+  if (Array.isArray(types) && types.some((t) => t === EVIDENCE_TYPE)) {
     return ev;
   }
   return null;
@@ -163,7 +170,7 @@ async function main(): Promise<void> {
   const didToPub = await loadDidToPub();
   const fallbackPub = await loadFallbackPub();
   const vmKeys = await loadDidVmKeys();
-  const intakeId = loadIntakeClientId();
+  const intakeId = await loadIntakeClientId();
 
   let credentials = 0;
   let batch = 0;
@@ -175,13 +182,21 @@ async function main(): Promise<void> {
     const files = readdirSync(signedDir)
       .filter((f) => f.endsWith(".sd-jwt"))
       .sort();
+    if (files.length === 0) {
+      errors.push(
+        `${signedDir}: no signed credentials (*.sd-jwt) found — the sign step produced nothing`,
+      );
+      continue;
+    }
     for (const file of files) {
       const sdJwt = readFileSync(join(signedDir, file), "utf-8").trim();
       const raw = rawIssuerPayload(sdJwt);
       const issuerDid = (raw.issuer as string) ?? "";
 
       // Resolve the proof key from the issuer's DID document via kid
-      // (ADR-006); the fallback key covers keyring-less environments.
+      // (ADR-006); the fallback key covers keyring-less environments only —
+      // an issuer-prefixed kid that names no published verification method
+      // is an error, never a fallback (it would accept forged mandates).
       const kid = issuerHeader(sdJwt).kid;
       let issuerPub: CryptoKey;
       if (typeof kid === "string" && vmKeys.size > 0) {
@@ -191,7 +206,14 @@ async function main(): Promise<void> {
           );
           continue;
         }
-        issuerPub = vmKeys.get(kid) ?? fallbackPub;
+        const vmKey = vmKeys.get(kid);
+        if (!vmKey) {
+          errors.push(
+            `${file}: proof kid ${kid} names no verification method published in the issuer's DID document`,
+          );
+          continue;
+        }
+        issuerPub = vmKey;
       } else {
         issuerPub = didToPub.get(issuerDid) ?? fallbackPub;
       }
@@ -219,7 +241,22 @@ async function main(): Promise<void> {
         console.log(`  OK (plain): ${file}`);
         continue;
       }
-      const authorizer = evidence.authorizedBy as string;
+      // Fail closed: typed batch evidence without an authorizer is
+      // malformed, never "plain".
+      const authorizer = evidence.authorizedBy;
+      if (typeof authorizer !== "string") {
+        errors.push(`${file}: BatchCredentialEvidence missing authorizedBy`);
+        continue;
+      }
+      // Identity credentials: the authorizing party must be the party
+      // vouching for the credential (spec §6, step 6). Without this, any
+      // DID's admin signature would authorize any issuer's batch.
+      if (authorizer !== issuerDid) {
+        errors.push(
+          `${file}: evidence authorizedBy ${authorizer} != issuer ${issuerDid} (spec §6, step 6)`,
+        );
+        continue;
+      }
       const authorizerPub = didToPub.get(authorizer);
       if (!authorizerPub) {
         errors.push(`${file}: no key for authorizer ${authorizer}`);
@@ -230,7 +267,7 @@ async function main(): Promise<void> {
         // (gatehouse did:key) — spec §4.3 / §9.6. authorizerPub is the admin
         // wallet key from the authorizedBy DID document.
         await verifyBatchEvidence(raw, evidence, authorizerPub, {
-          expectedAudience: intakeId ?? undefined,
+          expectedAudience: intakeId,
         });
       } catch (e) {
         errors.push(`${file}: batch evidence: ${e instanceof Error ? e.message : e}`);

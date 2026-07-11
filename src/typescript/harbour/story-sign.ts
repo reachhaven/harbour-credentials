@@ -7,9 +7,10 @@
  * credentials with batched evidence into each directory's ``signed/`` folder.
  *
  *   - Issuers are sovereign (ADR-006): every proof is executed by the Signing
- *     Service key — as itself (#controller) on its own artifacts, and via the
- *     assertion-only #delegate-1 mandate in the issuer's DID document for
- *     sovereign issuers. The proof ``kid`` names that verification method.
+ *     Service key, with the proof ``kid`` resolved at signing time from the
+ *     issuer's DID document (examples/did-ethr/) — the assertion method whose
+ *     publicKeyJwk matches the Signing Service key. did:ethr fragments are
+ *     per-update-event and never hardcoded.
  *   - Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
  *     batch per (output dir, authorizer). The authorizer's admin key signs ONE
  *     authorization JWT over the batch Merkle root; each credential gets its own
@@ -40,6 +41,7 @@ import {
   buildSdJwtPayload,
   signSdJwt,
   buildBatchEvidence,
+  EVIDENCE_TYPE,
   type JWK,
 } from "./index.js";
 
@@ -71,9 +73,19 @@ const VCT_PREFIX: Record<string, string> = {
 };
 const DEFAULT_VCT = "https://w3id.org/reachhaven/harbour/core/v1/VerifiableCredential";
 
+// Placeholder KB-JWT `sd_hash` for the simulated wallet ceremony (spec §4.3):
+// every real KB-JWT carries an sd_hash (RFC 9901 §4.3), but the story pipeline
+// has no actual OID4VP presentation to hash, so it uses this fixed value —
+// SHA-256 of "harbour-credentials example ceremony: no real OID4VP
+// presentation". Downstream verifiers ignore the value by spec. Mirrors
+// EXAMPLE_SD_HASH in credentials/example_signer.py.
+const EXAMPLE_SD_HASH = "s0c-KDj7V3cRdVS9sTSAoiOLY-kvvmMdIk1wO0yt974";
+
 interface RoleKeyEntry {
   privateKey: CryptoKey;
   kid: string;
+  /** Public JWK coordinates, for matching against DID-document methods. */
+  publicJwk?: { x: string; y: string };
 }
 
 const ROLE_FILES: Record<string, string> = {
@@ -104,6 +116,7 @@ async function loadRoleKeyring(): Promise<RoleKeyring> {
     byDID.set(did, {
       privateKey: await importP256PrivateKey(jwk),
       kid: `${did}#controller`,
+      publicJwk: { x: jwk.x as string, y: jwk.y as string },
     });
     roleDids.set(role, did);
     const didKey = mapping[role]?.did_key;
@@ -128,7 +141,11 @@ async function loadFallbackKey(): Promise<RoleKeyEntry> {
 function vctForCredential(vc: Record<string, unknown>): string {
   for (const t of (vc.type as string[]) ?? []) {
     if (typeof t === "string" && t.includes(":")) {
-      const [prefix, local] = t.split(":", 2);
+      // First colon only, KEEPING the remainder — JS split(":", 2) truncates
+      // a local name containing a colon (Python mirror: split(":", 1)).
+      const sep = t.indexOf(":");
+      const prefix = t.slice(0, sep);
+      const local = t.slice(sep + 1);
       const base = VCT_PREFIX[prefix];
       if (base) return base + local;
     }
@@ -136,29 +153,36 @@ function vctForCredential(vc: Record<string, unknown>): string {
   return DEFAULT_VCT;
 }
 
-function disclosablePaths(vc: Record<string, unknown>): string[] {
+// Segment lists, not dot-strings — claim keys contain dots (harbour.gx:*).
+function disclosablePaths(vc: Record<string, unknown>): string[][] {
   const cs = vc.credentialSubject;
   if (!cs || typeof cs !== "object") return [];
   return Object.keys(cs as object)
     .filter((k) => k !== "id" && k !== "type")
-    .map((k) => `credentialSubject.${k}`);
+    .map((k) => ["credentialSubject", k]);
 }
 
-function batchAuthorizer(vc: Record<string, unknown>): string | null {
+/** The harbour:BatchCredentialEvidence object, if any (exact type match). */
+function batchEvidenceEntry(
+  vc: Record<string, unknown>,
+): Record<string, unknown> | null {
   const evidence = vc.evidence;
   if (!Array.isArray(evidence) || evidence.length === 0) return null;
   const ev = evidence[0];
   if (!ev || typeof ev !== "object") return null;
   let types = (ev as Record<string, unknown>).type;
   if (typeof types === "string") types = [types];
-  if (
-    Array.isArray(types) &&
-    types.some((t) => typeof t === "string" && t.endsWith("BatchCredentialEvidence"))
-  ) {
-    const authorizer = (ev as Record<string, unknown>).authorizedBy;
-    return typeof authorizer === "string" ? authorizer : null;
+  if (Array.isArray(types) && types.some((t) => t === EVIDENCE_TYPE)) {
+    return ev as Record<string, unknown>;
   }
   return null;
+}
+
+function batchAuthorizer(vc: Record<string, unknown>): string | null {
+  const ev = batchEvidenceEntry(vc);
+  if (ev === null) return null;
+  const authorizer = ev.authorizedBy;
+  return typeof authorizer === "string" ? authorizer : null;
 }
 
 function b64urlToString(s: string): string {
@@ -199,23 +223,80 @@ function resolveKey(
   return byDID.get(did) ?? fallback;
 }
 
+/** did -> [(vm id, jwk x/y)] for every P-256 assertion method in the example DID docs. */
+type AssertionMethods = Map<string, { id: string; x: string; y: string }[]>;
+
+/**
+ * Read `examples/did-ethr/*.did.json` (standing in for live did:ethr
+ * resolution) and index each document's P-256 assertion methods.
+ */
+function loadAssertionMethods(): AssertionMethods {
+  const out: AssertionMethods = new Map();
+  const dir = join(EXAMPLES_DIR, "did-ethr");
+  let files: string[] = [];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".did.json")).sort();
+  } catch {
+    return out;
+  }
+  for (const f of files) {
+    const doc = JSON.parse(readFileSync(join(dir, f), "utf-8")) as Record<
+      string,
+      unknown
+    >;
+    const did = doc.id;
+    if (typeof did !== "string") continue;
+    const assertion = new Set(
+      Array.isArray(doc.assertionMethod) ? (doc.assertionMethod as string[]) : [],
+    );
+    const methods: { id: string; x: string; y: string }[] = [];
+    for (const vm of Array.isArray(doc.verificationMethod)
+      ? (doc.verificationMethod as Record<string, unknown>[])
+      : []) {
+      const id = vm.id;
+      const jwk = vm.publicKeyJwk as Record<string, unknown> | undefined;
+      if (
+        typeof id === "string" &&
+        assertion.has(id) &&
+        jwk &&
+        jwk.crv === "P-256" &&
+        typeof jwk.x === "string" &&
+        typeof jwk.y === "string"
+      ) {
+        methods.push({ id, x: jwk.x, y: jwk.y });
+      }
+    }
+    out.set(did, methods);
+  }
+  return out;
+}
+
 /**
  * Signing Service key + kid for a credential proof (ADR-006).
  *
- * The Signing Service executes every proof: as itself (#controller) on its
- * own artifacts, and through the assertion-only #delegate-1 mandate in the
- * issuer's DID document for sovereign issuers.
+ * The Signing Service executes every proof; the kid is RESOLVED AT SIGNING
+ * TIME from the issuer's DID document — the assertion method whose
+ * publicKeyJwk matches the Signing Service key. did:ethr fragments are
+ * per-update-event and can never be hardcoded.
  */
 function proofKey(
   issuerDid: string,
   keyring: RoleKeyring,
   fallback: RoleKeyEntry,
+  assertionMethods: AssertionMethods,
 ): RoleKeyEntry {
   const ssDid = keyring.roleDids.get("haven");
   const ss = ssDid ? keyring.byDID.get(ssDid) : undefined;
-  if (ssDid && ss) {
-    const fragment = issuerDid === ssDid ? "#controller" : "#delegate-1";
-    return { privateKey: ss.privateKey, kid: `${issuerDid}${fragment}` };
+  if (ssDid && ss && ss.publicJwk) {
+    for (const vm of assertionMethods.get(issuerDid) ?? []) {
+      if (vm.x === ss.publicJwk.x && vm.y === ss.publicJwk.y) {
+        return { privateKey: ss.privateKey, kid: vm.id };
+      }
+    }
+    throw new Error(
+      `issuer ${issuerDid} publishes no assertion method for the Signing ` +
+        "Service key in its DID document (ADR-006 mandate missing) — cannot sign",
+    );
   }
   return fallback;
 }
@@ -230,8 +311,14 @@ async function processPlain(
   item: BatchItem,
   keyring: RoleKeyring,
   fallback: RoleKeyEntry,
+  assertionMethods: AssertionMethods,
 ): Promise<void> {
-  const proof = proofKey((item.vc.issuer as string) ?? "", keyring, fallback);
+  const proof = proofKey(
+    (item.vc.issuer as string) ?? "",
+    keyring,
+    fallback,
+    assertionMethods,
+  );
   const { payload, disclosures } = buildSdJwtPayload(item.vc, {
     vct: vctForCredential(item.vc),
     disclosable: disclosablePaths(item.vc),
@@ -247,16 +334,18 @@ async function processBatch(
   authorizer: string,
   keyring: RoleKeyring,
   fallback: RoleKeyEntry,
+  assertionMethods: AssertionMethods,
 ): Promise<void> {
   // The admin wallet key stands in via the org's controller key (ADR-006 §3).
   const walletKey = resolveKey(authorizer, keyring.byDID, fallback);
-  // All credentials in a batch share an issuer (usually the authorizer org
-  // itself, ADR-006); proofs are executed by the Signing Service via the
+  // All credentials in a batch share an issuer: for the identity credentials
+  // authorizedBy MUST equal issuer (spec §6, step 6), and batches are grouped
+  // by authorizer. Proofs are executed by the Signing Service via the
   // issuer's mandate key. The authorization KB-JWT is addressed (`aud`) to
   // the OID4VP intake verifier — the gatehouse acting for the Signing
   // Service, identified by its did:key (spec §4.3, §9.6).
   const issuerDid = (batch[0].vc.issuer as string) ?? "";
-  const proof = proofKey(issuerDid, keyring, fallback);
+  const proof = proofKey(issuerDid, keyring, fallback, assertionMethods);
   const audience = keyring.roleDidKeys.get("haven") ?? fallback.kid;
 
   // 1. Fix salts.
@@ -276,6 +365,7 @@ async function processBatch(
   const evidenceObjs = await buildBatchEvidence(payloads, walletKey.privateKey, {
     authorizedBy: authorizer,
     audience,
+    sdHash: EXAMPLE_SD_HASH,
     domain: "harbour.local",
   });
 
@@ -304,6 +394,7 @@ function discoverExamples(dir: string): string[] {
 async function main(): Promise<void> {
   const keyring = await loadRoleKeyring();
   const fallback = await loadFallbackKey();
+  const assertionMethods = loadAssertionMethods();
 
   console.log(`  Loaded ${keyring.byDID.size} role keys`);
 
@@ -350,11 +441,11 @@ async function main(): Promise<void> {
     const authorizer = key.split(" ")[1];
     const members = batch.map((b) => basename(b.path)).join(", ");
     console.log(`  batch (authorizer ${authorizer.slice(-8)}, N=${batch.length}): ${members}`);
-    await processBatch(batch, authorizer, keyring, fallback);
+    await processBatch(batch, authorizer, keyring, fallback, assertionMethods);
     for (const b of batch) outputDirs.add(b.outputDir);
   }
   for (const item of plain) {
-    await processPlain(item, keyring, fallback);
+    await processPlain(item, keyring, fallback, assertionMethods);
     outputDirs.add(item.outputDir);
     console.log(`  plain: ${basename(item.path)}`);
   }

@@ -4,7 +4,7 @@
     "leaf": "SHA-256(0x00 || JCS(credential without evidence/proof))",
     "node": "SHA-256(0x01 || left || right)",
     "lone_node": "promoted unchanged (never duplicated)",
-    "root_encoding": "base64url, no padding (the authorization JWT nonce)"
+    "root_encoding": "base64url, no padding — committed in the statement line of the authorization message, whose SHA-256 hex is the KB-JWT nonce (spec §4.3.1)"
   },
   "batch_n4": {
     "credentials": [
@@ -18,7 +18,7 @@
           "harbour:NaturalPersonCredential"
         ],
         "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
-        "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
         "validFrom": "2026-01-01T00:00:00Z",
         "credentialSubject": {
           "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
@@ -26,12 +26,6 @@
           "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
         },
         "credentialStatus": [
-          {
-            "type": "harbour:CRSetEntry",
-            "statusPurpose": "revocation",
-            "statusServiceOperator": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-            "statusIndex": "np00000000000001"
-          },
           {
             "type": "harbour:CRSetEntry",
             "statusPurpose": "revocation",
@@ -58,7 +52,7 @@
           "harbour:NaturalPersonCredential"
         ],
         "id": "urn:uuid:00000000-0000-4000-8000-000000000002",
-        "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
         "validFrom": "2026-01-01T00:00:00Z",
         "credentialSubject": {
           "id": "did:ethr:0x14a34:0x1111111111111111111111111111111111111111",
@@ -66,12 +60,6 @@
           "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
         },
         "credentialStatus": [
-          {
-            "type": "harbour:CRSetEntry",
-            "statusPurpose": "revocation",
-            "statusServiceOperator": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-            "statusIndex": "np00000000000002"
-          },
           {
             "type": "harbour:CRSetEntry",
             "statusPurpose": "revocation",
@@ -98,7 +86,7 @@
           "harbour:NaturalPersonCredential"
         ],
         "id": "urn:uuid:00000000-0000-4000-8000-000000000003",
-        "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
         "validFrom": "2026-01-01T00:00:00Z",
         "credentialSubject": {
           "id": "did:ethr:0x14a34:0x2222222222222222222222222222222222222222",
@@ -106,12 +94,6 @@
           "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
         },
         "credentialStatus": [
-          {
-            "type": "harbour:CRSetEntry",
-            "statusPurpose": "revocation",
-            "statusServiceOperator": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-            "statusIndex": "np00000000000003"
-          },
           {
             "type": "harbour:CRSetEntry",
             "statusPurpose": "revocation",
@@ -138,7 +120,7 @@
           "harbour:NaturalPersonCredential"
         ],
         "id": "urn:uuid:00000000-0000-4000-8000-000000000004",
-        "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
         "validFrom": "2026-01-01T00:00:00Z",
         "credentialSubject": {
           "id": "did:ethr:0x14a34:0x3333333333333333333333333333333333333333",
@@ -146,12 +128,6 @@
           "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
         },
         "credentialStatus": [
-          {
-            "type": "harbour:CRSetEntry",
-            "statusPurpose": "revocation",
-            "statusServiceOperator": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-            "statusIndex": "np00000000000004"
-          },
           {
             "type": "harbour:CRSetEntry",
             "statusPurpose": "revocation",
@@ -170,59 +146,58 @@
       }
     ],
     "leaves": [
-      "cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No",
-      "1Bb1RD1b0mRbs7F0EoGVmhMiCoQ-BN9V3dihAiN6V44",
-      "EYKqCOBfC10e74Uf2tnf5wmDC_-r08kANFE9yc_ZDD8",
-      "UcZv_Q0N53wU6Nhr3mby1crFDN5gQAs3LvxvZzXN8CM"
+      "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+      "aRcUj4LShHotmgrhFs_ttH-1TUUndGnMvqhZiHtOIdA",
+      "sddDOKI2EGsd6kr7qixLIbwXhlBOGKfW1WLDMEQGMC8",
+      "m_S9N_S72LlWxulU-U_Oj2_C829KnxptVGjINufO0Fo"
     ],
-    "root": "Uz_rIhlrkBdIgpN1mzZe_NlIU6fBJl7gHGLbN31wvKw",
-    "nonce": "Uz_rIhlrkBdIgpN1mzZe_NlIU6fBJl7gHGLbN31wvKw",
+    "root": "hgcP66JtVHzrUW2vTnaZUi5ZyLmwe1z7NcEyx598pPU",
     "proofs": [
       [
         {
-          "hash": "1Bb1RD1b0mRbs7F0EoGVmhMiCoQ-BN9V3dihAiN6V44",
+          "hash": "aRcUj4LShHotmgrhFs_ttH-1TUUndGnMvqhZiHtOIdA",
           "position": "right"
         },
         {
-          "hash": "FCraQ-7Uc5AjE3a2mI5SZkfwnJvgZ07VJS0QAe471nw",
-          "position": "right"
-        }
-      ],
-      [
-        {
-          "hash": "cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No",
-          "position": "left"
-        },
-        {
-          "hash": "FCraQ-7Uc5AjE3a2mI5SZkfwnJvgZ07VJS0QAe471nw",
+          "hash": "KhXYlzdAZ5JscWFYajKqH4U2ZfocP4i0hgdLB4voMXY",
           "position": "right"
         }
       ],
       [
         {
-          "hash": "UcZv_Q0N53wU6Nhr3mby1crFDN5gQAs3LvxvZzXN8CM",
+          "hash": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+          "position": "left"
+        },
+        {
+          "hash": "KhXYlzdAZ5JscWFYajKqH4U2ZfocP4i0hgdLB4voMXY",
+          "position": "right"
+        }
+      ],
+      [
+        {
+          "hash": "m_S9N_S72LlWxulU-U_Oj2_C829KnxptVGjINufO0Fo",
           "position": "right"
         },
         {
-          "hash": "gGivf0vrKvqHavH9gBm105GfBjcmu3h6KbQ_12_abFA",
+          "hash": "8yDx9oiE2vwdVo7CEAg21n8dh31NDdu41BzhXQ4R-WQ",
           "position": "left"
         }
       ],
       [
         {
-          "hash": "EYKqCOBfC10e74Uf2tnf5wmDC_-r08kANFE9yc_ZDD8",
+          "hash": "sddDOKI2EGsd6kr7qixLIbwXhlBOGKfW1WLDMEQGMC8",
           "position": "left"
         },
         {
-          "hash": "gGivf0vrKvqHavH9gBm105GfBjcmu3h6KbQ_12_abFA",
+          "hash": "8yDx9oiE2vwdVo7CEAg21n8dh31NDdu41BzhXQ4R-WQ",
           "position": "left"
         }
       ]
     ],
     "internal_nodes": {
-      "node(0,1)": "gGivf0vrKvqHavH9gBm105GfBjcmu3h6KbQ_12_abFA",
-      "node(2,3)": "FCraQ-7Uc5AjE3a2mI5SZkfwnJvgZ07VJS0QAe471nw",
-      "root=node(node(0,1),node(2,3))": "Uz_rIhlrkBdIgpN1mzZe_NlIU6fBJl7gHGLbN31wvKw"
+      "node(0,1)": "8yDx9oiE2vwdVo7CEAg21n8dh31NDdu41BzhXQ4R-WQ",
+      "node(2,3)": "KhXYlzdAZ5JscWFYajKqH4U2ZfocP4i0hgdLB4voMXY",
+      "root=node(node(0,1),node(2,3))": "hgcP66JtVHzrUW2vTnaZUi5ZyLmwe1z7NcEyx598pPU"
     }
   },
   "batch_n1_degenerate": {
@@ -236,7 +211,7 @@
         "harbour:NaturalPersonCredential"
       ],
       "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
-      "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
+      "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
       "validFrom": "2026-01-01T00:00:00Z",
       "credentialSubject": {
         "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
@@ -244,12 +219,6 @@
         "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
       },
       "credentialStatus": [
-        {
-          "type": "harbour:CRSetEntry",
-          "statusPurpose": "revocation",
-          "statusServiceOperator": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-          "statusIndex": "np00000000000001"
-        },
         {
           "type": "harbour:CRSetEntry",
           "statusPurpose": "revocation",
@@ -266,12 +235,12 @@
         }
       ]
     },
-    "root": "cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No",
+    "root": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
     "proof": []
   },
   "evidence_invariance": {
-    "leaf_with_evidence": "cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No",
-    "leaf_without_evidence": "cHFmId-ZVri1SnhE3LkJyJ414pgmZg7sBFzCy-Db0No",
+    "leaf_with_evidence": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+    "leaf_without_evidence": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
     "equal": true
   },
   "negatives": {
