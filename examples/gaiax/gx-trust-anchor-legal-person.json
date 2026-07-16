@@ -17,7 +17,7 @@
   "credentialSubject": {
     "type": "gx:LegalPerson",
     "id": "urn:uuid:2cdda6d8-6cdf-4862-854b-325e2a773b61#cs",
-    "schema:name": "vDL Digital Ventures GmbH",
+    "schema:name": "Haven GmbH",
     "gx:registrationNumber": {
       "id": "urn:uuid:abb81276-0e47-4382-8429-eea3bb6d9346#cs"
     },

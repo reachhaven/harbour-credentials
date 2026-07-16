@@ -8,7 +8,7 @@ organization:
       gx:VatID       -> examples/gaiax/gx-registration-number.json
       gx:Issuer      -> examples/gaiax/gx-terms-and-conditions.json
 
-    Trust Anchor (vDL)
+    Trust Anchor (Haven GmbH)
       gx:LegalPerson -> examples/gaiax/gx-trust-anchor-legal-person.json
       gx:VatID       -> examples/gaiax/gx-trust-anchor-registration-number.json
       gx:Issuer      -> examples/gaiax/gx-trust-anchor-terms-and-conditions.json

@@ -103,7 +103,7 @@ The trust chain (ADR-006, sovereign issuers — each credential's `issuer` is th
 
 | Role key | Actor | Example identity |
 |----------|-------|------------------|
-| `trust-anchor` | Trust Anchor / Steward | vDL Digital Ventures GmbH |
+| `trust-anchor` | Trust Anchor / Steward | Haven GmbH |
 | `haven` | Signing Service (operated by Haven) | — |
 | `company` | Legal Person (organization) | Example Corporation GmbH |
 | `employee` | Natural Person (employee) | Alice Smith |
