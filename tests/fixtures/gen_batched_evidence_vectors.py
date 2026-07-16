@@ -64,7 +64,7 @@ def _credential(n: int, subject_addr: str, status_index: str) -> dict:
             },
         ],
         # Stripped before hashing — present here to prove leaf invariance.
-        "evidence": [{"type": ["harbour:BatchCredentialEvidence"], "_placeholder": n}],
+        "evidence": [{"type": ["harbour:CredentialEvidenceBatch"], "_placeholder": n}],
     }
 
 

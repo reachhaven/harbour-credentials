@@ -103,7 +103,7 @@ separation is between the **human admin** who signs the evidence and the
 `evidence` remains an **array** ([VCDM2] §5.6). Future Harbour credential
 types MAY carry evidence authorized by parties other than the issuer — e.g. a
 contract credential evidenced by several counterparties, each contributing its
-own `harbour:BatchCredentialEvidence` object. Any such type MUST define its
+own `harbour:CredentialEvidenceBatch` object. Any such type MUST define its
 own normative authorizer-binding rule; the issuer-equality rule above is the
 binding for the identity credentials, not a global invariant.
 
@@ -297,12 +297,12 @@ credential.
 ## 5. Wire Format
 
 Each issued credential carries one evidence object of the
-`harbour:BatchCredentialEvidence` ontology class (defined in
+`harbour:CredentialEvidenceBatch` ontology class (defined in
 `linkml/harbour-core-credential.yaml`):
 
 ```jsonc
 "evidence": [{
-  "type": ["harbour:BatchCredentialEvidence"],
+  "type": ["harbour:CredentialEvidenceBatch"],
 
   // The authorizer organization's did:ethr. The KB-JWT signing key MUST be a
   // verification method of this DID's document (as of the KB-JWT `iat`).
@@ -555,7 +555,7 @@ The following classes are defined in the Harbour core ontology
 typed scalars — **never `range: Any`** — so the generated SHACL shapes stay
 closed.
 
-- **`harbour:BatchCredentialEvidence`** (subtype of `harbour:Evidence`) —
+- **`harbour:CredentialEvidenceBatch`** (subtype of `harbour:Evidence`) —
   `authorizedBy` (a DID, `range: uri`), `authorization` (the compact KB-JWT
   string), `authorizationMessage` (the verbatim signed message string), and
   `merkleProof`.
@@ -568,7 +568,7 @@ closed.
   revocation-specific class is added by this spec.
 
 The previous inline-VP evidence class is removed;
-`harbour:BatchCredentialEvidence` is the sole credential-issuance evidence
+`harbour:CredentialEvidenceBatch` is the sole credential-issuance evidence
 type (a batch of size 1 is a degenerate batch with an empty
 `merkleProof.path`).
 
@@ -685,4 +685,4 @@ inconclusive ≠ valid, §7.3).
 | 1.3.0-draft | 2026-07-10 | Authorizer binding made normative: for the identity credentials `authorizedBy` MUST equal the credential `issuer` (§3, §6 step 6; future credential types may bind evidence to other parties — evidence stays an array). `sd_hash` marked REQUIRED per RFC 9901 (opaque downstream; examples carry a documented placeholder). §7 storage model corrected to the decided design: the cascade is a **signed, timestamped VC-JOSE snapshot hosted by the Signing Service at an HTTPS `registryEndpoint`** (matching the example DID documents) — IPFS/IPNS dropped; snapshot signature verification and `validFrom`/`validUntil` added to the resolution flow; **revocation is permanent** (no un-revoke; re-issue with a new ID), the issuer kill switch is a pointer-level liveness toggle distinct from the terminal revoked verdict; verifier freshness/downtime policy explicitly verifier-owned. |
 | 1.2.0-draft | 2026-07-07 | Wallet-realistic authorization: the plain-JWS authorization profile (custom `typ`) is dropped — wallets sign only via OID4VP, so the authorization is the presentation ceremony's **KB-JWT** (`typ: kb+jwt`, no `iss`, no `kid`) over a SIWE-style **authorization message** whose statement carries the batch root (normative grammar, §4.3.1); new `authorizationMessage` evidence member; downstream authority check = KB-JWT key is a verification method of `authorizedBy`'s DID document as of `iat`; `aud` = the OID4VP intake verifier (checked at intake, opaque downstream). |
 | 1.1.0-draft | 2026-07-06 | Sovereign-issuer trust model (ADR-006): issuer = vouching party's `did:ethr`, Signing Service signs under an assertion-only mandate key in the issuer's DID document; evidence signed by a human admin key on the org DID; single issuer-operated `CRSetEntry` replaces the dual-entry model; evidence field `authorizer` renamed to `authorizedBy`; authorization JWT `aud` = the executing Signing Service. |
-| 1.0.0-draft | 2026-06-22 | Initial draft: Merkle-batched `BatchCredentialEvidence` for `dc+sd-jwt`; Model B trust model; DID-resolved authorization JWT; dual-entry revocation (CRSet + org-wide did:ethr kill switch). |
+| 1.0.0-draft | 2026-06-22 | Initial draft: Merkle-batched `CredentialEvidenceBatch` for `dc+sd-jwt`; Model B trust model; DID-resolved authorization JWT; dual-entry revocation (CRSet + org-wide did:ethr kill switch). |

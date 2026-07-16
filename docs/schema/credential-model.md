@@ -125,7 +125,7 @@ classDiagram
         type : string ⟨required⟩
     }
 
-    class BatchCredentialEvidence {
+    class CredentialEvidenceBatch {
         authorizedBy : uri ⟨required⟩
         authorization : string ⟨compact JWS⟩
         merkleProof : MerkleProof
@@ -147,13 +147,13 @@ classDiagram
         challenge : string ⟨required⟩
     }
 
-    Evidence <|-- BatchCredentialEvidence
+    Evidence <|-- CredentialEvidenceBatch
     Evidence <|-- DelegatedSignatureEvidence
-    BatchCredentialEvidence --> MerkleProof
+    CredentialEvidenceBatch --> MerkleProof
     MerkleProof --> MerklePathElement
 ```
 
-**`BatchCredentialEvidence`** — attests that a human admin of the
+**`CredentialEvidenceBatch`** — attests that a human admin of the
 `authorizedBy` organization approved this credential's issuance as part of a
 Merkle-committed batch with a single signature; the credential's
 `merkleProof` binds its payload to the signed root. See the
@@ -403,7 +403,7 @@ For quick reference, every class defined across all three schema files:
 |-------|-------------|----------|--------|--------|
 | `HarbourCredential` | core | ✅ | *(W3C VC envelope)* | Core |
 | `Evidence` | core | ✅ | — | Core |
-| `BatchCredentialEvidence` | core | — | `Evidence` | Core |
+| `CredentialEvidenceBatch` | core | — | `Evidence` | Core |
 | `MerkleProof` | core | — | — | Core |
 | `MerklePathElement` | core | — | — | Core |
 | `DelegatedSignatureEvidence` (IRI `harbour:SignatureEvidence`) | core | — | `Evidence` | Core |

@@ -13,7 +13,7 @@ Because every verifier checks the evidence, a Signing Service that minted a cred
 
 ## Harbour Evidence Types
 
-### BatchCredentialEvidence
+### CredentialEvidenceBatch
 
 Proves that an authorizing party approved this credential's issuance as part of a **Merkle-committed batch** with a **single signature** — one admin signature covers all credentials issued in the batch, and each credential independently proves its own inclusion. The full construction is specified in [batched-credential-evidence.md](../specs/batched-credential-evidence.md).
 
@@ -21,7 +21,7 @@ Wire form (from the signed `legal-person-credential.decoded.json` story output):
 
 ```json
 {
-  "type": ["harbour:BatchCredentialEvidence"],
+  "type": ["harbour:CredentialEvidenceBatch"],
   "authorizedBy": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
   "authorization": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImtiK2p3dCJ9...",
   "authorizationMessage": "harbour.local wants you to sign this authorization with your wallet:\ndid:ethr:0x14a34:0x4d62...4774\n\nI authorize the issuance of 3 credential(s) committed to by Merkle root ANLV...51s.\n\nVersion: 1\nNonce: 1f60...\nIssued At: 2026-07-07T09:00:00+00:00",
@@ -96,7 +96,7 @@ The receipt credential is an **SD-JWT-VC**. Transaction data and identity detail
 
 | Evidence Type | Wire `type` | Use When |
 |--------------|-------------|----------|
-| `BatchCredentialEvidence` | `harbour:BatchCredentialEvidence` | Issuing credentials after a human admin's authorization — one signature per batch (Trust Anchor batches LegalPersonCredentials; an org batches its employees' NaturalPersonCredentials) |
+| `CredentialEvidenceBatch` | `harbour:CredentialEvidenceBatch` | Issuing credentials after a human admin's authorization — one signature per batch (Trust Anchor batches LegalPersonCredentials; an org batches its employees' NaturalPersonCredentials) |
 | `DelegatedSignatureEvidence` | `harbour:SignatureEvidence` | Issuing a receipt after a delegated action — blockchain purchase, contract signing, access delegation |
 
 ## Verifying Batch Evidence
@@ -160,9 +160,9 @@ Evidence:
   abstract: true
   class_uri: harbour:Evidence
 
-BatchCredentialEvidence:
+CredentialEvidenceBatch:
   is_a: Evidence
-  class_uri: harbour:BatchCredentialEvidence
+  class_uri: harbour:CredentialEvidenceBatch
   slots:
     - authorizedBy    # required; org did:ethr
     - authorization   # compact JWS, nonce = batch Merkle root

@@ -36,7 +36,7 @@
         "evidence": [
           {
             "type": [
-              "harbour:BatchCredentialEvidence"
+              "harbour:CredentialEvidenceBatch"
             ],
             "_placeholder": 1
           }
@@ -70,7 +70,7 @@
         "evidence": [
           {
             "type": [
-              "harbour:BatchCredentialEvidence"
+              "harbour:CredentialEvidenceBatch"
             ],
             "_placeholder": 2
           }
@@ -104,7 +104,7 @@
         "evidence": [
           {
             "type": [
-              "harbour:BatchCredentialEvidence"
+              "harbour:CredentialEvidenceBatch"
             ],
             "_placeholder": 3
           }
@@ -138,7 +138,7 @@
         "evidence": [
           {
             "type": [
-              "harbour:BatchCredentialEvidence"
+              "harbour:CredentialEvidenceBatch"
             ],
             "_placeholder": 4
           }
@@ -229,7 +229,7 @@
       "evidence": [
         {
           "type": [
-            "harbour:BatchCredentialEvidence"
+            "harbour:CredentialEvidenceBatch"
           ],
           "_placeholder": 1
         }

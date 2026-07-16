@@ -74,7 +74,7 @@ The `LegalPersonCredential` is the **compliance stamp**. Its
 | `rulesVersion` | `CD25.10` | Loire compliance document version |
 | `validatedCriteria` | `[PA1.1]` | Specific criteria checked |
 
-The `evidence` field carries `harbour:BatchCredentialEvidence` — a Trust
+The `evidence` field carries `harbour:CredentialEvidenceBatch` — a Trust
 Anchor admin's single batch authorization signature plus this credential's
 Merkle inclusion proof. The Trust Anchor is the `issuer`; Haven's Signing
 Service only executes the proof under the mandate key in the Trust Anchor's

@@ -9,7 +9,7 @@
  *      for sovereign issuers this is the Signing Service's assertion-only
  *      #delegate-1 mandate key). The example DID documents under
  *      ``examples/did-ethr/`` stand in for live did:ethr resolution.
- *   2. If the credential carries harbour:BatchCredentialEvidence, verify the
+ *   2. If the credential carries harbour:CredentialEvidenceBatch, verify the
  *      batched evidence (verifyBatchEvidence): recompute the Merkle leaf from
  *      the raw issuer payload, fold the inclusion proof, and check it against
  *      the root committed in the signed authorizationMessage (whose SHA-256
@@ -245,7 +245,7 @@ async function main(): Promise<void> {
       // malformed, never "plain".
       const authorizer = evidence.authorizedBy;
       if (typeof authorizer !== "string") {
-        errors.push(`${file}: BatchCredentialEvidence missing authorizedBy`);
+        errors.push(`${file}: CredentialEvidenceBatch missing authorizedBy`);
         continue;
       }
       // Identity credentials: the authorizing party must be the party

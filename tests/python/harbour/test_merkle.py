@@ -63,7 +63,7 @@ def test_leaf_excludes_evidence_and_proof():
     base = {"type": ["VerifiableCredential"], "issuer": "did:ethr:0x14a34:0xabc"}
     with_extra = {
         **base,
-        "evidence": [{"type": ["harbour:BatchCredentialEvidence"]}],
+        "evidence": [{"type": ["harbour:CredentialEvidenceBatch"]}],
         "proof": {"type": "DataIntegrityProof"},
     }
     assert compute_leaf(base) == compute_leaf(with_extra)

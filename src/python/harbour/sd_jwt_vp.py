@@ -185,7 +185,7 @@ def issue_sd_jwt_vp(
                      If None, includes all available disclosures.
                      If empty list [], includes no disclosures (max privacy).
         evidence: Evidence objects to include in the VP. Supported types:
-                  - BatchCredentialEvidence: issuance authorization
+                  - CredentialEvidenceBatch: issuance authorization
                     (authorizedBy / authorization KB-JWT /
                     authorizationMessage / merkleProof)
                   - SignatureEvidence (DelegatedSignatureEvidence):

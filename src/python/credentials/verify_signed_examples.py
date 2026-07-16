@@ -8,7 +8,7 @@ For every ``<name>.sd-jwt`` under ``examples/signed/`` and
      document (ADR-006: for sovereign issuers this is the Signing Service's
      assertion-only ``#delegate-1`` mandate key). The example DID documents
      under ``examples/did-ethr/`` stand in for live did:ethr resolution.
-  2. If the credential carries ``harbour:BatchCredentialEvidence``, verify the
+  2. If the credential carries ``harbour:CredentialEvidenceBatch``, verify the
      batched evidence (``verify_batch_evidence``): recompute the Merkle leaf from
      the *raw* issuer payload (with ``_sd`` digests, ``evidence`` stripped), fold
      the inclusion proof, and check it against the root committed in the signed
@@ -239,7 +239,7 @@ def verify_signed_dir(
         authorizer = evidence.get("authorizedBy")
         if not isinstance(authorizer, str):
             counts.errors.append(
-                f"{sd_jwt_path.name}: BatchCredentialEvidence missing authorizedBy"
+                f"{sd_jwt_path.name}: CredentialEvidenceBatch missing authorizedBy"
             )
             continue
         # Identity credentials: the authorizing party must be the party

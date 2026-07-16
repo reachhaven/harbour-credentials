@@ -72,7 +72,7 @@ verification method **inside the issuer's own `did:ethr` document**:
 
 ### 3. Evidence is a human authorization
 
-The `harbour:BatchCredentialEvidence` authorization is a **KB-JWT signed by
+The `harbour:CredentialEvidenceBatch` authorization is a **KB-JWT signed by
 a human admin's wallet key that is authorized on the issuing organization's
 `did:ethr`** (the IdentityController maps 1..n admin wallet keys to the org
 DID; wallets sign only via OID4VP presentations — see the batched-evidence

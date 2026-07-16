@@ -5,7 +5,7 @@ Implements the wire format and verification of
 ``docs/specs/batched-credential-evidence.md`` §4–6. An admin of the
 authorizing organization signs — via their wallet's OID4VP **KB-JWT** — a
 SIWE-style authorization message whose statement carries the batch Merkle
-root; each credential then carries a ``harbour:BatchCredentialEvidence``
+root; each credential then carries a ``harbour:CredentialEvidenceBatch``
 object with the org DID (``authorizedBy``), that single KB-JWT
 (``authorization``), the verbatim message (``authorizationMessage``), and its
 own inclusion proof.
@@ -64,8 +64,8 @@ __all__ = [
 
 # typ header of the batch authorization token — an OID4VP KB-JWT (§4.3).
 AUTHORIZATION_JWT_TYP = "kb+jwt"
-# The harbour:BatchCredentialEvidence evidence type token (§5).
-EVIDENCE_TYPE = "harbour:BatchCredentialEvidence"
+# The harbour:CredentialEvidenceBatch evidence type token (§5).
+EVIDENCE_TYPE = "harbour:CredentialEvidenceBatch"
 
 # Normative statement grammar (§4.3.1): exactly one such line per message;
 # the root is base64url unpadded SHA-256 (43 chars).
@@ -252,7 +252,7 @@ def build_batch_evidence(
     iat: int | None = None,
     alg: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Build the ``harbour:BatchCredentialEvidence`` object for each credential.
+    """Build the ``harbour:CredentialEvidenceBatch`` object for each credential.
 
     The leaf of credential *i* is ``compute_leaf(payloads[i])`` — i.e. over the
     issuer payload with its ``evidence``/``proof`` members removed (§4.1). One
@@ -340,7 +340,7 @@ def verify_batch_evidence(
     Args:
         payload: The issued credential's issuer payload (``evidence`` may be
             present — it is stripped for the leaf).
-        evidence: The single ``harbour:BatchCredentialEvidence`` object.
+        evidence: The single ``harbour:CredentialEvidenceBatch`` object.
         wallet_public_key: An admin wallet public key from the
             ``authorizedBy`` DID document.
         expected_audience: If given, require the KB-JWT ``aud`` to match
@@ -354,10 +354,10 @@ def verify_batch_evidence(
     """
     auth = evidence.get("authorization")
     if not isinstance(auth, str):
-        raise VerificationError("BatchCredentialEvidence missing authorization KB-JWT")
+        raise VerificationError("CredentialEvidenceBatch missing authorization KB-JWT")
     message = evidence.get("authorizationMessage")
     if not isinstance(message, str):
-        raise VerificationError("BatchCredentialEvidence missing authorizationMessage")
+        raise VerificationError("CredentialEvidenceBatch missing authorizationMessage")
 
     auth_payload = verify_authorization(
         auth,
@@ -370,7 +370,7 @@ def verify_batch_evidence(
 
     proof = evidence.get("merkleProof")
     if not isinstance(proof, dict) or not isinstance(proof.get("path"), list):
-        raise VerificationError("BatchCredentialEvidence missing merkleProof.path")
+        raise VerificationError("CredentialEvidenceBatch missing merkleProof.path")
 
     leaf = compute_leaf(payload)
     root = b64url_decode(root_b64)

@@ -72,7 +72,7 @@ The examples use a **two-tier layout**:
 
 Credential types in the Gaia-X layer use the `harbour.gx:` namespace prefix
 (e.g. `harbour.gx:LegalPersonCredential`, `harbour.gx:NaturalPerson`) while core
-types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:BatchCredentialEvidence`).
+types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:CredentialEvidenceBatch`).
 
 ## Credential Issuance Model
 
@@ -83,7 +83,7 @@ as an assertion-only `#delegate-1` verification method in the issuer's DID
 document, and the proof `kid` names that method. Every credential carries two
 distinct signatures:
 
-- **Evidence** (`harbour:BatchCredentialEvidence`) — the authorization,
+- **Evidence** (`harbour:CredentialEvidenceBatch`) — the authorization,
   signed by a *human admin* whose key is authorized on the issuing org's
   `did:ethr`. One admin signature covers a whole batch via a Merkle root
   (see [`batched-credential-evidence.md`](../docs/specs/batched-credential-evidence.md)).
@@ -493,7 +493,7 @@ artifacts to `examples/signed/` and `examples/gaiax/signed/` respectively.
 
 ## Related Documentation
 
-- [Evidence types](../docs/guide/evidence.md) — BatchCredentialEvidence + DelegatedSignatureEvidence
+- [Evidence types](../docs/guide/evidence.md) — CredentialEvidenceBatch + DelegatedSignatureEvidence
 - [Delegated signing flow](../docs/guide/delegated-signing.md) — Complete OID4VP consent flow
 - [Delegation challenge spec](../docs/specs/delegation-challenge-encoding.md) — Challenge format + transaction data
 - [DID documents](did-ethr/README.md) — All example `did:ethr` identifiers

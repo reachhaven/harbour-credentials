@@ -27,7 +27,7 @@ import {
 
 /** typ header of the batch authorization token — an OID4VP KB-JWT (§4.3). */
 export const AUTHORIZATION_JWT_TYP = "kb+jwt";
-export const EVIDENCE_TYPE = "harbour:BatchCredentialEvidence";
+export const EVIDENCE_TYPE = "harbour:CredentialEvidenceBatch";
 
 /**
  * Normative statement grammar (§4.3.1): exactly one such line per message;
@@ -204,7 +204,7 @@ export async function verifyAuthorization(
   return payload;
 }
 
-/** Build the BatchCredentialEvidence object for each credential in a batch. */
+/** Build the CredentialEvidenceBatch object for each credential in a batch. */
 export async function buildBatchEvidence(
   payloads: Record<string, unknown>[],
   walletKey: CryptoKey,
@@ -254,11 +254,11 @@ export async function verifyBatchEvidence(
 ): Promise<Record<string, unknown>> {
   const auth = evidence.authorization;
   if (typeof auth !== "string") {
-    throw new VerificationError("BatchCredentialEvidence missing authorization KB-JWT");
+    throw new VerificationError("CredentialEvidenceBatch missing authorization KB-JWT");
   }
   const message = evidence.authorizationMessage;
   if (typeof message !== "string") {
-    throw new VerificationError("BatchCredentialEvidence missing authorizationMessage");
+    throw new VerificationError("CredentialEvidenceBatch missing authorizationMessage");
   }
 
   const authPayload = await verifyAuthorization(auth, walletPublicKey, {
@@ -270,7 +270,7 @@ export async function verifyBatchEvidence(
 
   const proof = evidence.merkleProof as { path?: MerkleProofStep[] } | undefined;
   if (!proof || !Array.isArray(proof.path)) {
-    throw new VerificationError("BatchCredentialEvidence missing merkleProof.path");
+    throw new VerificationError("CredentialEvidenceBatch missing merkleProof.path");
   }
   const leaf = computeLeaf(payload);
   const root = b64urlDecode(rootB64);

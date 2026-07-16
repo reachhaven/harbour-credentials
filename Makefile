@@ -457,12 +457,15 @@ _lint_default: _lint_stale_refs
 # first run); grep is cheap insurance. Scoped to docs/examples/schema — code
 # may deliberately carry historical aliases (DELEGATED_EVIDENCE_TYPES).
 # Excludes vendored spec copies, generated API docs, and gitignored outputs.
-STALE_IRIS := harbour:CredentialEvidence harbour:DelegatedSignatureEvidence harbour:authorizer harbour-batch-auth+jwt
+# Entries are EREs matched with a trailing non-alphanumeric boundary so a
+# stale IRI does not flag a longer current one (harbour:CredentialEvidence
+# must not match harbour:CredentialEvidenceBatch); escape regex metachars.
+STALE_IRIS := harbour:CredentialEvidence harbour:BatchCredentialEvidence harbour:DelegatedSignatureEvidence harbour:authorizer harbour-batch-auth\+jwt
 _lint_stale_refs:
 	@echo "Checking for stale evidence-class references..."
 	@found=0; \
 	for iri in $(STALE_IRIS); do \
-		if grep -rn --fixed-strings "$$iri" \
+		if grep -rnE "$$iri([^[:alnum:]]|$$)" \
 			docs/ examples/ linkml/ README.md CLAUDE.md AGENTS.md \
 			--include='*.md' --include='*.json' --include='*.yaml' \
 			--exclude-dir='references' --exclude-dir='api' \

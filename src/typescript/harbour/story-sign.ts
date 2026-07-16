@@ -11,7 +11,7 @@
  *     issuer's DID document (examples/did-ethr/) — the assertion method whose
  *     publicKeyJwk matches the Signing Service key. did:ethr fragments are
  *     per-update-event and never hardcoded.
- *   - Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
+ *   - Credentials carrying ``harbour:CredentialEvidenceBatch`` are grouped into a
  *     batch per (output dir, authorizer). The authorizer's admin key signs ONE
  *     authorization JWT over the batch Merkle root; each credential gets its own
  *     inclusion proof. Salts are fixed first (buildSdJwtPayload), the root is
@@ -162,7 +162,7 @@ function disclosablePaths(vc: Record<string, unknown>): string[][] {
     .map((k) => ["credentialSubject", k]);
 }
 
-/** The harbour:BatchCredentialEvidence object, if any (exact type match). */
+/** The harbour:CredentialEvidenceBatch object, if any (exact type match). */
 function batchEvidenceEntry(
   vc: Record<string, unknown>,
 ): Record<string, unknown> | null {

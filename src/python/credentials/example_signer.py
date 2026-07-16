@@ -19,7 +19,7 @@ Issuance model (see ``docs/specs/batched-credential-evidence.md`` and ADR-006):
     hardcoded (ADR-006; in the current example documents this resolves to
     ``#controller`` on the Signing Service's own artifacts and the
     ``#delegate-1`` mandate for sovereign issuers).
-  * Credentials carrying ``harbour:BatchCredentialEvidence`` are grouped into a
+  * Credentials carrying ``harbour:CredentialEvidenceBatch`` are grouped into a
     **batch per (output dir, authorizer)**. The authorizer's admin wallet key
     signs **one** KB-JWT over an authorization message committing to the
     batch Merkle root (simulating the OID4VP ceremony, spec §4.3); each
@@ -212,7 +212,7 @@ def disclosable_paths(vc: dict) -> list[list[str]]:
 
 
 def batch_evidence_entry(vc: dict) -> dict | None:
-    """Return the ``harbour:BatchCredentialEvidence`` object, if any."""
+    """Return the ``harbour:CredentialEvidenceBatch`` object, if any."""
     evidence = vc.get("evidence")
     if not isinstance(evidence, list) or not evidence:
         return None
