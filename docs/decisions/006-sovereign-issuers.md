@@ -32,8 +32,7 @@ The divergence produced concrete defects:
   credentials that describe them, undermining the ecosystem's sovereignty
   guarantees (an issuer mandate that cannot be revoked is not a mandate).
 
-Model 2 is the governing design (Haven design notes, July 2026). This ADR
-ratifies it for this repository.
+Model 2 is the governing design. This ADR ratifies it for this repository.
 
 ## Decision
 
@@ -141,8 +140,6 @@ machinery:
 
 ## References
 
-- Haven design notes: "Haven Credentials" (internal, July 2026) — trust
-  path, mandate, publication, and revocation rationale.
 - `docs/specs/batched-credential-evidence.md` — evidence mechanism.
 - `docs/did-identity-system.md` — IdentityController and `did:ethr` setup.
 - ADR-005 — did:ethr migration.
