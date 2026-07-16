@@ -33,6 +33,8 @@ export {
   verifySdJwtVc,
   buildSdJwtPayload,
   signSdJwt,
+  SD_JWT_VC_TYP,
+  ACCEPTED_SD_JWT_VC_TYPS,
 } from "./sd-jwt.js";
 
 export {

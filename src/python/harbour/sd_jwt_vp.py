@@ -46,6 +46,7 @@ from harbour.delegation import (
     validate_transaction_data,
 )
 from harbour.keys import PrivateKey, PublicKeyType
+from harbour.sd_jwt import ACCEPTED_SD_JWT_VC_TYPS, SD_JWT_VC_TYP
 from harbour.verifier import VerificationError
 
 logger = logging.getLogger(__name__)
@@ -415,9 +416,10 @@ def verify_sd_jwt_vp(
         raise VerificationError(f"VC JWT verification failed: {e}") from e
 
     vc_header = vc_result.headers()
-    if vc_header.get("typ") != "vc+sd-jwt":
+    if vc_header.get("typ") not in ACCEPTED_SD_JWT_VC_TYPS:
         raise VerificationError(
-            f"Unexpected VC typ: expected 'vc+sd-jwt', got {vc_header.get('typ')!r}"
+            f"Unexpected VC typ: expected {SD_JWT_VC_TYP!r}, "
+            f"got {vc_header.get('typ')!r}"
         )
 
     vc_payload = json.loads(vc_result.payload)

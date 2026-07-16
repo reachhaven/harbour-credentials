@@ -1,5 +1,8 @@
 """Tests for SD-JWT-VC issuance and verification."""
 
+import base64
+import json
+
 import pytest
 
 from harbour.keys import (
@@ -21,6 +24,11 @@ SAMPLE_CLAIMS = {
 }
 
 VCT = "https://w3id.org/reachhaven/harbour/core/v1/LegalPersonCredential"
+
+
+def _jose_header(sd_jwt: str) -> dict:
+    seg = sd_jwt.split(".")[0]
+    return json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
 
 
 class TestSDJWTVCIssuance:
@@ -50,6 +58,10 @@ class TestSDJWTVCIssuance:
         sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         result = verify_sd_jwt_vc(sd_jwt, p256_public_key)
         assert result["vct"] == VCT
+
+    def test_issue_uses_dc_sd_jwt_typ(self, p256_private_key):
+        sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
+        assert _jose_header(sd_jwt)["typ"] == "dc+sd-jwt"
 
     def test_issue_with_cnf(self, p256_private_key, p256_public_key):
         holder_pub_jwk = p256_public_key_to_jwk(p256_public_key)
@@ -118,6 +130,28 @@ class TestSDJWTVCVerification:
             verify_sd_jwt_vc(
                 sd_jwt, p256_public_key, expected_vct="https://wrong.example.com/vc"
             )
+
+    def test_verify_accepts_legacy_vc_sd_jwt_typ(
+        self, p256_private_key, p256_public_key, monkeypatch
+    ):
+        """Pre-rename draft-08 tokens (typ vc+sd-jwt) verify during transition."""
+        import harbour.sd_jwt as sd_jwt_mod
+
+        monkeypatch.setattr(sd_jwt_mod, "SD_JWT_VC_TYP", "vc+sd-jwt")
+        legacy = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
+        assert _jose_header(legacy)["typ"] == "vc+sd-jwt"
+        result = verify_sd_jwt_vc(legacy, p256_public_key)
+        assert result["vct"] == VCT
+
+    def test_verify_rejects_unknown_typ(
+        self, p256_private_key, p256_public_key, monkeypatch
+    ):
+        import harbour.sd_jwt as sd_jwt_mod
+
+        monkeypatch.setattr(sd_jwt_mod, "SD_JWT_VC_TYP", "JWT")
+        token = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
+        with pytest.raises(VerificationError, match="Unexpected typ"):
+            verify_sd_jwt_vc(token, p256_public_key)
 
     def test_tamper_issuer_jwt(self, p256_private_key, p256_public_key):
         sd_jwt = issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)

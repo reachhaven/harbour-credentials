@@ -214,7 +214,7 @@ import {{ compactVerify, importJWK }} from "jose";
 const key = await importJWK({json.dumps(pub_jwk)}, "ES256");
 const result = await compactVerify("{issuer_jwt}", key);
 const header = JSON.parse(Buffer.from("{issuer_jwt}".split(".")[0], "base64url").toString());
-if (header.typ !== "vc+sd-jwt") throw new Error("wrong typ: " + header.typ);
+if (header.typ !== "dc+sd-jwt") throw new Error("wrong typ: " + header.typ);
 const payload = JSON.parse(new TextDecoder().decode(result.payload));
 if (payload.vct !== "https://example.com/vc") throw new Error("wrong vct");
 console.log("OK");
@@ -239,7 +239,7 @@ const payload = new TextEncoder().encode(JSON.stringify({{
   name: "NodeTest"
 }}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vc+sd-jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "dc+sd-jwt" }});
 const token = await signer.sign(key);
 // Output as SD-JWT (issuer-jwt with trailing ~)
 console.log(token + "~");

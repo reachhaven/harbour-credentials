@@ -35,6 +35,13 @@ from harbour.verifier import VerificationError
 # SD-JWT uses ~-delimited format: <issuer-jwt>~<disclosure1>~<disclosure2>~...~
 SD_JWT_SEPARATOR = "~"
 
+# SD-JWT-VC JOSE typ. [SD-JWT-VC] draft-14 renamed vc+sd-jwt -> dc+sd-jwt to
+# avoid the clash with W3C VC-JOSE-COSE's application/vc+sd-jwt; verifiers
+# SHOULD accept the pre-rename value during the transition
+# (docs/specs/references/sd-jwt-vc.md).
+SD_JWT_VC_TYP = "dc+sd-jwt"
+ACCEPTED_SD_JWT_VC_TYPS = (SD_JWT_VC_TYP, "vc+sd-jwt")
+
 
 def _create_disclosure(claim_name: str, claim_value: Any) -> tuple[str, str]:
     """Create a single SD-JWT disclosure.
@@ -168,7 +175,7 @@ def sign_sd_jwt(
         SD-JWT compact string: ``<issuer-jwt>~<disclosure1>~...~``
     """
     alg = _resolve_alg(private_key, alg)
-    header = {"alg": alg, "typ": "vc+sd-jwt"}
+    header = {"alg": alg, "typ": SD_JWT_VC_TYP}
     if kid is not None:
         header["kid"] = kid
     if x5c is not None:
@@ -308,9 +315,9 @@ def verify_sd_jwt_vc(
 
     # Validate typ header
     header = result.headers()
-    if header.get("typ") != "vc+sd-jwt":
+    if header.get("typ") not in ACCEPTED_SD_JWT_VC_TYPS:
         raise VerificationError(
-            f"Unexpected typ: expected 'vc+sd-jwt', got {header.get('typ')!r}"
+            f"Unexpected typ: expected {SD_JWT_VC_TYP!r}, got {header.get('typ')!r}"
         )
 
     payload = json.loads(result.payload)

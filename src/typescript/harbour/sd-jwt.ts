@@ -18,6 +18,18 @@ import { VerificationError } from "./verifier.js";
 
 const SD_JWT_SEPARATOR = "~";
 
+/**
+ * SD-JWT-VC JOSE typ. [SD-JWT-VC] draft-14 renamed vc+sd-jwt -> dc+sd-jwt to
+ * avoid the clash with W3C VC-JOSE-COSE's application/vc+sd-jwt; verifiers
+ * SHOULD accept the pre-rename value during the transition
+ * (docs/specs/references/sd-jwt-vc.md).
+ */
+export const SD_JWT_VC_TYP = "dc+sd-jwt";
+export const ACCEPTED_SD_JWT_VC_TYPS: readonly string[] = [
+  SD_JWT_VC_TYP,
+  "vc+sd-jwt",
+];
+
 interface IssueOptions {
   alg?: string;
   x5c?: string[];
@@ -131,7 +143,7 @@ export async function signSdJwt(
   options: { alg?: string; x5c?: string[]; kid?: string } = {},
 ): Promise<string> {
   const alg = options.alg ?? resolveAlg(privateKey);
-  const header: Record<string, unknown> = { alg, typ: "vc+sd-jwt" };
+  const header: Record<string, unknown> = { alg, typ: SD_JWT_VC_TYP };
   if (options.kid) header.kid = options.kid;
   if (options.x5c) header.x5c = options.x5c;
   const signer = new CompactSign(
@@ -232,9 +244,9 @@ export async function verifySdJwtVc(
       `SD-JWT verification failed: ${e instanceof Error ? e.message : e}`,
     );
   }
-  if (result.protectedHeader.typ !== "vc+sd-jwt") {
+  if (!ACCEPTED_SD_JWT_VC_TYPS.includes(result.protectedHeader.typ ?? "")) {
     throw new VerificationError(
-      `Unexpected typ: expected 'vc+sd-jwt', got '${result.protectedHeader.typ}'`,
+      `Unexpected typ: expected '${SD_JWT_VC_TYP}', got '${result.protectedHeader.typ}'`,
     );
   }
   const payload = JSON.parse(new TextDecoder().decode(result.payload));
