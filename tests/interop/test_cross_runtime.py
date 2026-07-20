@@ -23,7 +23,21 @@ KEYS_DIR = FIXTURES_DIR / "keys"
 TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
 
-_YARN = shutil.which("yarn") or "yarn"
+def _yarn_command() -> list[str]:
+    """Resolve the yarn invocation, falling back to corepack.
+
+    The repo mandates `corepack yarn`; on corepack-only machines there is no
+    bare `yarn` on PATH, and probing only for it made this whole suite skip
+    silently.
+    """
+    if shutil.which("yarn"):
+        return ["yarn"]
+    if shutil.which("corepack"):
+        return ["corepack", "yarn"]
+    return ["yarn"]
+
+
+_YARN = _yarn_command()
 
 
 def _run_node(script: str) -> str:
@@ -38,7 +52,7 @@ def _run_node(script: str) -> str:
         tmp = Path(f.name)
     try:
         result = subprocess.run(
-            [_YARN, "node", str(tmp)],
+            [*_YARN, "node", str(tmp)],
             capture_output=True,
             text=True,
             cwd=str(TS_DIR),
@@ -200,7 +214,7 @@ import {{ compactVerify, importJWK }} from "jose";
 const key = await importJWK({json.dumps(pub_jwk)}, "ES256");
 const result = await compactVerify("{issuer_jwt}", key);
 const header = JSON.parse(Buffer.from("{issuer_jwt}".split(".")[0], "base64url").toString());
-if (header.typ !== "vc+sd-jwt") throw new Error("wrong typ: " + header.typ);
+if (header.typ !== "dc+sd-jwt") throw new Error("wrong typ: " + header.typ);
 const payload = JSON.parse(new TextDecoder().decode(result.payload));
 if (payload.vct !== "https://example.com/vc") throw new Error("wrong vct");
 console.log("OK");
@@ -225,7 +239,7 @@ const payload = new TextEncoder().encode(JSON.stringify({{
   name: "NodeTest"
 }}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vc+sd-jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "dc+sd-jwt" }});
 const token = await signer.sign(key);
 // Output as SD-JWT (issuer-jwt with trailing ~)
 console.log(token + "~");

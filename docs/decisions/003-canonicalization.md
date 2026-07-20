@@ -1,8 +1,14 @@
-# ADR-003: No Canonicalization Required
+# ADR-003: No Canonicalization Required (for signatures)
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-07-06 — see [Amendment](#amendment-2026-07-content-digests-use-jcs))
 **Date:** 2026-02-17
 **Depends on:** [ADR-001](001-vc-securing-mechanism.md) (VC-JOSE-COSE)
+
+> **Scope**: this ADR is about **signature verification**. Signatures remain
+> canonicalization-free (bytes are preserved in the JWT). Since the digestSRI
+> feature (PR #11), **content digests** do use RFC 8785 (JCS) — see the
+> amendment below. The two do not conflict: a digest hashes a *document*, a
+> signature covers *bytes on the wire*.
 
 ## Context
 
@@ -55,12 +61,28 @@ The verifier never re-serializes the payload. It verifies the signature over the
 ## Consequences
 
 - Remove `_canonicalize()` from both signer and verifier
-- No need for JCS (RFC 8785) or RDFC-1.0
+- No JCS (RFC 8785) or RDFC-1.0 in the signature path
 - Signing/verification is a one-liner with any JOSE library
 - Cross-runtime interoperability is guaranteed by JWT specification, not by our serialization code
+
+## Amendment (2026-07): content digests use JCS
+
+The digestSRI feature (`harbour.digest_sri`, PR #11) and the batched-evidence
+Merkle leaves ([spec §4.1](../specs/batched-credential-evidence.md)) need a
+deterministic hash of a JSON *document* — a different problem from signature
+verification, where the signed bytes travel inside the JWT. For these content
+digests both runtimes canonicalize with **RFC 8785 (JCS)** before hashing:
+
+```text
+digestSRI    = sha256( JCS(unsigned credential document) )
+Merkle leaf  = sha256( 0x00 || JCS(issuer payload without `evidence`) )
+```
+
+The original decision stands unchanged for signatures: no canonicalization is
+performed to sign or verify any JWT/SD-JWT.
 
 ## References
 
 - [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) — JSON Web Token (JWT)
-- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) — JSON Canonicalization Scheme (JCS) — not needed but referenced for context
+- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) — JSON Canonicalization Scheme (JCS) — used for content digests (see Amendment), not for signatures
 - [W3C RDF Dataset Canonicalization](https://www.w3.org/TR/rdf-canon/) — RDFC-1.0, used by Data Integrity but not by JOSE

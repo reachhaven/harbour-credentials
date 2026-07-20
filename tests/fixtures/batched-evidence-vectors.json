@@ -1,0 +1,252 @@
+{
+  "_description": "Batched credential evidence test vectors — see docs/specs/batched-credential-evidence.md §10. Regenerate with tests/fixtures/gen_batched_evidence_vectors.py.",
+  "construction": {
+    "leaf": "SHA-256(0x00 || JCS(credential without evidence/proof))",
+    "node": "SHA-256(0x01 || left || right)",
+    "lone_node": "promoted unchanged (never duplicated)",
+    "root_encoding": "base64url, no padding — committed in the statement line of the authorization message, whose SHA-256 hex is the KB-JWT nonce (spec §4.3.1)"
+  },
+  "batch_n4": {
+    "credentials": [
+      {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://w3id.org/reachhaven/harbour/core/v1/"
+        ],
+        "type": [
+          "VerifiableCredential",
+          "harbour:NaturalPersonCredential"
+        ],
+        "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+        "validFrom": "2026-01-01T00:00:00Z",
+        "credentialSubject": {
+          "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
+          "type": "harbour:NaturalPerson",
+          "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+        },
+        "credentialStatus": [
+          {
+            "type": "harbour:CRSetEntry",
+            "statusPurpose": "revocation",
+            "statusServiceOperator": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+            "statusIndex": "np00000000000001"
+          }
+        ],
+        "evidence": [
+          {
+            "type": [
+              "harbour:CredentialEvidenceBatch"
+            ],
+            "_placeholder": 1
+          }
+        ]
+      },
+      {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://w3id.org/reachhaven/harbour/core/v1/"
+        ],
+        "type": [
+          "VerifiableCredential",
+          "harbour:NaturalPersonCredential"
+        ],
+        "id": "urn:uuid:00000000-0000-4000-8000-000000000002",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+        "validFrom": "2026-01-01T00:00:00Z",
+        "credentialSubject": {
+          "id": "did:ethr:0x14a34:0x1111111111111111111111111111111111111111",
+          "type": "harbour:NaturalPerson",
+          "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+        },
+        "credentialStatus": [
+          {
+            "type": "harbour:CRSetEntry",
+            "statusPurpose": "revocation",
+            "statusServiceOperator": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+            "statusIndex": "np00000000000002"
+          }
+        ],
+        "evidence": [
+          {
+            "type": [
+              "harbour:CredentialEvidenceBatch"
+            ],
+            "_placeholder": 2
+          }
+        ]
+      },
+      {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://w3id.org/reachhaven/harbour/core/v1/"
+        ],
+        "type": [
+          "VerifiableCredential",
+          "harbour:NaturalPersonCredential"
+        ],
+        "id": "urn:uuid:00000000-0000-4000-8000-000000000003",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+        "validFrom": "2026-01-01T00:00:00Z",
+        "credentialSubject": {
+          "id": "did:ethr:0x14a34:0x2222222222222222222222222222222222222222",
+          "type": "harbour:NaturalPerson",
+          "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+        },
+        "credentialStatus": [
+          {
+            "type": "harbour:CRSetEntry",
+            "statusPurpose": "revocation",
+            "statusServiceOperator": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+            "statusIndex": "np00000000000003"
+          }
+        ],
+        "evidence": [
+          {
+            "type": [
+              "harbour:CredentialEvidenceBatch"
+            ],
+            "_placeholder": 3
+          }
+        ]
+      },
+      {
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://w3id.org/reachhaven/harbour/core/v1/"
+        ],
+        "type": [
+          "VerifiableCredential",
+          "harbour:NaturalPersonCredential"
+        ],
+        "id": "urn:uuid:00000000-0000-4000-8000-000000000004",
+        "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+        "validFrom": "2026-01-01T00:00:00Z",
+        "credentialSubject": {
+          "id": "did:ethr:0x14a34:0x3333333333333333333333333333333333333333",
+          "type": "harbour:NaturalPerson",
+          "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+        },
+        "credentialStatus": [
+          {
+            "type": "harbour:CRSetEntry",
+            "statusPurpose": "revocation",
+            "statusServiceOperator": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+            "statusIndex": "np00000000000004"
+          }
+        ],
+        "evidence": [
+          {
+            "type": [
+              "harbour:CredentialEvidenceBatch"
+            ],
+            "_placeholder": 4
+          }
+        ]
+      }
+    ],
+    "leaves": [
+      "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+      "aRcUj4LShHotmgrhFs_ttH-1TUUndGnMvqhZiHtOIdA",
+      "sddDOKI2EGsd6kr7qixLIbwXhlBOGKfW1WLDMEQGMC8",
+      "m_S9N_S72LlWxulU-U_Oj2_C829KnxptVGjINufO0Fo"
+    ],
+    "root": "hgcP66JtVHzrUW2vTnaZUi5ZyLmwe1z7NcEyx598pPU",
+    "proofs": [
+      [
+        {
+          "hash": "aRcUj4LShHotmgrhFs_ttH-1TUUndGnMvqhZiHtOIdA",
+          "position": "right"
+        },
+        {
+          "hash": "KhXYlzdAZ5JscWFYajKqH4U2ZfocP4i0hgdLB4voMXY",
+          "position": "right"
+        }
+      ],
+      [
+        {
+          "hash": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+          "position": "left"
+        },
+        {
+          "hash": "KhXYlzdAZ5JscWFYajKqH4U2ZfocP4i0hgdLB4voMXY",
+          "position": "right"
+        }
+      ],
+      [
+        {
+          "hash": "m_S9N_S72LlWxulU-U_Oj2_C829KnxptVGjINufO0Fo",
+          "position": "right"
+        },
+        {
+          "hash": "8yDx9oiE2vwdVo7CEAg21n8dh31NDdu41BzhXQ4R-WQ",
+          "position": "left"
+        }
+      ],
+      [
+        {
+          "hash": "sddDOKI2EGsd6kr7qixLIbwXhlBOGKfW1WLDMEQGMC8",
+          "position": "left"
+        },
+        {
+          "hash": "8yDx9oiE2vwdVo7CEAg21n8dh31NDdu41BzhXQ4R-WQ",
+          "position": "left"
+        }
+      ]
+    ],
+    "internal_nodes": {
+      "node(0,1)": "8yDx9oiE2vwdVo7CEAg21n8dh31NDdu41BzhXQ4R-WQ",
+      "node(2,3)": "KhXYlzdAZ5JscWFYajKqH4U2ZfocP4i0hgdLB4voMXY",
+      "root=node(node(0,1),node(2,3))": "hgcP66JtVHzrUW2vTnaZUi5ZyLmwe1z7NcEyx598pPU"
+    }
+  },
+  "batch_n1_degenerate": {
+    "credential": {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/reachhaven/harbour/core/v1/"
+      ],
+      "type": [
+        "VerifiableCredential",
+        "harbour:NaturalPersonCredential"
+      ],
+      "id": "urn:uuid:00000000-0000-4000-8000-000000000001",
+      "issuer": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+      "validFrom": "2026-01-01T00:00:00Z",
+      "credentialSubject": {
+        "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
+        "type": "harbour:NaturalPerson",
+        "harbour:memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
+      },
+      "credentialStatus": [
+        {
+          "type": "harbour:CRSetEntry",
+          "statusPurpose": "revocation",
+          "statusServiceOperator": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+          "statusIndex": "np00000000000001"
+        }
+      ],
+      "evidence": [
+        {
+          "type": [
+            "harbour:CredentialEvidenceBatch"
+          ],
+          "_placeholder": 1
+        }
+      ]
+    },
+    "root": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+    "proof": []
+  },
+  "evidence_invariance": {
+    "leaf_with_evidence": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+    "leaf_without_evidence": "z_jAnYA2s6Tt9b9yk-K3Dz2D2JgBM9OjKZiH8GQhOgo",
+    "equal": true
+  },
+  "negatives": {
+    "tampered_leaf_verifies": false,
+    "swapped_position_verifies": false,
+    "wrong_root_verifies": false,
+    "_note": "all three MUST be false; duplicated-node forgery is structurally impossible because lone nodes are promoted, not duplicated (§9.2)"
+  }
+}

@@ -24,7 +24,7 @@ const GAIAX = resolve(__dirname, "../../../examples/gaiax");
 
 // Cross-runtime known-answer vector (keep in sync with the Python suite).
 // Standard base64 (RFC 4648 §4) per W3C SRI — NOT lowercase hex.
-const LEGAL_PERSON_SRI = "sha256-dl7zg1RuG2HhA97FckTfjuXIUxhc0Cagbp2MD4B6JTw=";
+const LEGAL_PERSON_SRI = "sha256-96CWnj0WFnepzcQhvBmXHu0U1nq3W6/Os+0VUKfvByw=";
 
 function load(name: string): unknown {
   return JSON.parse(readFileSync(resolve(GAIAX, name), "utf-8"));

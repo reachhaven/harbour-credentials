@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Supports SD-JWT-VC (EUDI/OIDC4VP) + VC-JOSE-COSE (Gaia-X) formats with ES256 (P-256) as the primary algorithm.
 
-The library is validated end-to-end by the **Harbour Credential Lifecycle** (see `examples/README.md`): a 4-actor narrative — Trust Anchor → Signing Service → Legal Person (organization) → Natural Person (employee) — that is signed and verified in *both* runtimes via the **story pipeline** (`make story`), proving interoperability. Understanding this trust model (below) is the fastest way to grasp the codebase.
+The library is validated end-to-end by the **Harbour Credential Lifecycle** (see `examples/README.md`): a 4-actor narrative — Trust Anchor → Legal Person (organization) → Natural Person (employee), with the Signing Service executing all proofs under a per-issuer mandate (ADR-006) — that is signed and verified in *both* runtimes via the **story pipeline** (`make story`), proving interoperability. Understanding this trust model (below) is the fastest way to grasp the codebase.
 
 ## Essential Commands
 
@@ -73,37 +73,48 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `delegation` | `delegation.py` | `delegation.ts` | Delegated signing evidence (OID4VP transaction_data) |
 | `sd_jwt_vp` / `sd-jwt-vp` | `sd_jwt_vp.py` | `sd-jwt-vp.ts` | SD-JWT VP issue/verify with evidence |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates / x5c chains |
+| `merkle` | `merkle.py` | `merkle.ts` | Merkle tree construction/inclusion proofs (batched evidence) |
+| `batch_evidence` | `batch_evidence.py` | `batch-evidence.ts` | Batched credential evidence build/verify (wallet KB-JWT + authorization message + Merkle proof) |
+| `digest_sri` | `digest_sri.py` | `digest-sri.ts` | W3C SRI digests over RFC 8785 (JCS) canonical JSON |
 | `generate_artifacts` | `generate_artifacts.py` | — | LinkML → OWL/SHACL/JSON-LD artifact generation |
-| credential pipeline | `credentials/` (CLI) | `story-sign.ts` / `story-verify.ts` (CLI) | End-to-end example signing/verification (see below) |
+| credential pipeline | `credentials/` (CLI) | `story-sign.ts` / `story-verify.ts` / `story-digests.ts` (CLI) | End-to-end example signing/verification (see below) |
 
-**Credential pipeline is CLI-only, not a library export** in either runtime. Python keeps it as a separate package `src/python/credentials/` (`example_signer.py` signs example credentials with role-based keys + evidence VPs; `verify_signed_examples.py` verifies them). TypeScript has functionally-equivalent `story-sign.ts` / `story-verify.ts` (run via `yarn story:sign` / `yarn story:verify`, excluded from the `tsc` build). Do not try to export these as library functions.
+**Credential pipeline is CLI-only, not a library export** in either runtime. Python keeps it as a separate package `src/python/credentials/` (`example_signer.py` issues dc+sd-jwt credentials with batched evidence using role-based keys; `verify_signed_examples.py` verifies them). TypeScript has functionally-equivalent `story-sign.ts` / `story-verify.ts` (run via `yarn story:sign` / `yarn story:verify`, excluded from the `tsc` build). Do not try to export these as library functions.
 
 ### The Credential Lifecycle & Trust Model
 
 The `examples/` directory is the authoritative end-to-end narrative, not just test data (full walkthrough in `examples/README.md`):
 
-- **`examples/*.json`** — Harbour credential skeletons showing the VC envelope and nested evidence-VP structure.
-- **`examples/gaiax/`** — Complete journey with 4 actors and role-based authorization via evidence VPs.
+- **`examples/*.json`** — Harbour credential skeletons showing the VC envelope and batched evidence structure.
+- **`examples/gaiax/`** — Complete journey with 4 actors and role-based authorization via batched evidence (one admin KB-JWT per batch).
 - **`examples/gaiax_external/`** — Third-party Gaia-X credentials *not* produced by our pipeline.
-- **`examples/signed/`, `examples/gaiax/signed/`** — Story-pipeline output (`.jwt`, `.decoded.json`, `.evidence-vp.jwt`); **gitignored**.
+- **`examples/signed/`, `examples/gaiax/signed/`** — Story-pipeline output (`.sd-jwt`, `.decoded.json`, plus `resolved/` claim dumps from `--dump-resolved`); **gitignored**.
 
-The trust chain each credential's evidence VP proves:
+The trust chain (ADR-006, sovereign issuers — each credential's `issuer` is the vouching party's own DID; the Signing Service only executes proofs via an assertion-only mandate key in the issuer's DID document):
 
 | Actor | Identity | Role |
 |-------|----------|------|
-| Trust Anchor | did:ethr | Root of trust; self-signed authority |
-| Signing Service | did:ethr | Issues all credentials; `#controller` key for issuance, `#delegate-1` for delegated transactions |
-| Legal Person | did:ethr | Organization authorized by the Trust Anchor; authorizes employees |
-| Natural Person | did:ethr | Employee, linked to the org via `memberOf` |
+| Trust Anchor | did:ethr | Root of trust; **issues all LegalPersonCredentials**, incl. its own (`issuer == subject`); a TA admin signs batch evidence |
+| Signing Service | did:ethr | Executes every proof via per-issuer `#delegate-1` mandate keys (kid names the issuer's method); signs its own artifacts with `#controller` |
+| Legal Person | did:ethr | Organization; **issues its employees' NaturalPersonCredentials**; an org admin signs batch evidence |
+| Natural Person | did:ethr | Employee; `memberOf` MUST equal `issuer` (the org) |
 
-The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, haven, company, employee, ascs).
+**Role-key glossary** — code/fixtures use short role names (`tests/fixtures/keys/`, `role-did-mapping.json`); docs use actor names. They map 1:1:
+
+| Role key | Actor | Example identity |
+|----------|-------|------------------|
+| `trust-anchor` | Trust Anchor / Steward | Haven GmbH |
+| `haven` | Signing Service (operated by Haven) | — |
+| `company` | Legal Person (organization) | Example Corporation GmbH |
+| `employee` | Natural Person (employee) | Alice Smith |
+| `ascs` | External anchor org (reserved; not part of the gaiax story) | ASCS e.V. |
 
 ### Test Layout
 
-- `tests/fixtures/` — shared `keys/`, `tokens/`, `credentials/`, `sample-vc.json`
+- `tests/fixtures/` — shared `keys/`, `tokens/`, `sample-vc.json`, `batched-evidence-vectors.json`
 - `tests/conftest.py` — root fixtures: session-scoped Ed25519 + P-256 keypairs, sample VC/VP
 - `tests/python/credentials/conftest.py` — parametrized fixtures over `examples/` credentials + pre-signed JWTs
-- `tests/python/harbour/` — per-module tests (sign, verify, keys, sd_jwt, kb_jwt, sd_jwt_vp, x509, delegation, tamper)
+- `tests/python/harbour/` — per-module tests (sign, verify, keys, sd_jwt, kb_jwt, sd_jwt_vp, x509, delegation, tamper, merkle, batch_evidence, digest_sri)
 - `tests/python/credentials/` — pipeline + LinkML/SHACL validation tests
 - `tests/typescript/harbour/` — vitest tests (config: `src/typescript/harbour/vitest.config.ts`)
 - `tests/interop/` — cross-runtime tests; **auto-skip** if TS deps are unavailable
@@ -173,7 +184,7 @@ import {
 
 ## CLI Entry Points
 
-Every harbour module has an argparse `main()` with `--help`: `python -m harbour.{keys,signer,verifier,sd_jwt,kb_jwt,delegation,sd_jwt_vp,x509,generate_artifacts} --help`. Pipeline CLIs: `python -m credentials.example_signer --help`, `python -m credentials.verify_signed_examples --help`.
+Every harbour module has an argparse `main()` with `--help`: `python -m harbour.{keys,signer,verifier,sd_jwt,kb_jwt,delegation,sd_jwt_vp,x509,merkle,batch_evidence,generate_artifacts} --help`. Pipeline CLIs: `python -m credentials.example_signer --help`, `python -m credentials.verify_signed_examples --help`.
 
 ## Coding Conventions
 
@@ -202,7 +213,7 @@ Every harbour module has an argparse `main()` with `--help`: `python -m harbour.
 **STRICT REQUIREMENTS:**
 
 - Always sign commits with `-s -S` (Signed-off-by + GPG signature)
-- **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or any mention of AI tools in commit messages
+- **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or any mention of AI tools in commit messages; the author is a human developer with their official email
 - Use conventional commit format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`, `ci:`); a `!` marks breaking changes (e.g. `feat(linkml)!: ...`). These feed the git-cliff changelog.
 - Run `make all` (or at least `make test full` + `make lint`) before committing
 
@@ -227,8 +238,8 @@ When asked to prepare a commit or PR, default to writing these gitignored files 
 
 | Topic | File |
 |-------|------|
-| Agent instructions (authoritative for LinkML/standards rules) | [AGENTS.md](AGENTS.md) |
-| Copilot instructions | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
+| Agent instructions (thin pointer to this file) | [AGENTS.md](AGENTS.md) |
+| Copilot instructions (thin pointer to this file) | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
 | Architecture | [docs/architecture.md](docs/architecture.md) |
 | ADRs | [docs/decisions/](docs/decisions/) |
 

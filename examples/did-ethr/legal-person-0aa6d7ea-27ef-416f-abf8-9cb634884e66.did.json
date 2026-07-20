@@ -1,6 +1,7 @@
 {
   "@context": [
     "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/reachhaven/harbour/core/v1/",
     {
       "JsonWebKey": "https://w3id.org/security#JsonWebKey",
       "publicKeyJwk": {
@@ -21,12 +22,39 @@
         "x": "cA5C-HS35A0oj56Udl_HS7nvtAwpWTf3fAGXJFYm3Qo",
         "y": "Y16LRNZm58cqhsPb0XsWqtixDYDcKUgdGsiiici7NNo"
       }
+    },
+    {
+      "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#delegate-1",
+      "type": "JsonWebKey",
+      "controller": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "5TDhagEwEJvWbr7gt91Pds6g74LVYlqunw6a863jAoQ",
+        "y": "uAaJmh4wdv9sAacVZyMDF55WscI8Gk9NwdVJzXjYek4"
+      }
     }
   ],
   "authentication": [
     "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#controller"
   ],
   "assertionMethod": [
-    "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#controller"
+    "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#controller",
+    "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#delegate-1"
+  ],
+  "service": [
+    {
+      "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#service-1",
+      "type": "harbour:LinkedCredentialService",
+      "serviceEndpoint": "https://reachhaven.com/.well-known/credentials/legal-person-0aa6d7ea-27ef-416f-abf8-9cb634884e66.jwt"
+    },
+    {
+      "id": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93#service-2",
+      "type": "harbour:CRSetRevocationRegistryService",
+      "serviceEndpoint": {
+        "@type": "harbour:CRSetServiceEndpoint",
+        "registryEndpoint": "https://resolver.harbour.id/crset/"
+      }
+    }
   ]
 }

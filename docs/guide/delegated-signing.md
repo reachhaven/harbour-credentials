@@ -125,11 +125,14 @@ This repository verifies signatures and hash bindings, but it does **not** host 
 - Naming policy in examples:
   - All identifiers use UUID-based path segments (no real names or organization names in DID paths).
 
-Current integration hooks and TODOs:
+Current integration hooks:
 
 - `issue_sd_jwt_vp(..., holder_did=...)` allows the wallet DID to be embedded in the consent VP.
 - `verify_sd_jwt_vp(..., holder_public_key=...)` accepts the DID-resolved public key from your resolver stack.
-- TODO: Add optional resolver callback adapters for `did:ethr` so verification can resolve custom P-256 controller keys in-process.
+
+**Known limitation**: the library does not resolve `did:ethr` documents
+itself — callers must supply the resolved public key. In-process resolver
+callback adapters are a candidate future extension.
 
 ## OID4VP Transaction Data
 
@@ -265,7 +268,7 @@ After executing the transaction, the signing service issues a **receipt credenti
   "type": ["VerifiableCredential", "harbour:DelegatedSigningReceipt"],
   "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
   "evidence": [{
-    "type": "harbour:DelegatedSignatureEvidence",
+    "type": "harbour:SignatureEvidence",
     "verifiablePresentation": "<consent VP with PII redacted>",
     "delegatedTo": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
     "transaction_data": { "..." }

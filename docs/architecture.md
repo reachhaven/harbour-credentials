@@ -62,12 +62,14 @@ pattern, and class map, see [Credential Data Model](schema/credential-model.md).
 harbour-credentials/
 ├── src/
 │   ├── python/
-│   │   ├── harbour/           # Crypto library (6 modules)
-│   │   └── credentials/       # LinkML pipeline (3 modules)
+│   │   ├── harbour/           # Crypto library (keys, sign, verify, sd-jwt,
+│   │   │                      #  kb-jwt, sd-jwt-vp, delegation, merkle,
+│   │   │                      #  batch-evidence, digest-sri, x509, artifacts)
+│   │   └── credentials/       # Story pipeline (3 CLIs, not a library export)
 │   └── typescript/
-│       └── harbour/           # Crypto library (6 modules)
+│       └── harbour/           # Crypto library (feature parity) + story CLIs
 ├── tests/
-│   ├── fixtures/              # Shared fixtures (credentials, keys, tokens)
+│   ├── fixtures/              # Shared fixtures (keys, tokens, test vectors)
 │   ├── interop/               # Cross-runtime interoperability tests
 │   ├── python/                # Python tests (harbour + credentials)
 │   └── typescript/harbour/    # TypeScript tests

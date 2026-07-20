@@ -10,8 +10,8 @@
   "name": "VAT ID",
   "description": "Value Added Tax Identifier",
   "issuer": "did:ethr:0x14a34:0x31f1ca3dc5da9f83f360d805662d11a418950202",
-  "validFrom": "2024-01-15T00:00:00Z",
-  "validUntil": "2024-07-15T00:00:00Z",
+  "validFrom": "2026-01-15T00:00:00Z",
+  "validUntil": "2026-07-15T00:00:00Z",
   "credentialSubject": {
     "type": "gx:VatID",
     "id": "urn:uuid:c3d4e5f6-a7b8-9012-cdef-123456789012#cs",
@@ -22,7 +22,7 @@
     {
       "gx:evidenceOf": "gx:VatID",
       "gx:evidenceURL": "http://ec.europa.eu/taxation_customs/vies/services/checkVatService",
-      "gx:executionDate": "2024-01-15T00:00:00Z"
+      "gx:executionDate": "2026-01-15T00:00:00Z"
     }
   ]
 }

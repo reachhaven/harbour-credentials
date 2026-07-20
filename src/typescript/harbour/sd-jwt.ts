@@ -1,83 +1,229 @@
 /**
  * SD-JWT-VC issuance and verification for JavaScript/TypeScript.
  *
- * Implements SD-JWT-VC using native crypto + jose, without external SD-JWT libs
- * for maximum portability.
+ * Implements SD-JWT-VC using native crypto + jose. Supports both flat and
+ * structured (nested, dot-path) selective disclosure per RFC 9901 §6, mirroring
+ * the Python `harbour.sd_jwt` module.
+ *
+ * Issuance is split into `buildSdJwtPayload` (fix salts, produce the issuer
+ * payload + disclosures) and `signSdJwt` (sign the possibly-augmented payload),
+ * so callers can hash a stable payload before signing — e.g. the Merkle leaf for
+ * batched credential evidence (`docs/specs/batched-credential-evidence.md` §4.1).
  */
 
+import { createHash, randomBytes } from "node:crypto";
 import * as jose from "jose";
 import { CompactSign, compactVerify } from "jose";
 import { VerificationError } from "./verifier.js";
 
 const SD_JWT_SEPARATOR = "~";
 
+/**
+ * SD-JWT-VC JOSE typ. [SD-JWT-VC] draft-14 renamed vc+sd-jwt -> dc+sd-jwt to
+ * avoid the clash with W3C VC-JOSE-COSE's application/vc+sd-jwt; verifiers
+ * SHOULD accept the pre-rename value during the transition
+ * (docs/specs/references/sd-jwt-vc.md).
+ */
+export const SD_JWT_VC_TYP = "dc+sd-jwt";
+export const ACCEPTED_SD_JWT_VC_TYPS: readonly string[] = [
+  SD_JWT_VC_TYP,
+  "vc+sd-jwt",
+];
+
 interface IssueOptions {
-  /** Algorithm override (default: ES256 for P-256). */
   alg?: string;
-  /** X.509 certificate chain. */
   x5c?: string[];
-  /** Holder confirmation key (for key binding). */
   cnf?: Record<string, unknown>;
 }
 
+function base64urlEncode(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("base64url").replace(/=+$/, "");
+}
+
+function base64urlDecode(s: string): Uint8Array {
+  return new Uint8Array(Buffer.from(s, "base64url"));
+}
+
+function resolveAlg(key: CryptoKey): string {
+  if (key.algorithm.name === "ECDSA") return "ES256";
+  if (key.algorithm.name === "Ed25519") return "EdDSA";
+  throw new Error(`Unsupported algorithm: ${key.algorithm.name}`);
+}
+
+function createDisclosure(name: string, value: unknown): [string, string] {
+  const salt = randomBytes(16).toString("base64url");
+  const discB64 = Buffer.from(JSON.stringify([salt, name, value]), "utf-8")
+    .toString("base64url")
+    .replace(/=+$/, "");
+  const digest = createHash("sha256").update(discB64).digest();
+  return [discB64, base64urlEncode(digest)];
+}
+
 /**
- * Issue an SD-JWT-VC credential.
+ * Apply structured selective disclosure to a (possibly nested) payload.
+ * Each entry is either an array of exact key segments (safe for keys that
+ * themselves contain dots, e.g. ["credentialSubject", "harbour.gx:labelLevel"])
+ * or a dot-separated string ("credentialSubject.email"; a simple name is a
+ * top-level claim). `_sd` digests are placed at the right nesting level per
+ * RFC 9901 §6.2. Mirrors the Python `_apply_structured_disclosures`.
+ *
+ * Throws if a declared path does not resolve — a declared-but-missing
+ * disclosure is a caller bug, and skipping it would silently issue the claim
+ * in plaintext.
  */
-export async function issueSdJwtVc(
+function applyStructuredDisclosures(
+  payload: Record<string, unknown>,
+  disclosable: (string | string[])[],
+): { payload: Record<string, unknown>; disclosures: string[] } {
+  const result = structuredClone(payload);
+  const disclosures: string[] = [];
+
+  for (const path of disclosable) {
+    const parts = typeof path === "string" ? path.split(".") : [...path];
+    if (parts.length === 0) throw new Error("empty disclosable path");
+    const leafKey = parts[parts.length - 1];
+    let parent: unknown = result;
+    for (const part of parts.slice(0, -1)) {
+      if (parent && typeof parent === "object" && part in (parent as object)) {
+        parent = (parent as Record<string, unknown>)[part];
+      } else {
+        throw new Error(
+          `disclosable path not found in claims: ${JSON.stringify(parts)}`,
+        );
+      }
+    }
+    if (
+      !parent ||
+      typeof parent !== "object" ||
+      !(leafKey in (parent as object))
+    ) {
+      throw new Error(
+        `disclosable path not found in claims: ${JSON.stringify(parts)}`,
+      );
+    }
+    const obj = parent as Record<string, unknown>;
+    const value = obj[leafKey];
+    delete obj[leafKey];
+    const [discB64, digest] = createDisclosure(leafKey, value);
+    disclosures.push(discB64);
+    if (!Array.isArray(obj._sd)) obj._sd = [];
+    (obj._sd as string[]).push(digest);
+  }
+  return { payload: result, disclosures };
+}
+
+/** Build the issuer SD-JWT payload (with `_sd` digests) and its disclosures. */
+export function buildSdJwtPayload(
   claims: Record<string, unknown>,
-  privateKey: CryptoKey,
   options: {
     vct: string;
-    disclosable?: string[];
-  } & IssueOptions,
+    disclosable?: (string | string[])[];
+    cnf?: Record<string, unknown>;
+  },
+): { payload: Record<string, unknown>; disclosures: string[] } {
+  const { payload, disclosures } = applyStructuredDisclosures(
+    { ...claims, vct: options.vct },
+    options.disclosable ?? [],
+  );
+  if (disclosures.length > 0) payload._sd_alg = "sha-256";
+  if (options.cnf) payload.cnf = options.cnf;
+  return { payload, disclosures };
+}
+
+/**
+ * Sign a prepared SD-JWT payload and assemble the compact SD-JWT.
+ *
+ * `kid` names the signing verification method in the issuer's DID document
+ * (ADR-006 mandate signing).
+ */
+export async function signSdJwt(
+  payload: Record<string, unknown>,
+  disclosures: string[],
+  privateKey: CryptoKey,
+  options: { alg?: string; x5c?: string[]; kid?: string } = {},
 ): Promise<string> {
   const alg = options.alg ?? resolveAlg(privateKey);
-  const disclosable = new Set(options.disclosable ?? []);
-
-  const disclosedClaims: Record<string, unknown> = { vct: options.vct };
-  const disclosures: string[] = [];
-  const sdDigests: string[] = [];
-
-  for (const [key, value] of Object.entries(claims)) {
-    if (disclosable.has(key)) {
-      const salt = crypto.randomUUID().replace(/-/g, "");
-      const discArray = [salt, key, value];
-      const discJson = new TextEncoder().encode(JSON.stringify(discArray));
-      const discB64 = base64urlEncode(discJson);
-      disclosures.push(discB64);
-
-      const hash = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(discB64),
-      );
-      sdDigests.push(base64urlEncode(new Uint8Array(hash)));
-    } else {
-      disclosedClaims[key] = value;
-    }
-  }
-
-  const payload: Record<string, unknown> = { ...disclosedClaims };
-  if (sdDigests.length > 0) {
-    payload._sd = sdDigests;
-    payload._sd_alg = "sha-256";
-  }
-  if (options.cnf) {
-    payload.cnf = options.cnf;
-  }
-
-  const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
-  const signer = new CompactSign(payloadBytes);
-  const header: Record<string, unknown> = { alg, typ: "vc+sd-jwt" };
+  const header: Record<string, unknown> = { alg, typ: SD_JWT_VC_TYP };
+  if (options.kid) header.kid = options.kid;
   if (options.x5c) header.x5c = options.x5c;
+  const signer = new CompactSign(
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
   signer.setProtectedHeader(header as jose.CompactJWSHeaderParameters);
-
   const issuerJwt = await signer.sign(privateKey);
   return [issuerJwt, ...disclosures, ""].join(SD_JWT_SEPARATOR);
 }
 
-/**
- * Verify an SD-JWT-VC and return all disclosed claims.
- */
+/** Issue an SD-JWT-VC credential (thin wrapper over build + sign). */
+export async function issueSdJwtVc(
+  claims: Record<string, unknown>,
+  privateKey: CryptoKey,
+  options: { vct: string; disclosable?: (string | string[])[] } & IssueOptions,
+): Promise<string> {
+  const { payload, disclosures } = buildSdJwtPayload(claims, {
+    vct: options.vct,
+    disclosable: options.disclosable,
+    cnf: options.cnf,
+  });
+  return signSdJwt(payload, disclosures, privateKey, {
+    alg: options.alg,
+    x5c: options.x5c,
+  });
+}
+
+// --- verification -----------------------------------------------------------
+
+function collectSdDigests(obj: unknown): Set<string> {
+  const digests = new Set<string>();
+  if (Array.isArray(obj)) {
+    for (const item of obj) for (const d of collectSdDigests(item)) digests.add(d);
+  } else if (obj && typeof obj === "object") {
+    for (const d of ((obj as Record<string, unknown>)._sd as string[]) ?? []) {
+      digests.add(d);
+    }
+    for (const v of Object.values(obj as Record<string, unknown>)) {
+      for (const d of collectSdDigests(v)) digests.add(d);
+    }
+  }
+  return digests;
+}
+
+function insertDisclosureRecursive(
+  obj: Record<string, unknown>,
+  name: string,
+  value: unknown,
+  digest: string,
+): boolean {
+  const sd = obj._sd as string[] | undefined;
+  if (Array.isArray(sd) && sd.includes(digest)) {
+    obj[name] = value;
+    obj._sd = sd.filter((d) => d !== digest);
+    if ((obj._sd as string[]).length === 0) delete obj._sd;
+    return true;
+  }
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      if (insertDisclosureRecursive(v as Record<string, unknown>, name, value, digest)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function cleanSdMetadata(obj: unknown): unknown {
+  if (Array.isArray(obj)) return obj.map(cleanSdMetadata);
+  if (obj && typeof obj === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (k !== "_sd" && k !== "_sd_alg") out[k] = cleanSdMetadata(v);
+    }
+    return out;
+  }
+  return obj;
+}
+
+/** Verify an SD-JWT-VC and return all disclosed claims (recursive `_sd`). */
 export async function verifySdJwtVc(
   sdJwt: string,
   publicKey: CryptoKey,
@@ -87,7 +233,6 @@ export async function verifySdJwtVc(
   if (parts.length < 2) {
     throw new VerificationError("Invalid SD-JWT format");
   }
-
   const issuerJwt = parts[0];
   const discStrings = parts.slice(1).filter((p) => p.length > 0);
 
@@ -99,40 +244,27 @@ export async function verifySdJwtVc(
       `SD-JWT verification failed: ${e instanceof Error ? e.message : e}`,
     );
   }
-
-  if (result.protectedHeader.typ !== "vc+sd-jwt") {
+  if (!ACCEPTED_SD_JWT_VC_TYPS.includes(result.protectedHeader.typ ?? "")) {
     throw new VerificationError(
-      `Unexpected typ: expected 'vc+sd-jwt', got '${result.protectedHeader.typ}'`,
+      `Unexpected typ: expected '${SD_JWT_VC_TYP}', got '${result.protectedHeader.typ}'`,
     );
   }
-
   const payload = JSON.parse(new TextDecoder().decode(result.payload));
-
   if (options.expectedVct && payload.vct !== options.expectedVct) {
     throw new VerificationError(
       `VCT mismatch: expected '${options.expectedVct}', got '${payload.vct}'`,
     );
   }
 
-  const sdDigests = new Set<string>(payload._sd ?? []);
-  const disclosed: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(payload)) {
-    if (k !== "_sd" && k !== "_sd_alg") {
-      disclosed[k] = v;
-    }
-  }
-
+  const allDigests = collectSdDigests(payload);
   for (const discB64 of discStrings) {
-    const hash = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(discB64),
+    const discHash = base64urlEncode(
+      createHash("sha256").update(discB64).digest(),
     );
-    const discHash = base64urlEncode(new Uint8Array(hash));
-    if (!sdDigests.has(discHash)) {
+    if (!allDigests.has(discHash)) {
       throw new VerificationError("Disclosure hash not found in _sd digests");
     }
-    sdDigests.delete(discHash);
-
+    allDigests.delete(discHash);
     const discJson = JSON.parse(
       new TextDecoder().decode(base64urlDecode(discB64)),
     );
@@ -140,28 +272,12 @@ export async function verifySdJwtVc(
       throw new VerificationError("Invalid disclosure format");
     }
     const [, claimName, claimValue] = discJson;
-    disclosed[claimName] = claimValue;
+    if (!insertDisclosureRecursive(payload, claimName, claimValue, discHash)) {
+      throw new VerificationError(
+        `Could not locate _sd digest for claim '${claimName}'`,
+      );
+    }
   }
 
-  return disclosed;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function resolveAlg(key: CryptoKey): string {
-  if (key.algorithm.name === "ECDSA") return "ES256";
-  if (key.algorithm.name === "Ed25519") return "EdDSA";
-  throw new Error(`Unsupported algorithm: ${key.algorithm.name}`);
-}
-
-function base64urlEncode(bytes: Uint8Array): string {
-  return Buffer.from(bytes)
-    .toString("base64url")
-    .replace(/=+$/, "");
-}
-
-function base64urlDecode(s: string): Uint8Array {
-  return new Uint8Array(Buffer.from(s, "base64url"));
+  return cleanSdMetadata(payload) as Record<string, unknown>;
 }

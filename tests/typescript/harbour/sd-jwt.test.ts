@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { CompactSign } from "jose";
 import { issueSdJwtVc, verifySdJwtVc } from "../../../src/typescript/harbour/sd-jwt.js";
 import { VerificationError } from "../../../src/typescript/harbour/verifier.js";
 import {
@@ -26,6 +27,20 @@ const SAMPLE_CLAIMS = {
 let privateKey: CryptoKey;
 let publicKey: CryptoKey;
 
+function joseHeader(sdJwt: string): Record<string, unknown> {
+  return JSON.parse(Buffer.from(sdJwt.split(".")[0], "base64url").toString());
+}
+
+/** Mint an SD-JWT with an arbitrary typ header (no disclosures). */
+async function signWithTyp(typ: string): Promise<string> {
+  const payload = new TextEncoder().encode(
+    JSON.stringify({ ...SAMPLE_CLAIMS, vct: VCT }),
+  );
+  const signer = new CompactSign(payload);
+  signer.setProtectedHeader({ alg: "ES256", typ });
+  return (await signer.sign(privateKey)) + "~";
+}
+
 beforeAll(async () => {
   const fixture = JSON.parse(
     readFileSync(resolve(FIXTURES_DIR, "keys", "test-keypair-p256.json"), "utf-8"),
@@ -41,6 +56,11 @@ describe("SD-JWT-VC issuance", () => {
     expect(parts.length).toBeGreaterThanOrEqual(2);
     expect(parts[parts.length - 1]).toBe(""); // trailing ~
     expect(parts[0].split(".")).toHaveLength(3); // issuer JWT
+  });
+
+  it("uses the dc+sd-jwt typ header", async () => {
+    const sdJwt = await issueSdJwtVc(SAMPLE_CLAIMS, privateKey, { vct: VCT });
+    expect(joseHeader(sdJwt).typ).toBe("dc+sd-jwt");
   });
 
   it("creates disclosures for disclosable claims", async () => {
@@ -78,6 +98,19 @@ describe("SD-JWT-VC verification", () => {
     const { publicKey: wrongKey } = await generateP256Keypair();
     await expect(verifySdJwtVc(sdJwt, wrongKey)).rejects.toThrow(
       VerificationError,
+    );
+  });
+
+  it("accepts the legacy vc+sd-jwt typ during transition", async () => {
+    const legacy = await signWithTyp("vc+sd-jwt");
+    const result = await verifySdJwtVc(legacy, publicKey);
+    expect(result.vct).toBe(VCT);
+  });
+
+  it("throws on an unknown typ", async () => {
+    const token = await signWithTyp("JWT");
+    await expect(verifySdJwtVc(token, publicKey)).rejects.toThrow(
+      /Unexpected typ/,
     );
   });
 

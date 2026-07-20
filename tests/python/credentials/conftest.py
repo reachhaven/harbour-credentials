@@ -82,18 +82,19 @@ def example_vc(request):
     return json.loads(request.param.read_text())
 
 
-def _all_signed_jwts() -> list[Path]:
-    """Collect pre-signed VC JWTs from signed/ dirs (excludes evidence VPs)."""
+def _all_signed_sd_jwts() -> list[Path]:
+    """Collect pre-signed dc+sd-jwt artifacts from the signed/ dirs."""
     files: list[Path] = []
     for d in [SIGNED_DIR, GAIAX_SIGNED_DIR]:
         if d.exists():
-            files.extend(
-                p for p in sorted(d.glob("*.jwt")) if ".evidence-vp." not in p.name
-            )
+            files.extend(sorted(d.glob("*.sd-jwt")))
     return files
 
 
-@pytest.fixture(params=_all_signed_jwts())
-def signed_jwt(request):
-    """Parametrized fixture for each pre-signed VC JWT (excludes evidence VPs)."""
-    return request.param.read_text().strip()
+@pytest.fixture(
+    params=_all_signed_sd_jwts(),
+    ids=lambda p: f"{p.parent.parent.name}/{p.name}",
+)
+def signed_sd_jwt(request):
+    """Parametrized fixture for each pre-signed dc+sd-jwt artifact."""
+    return request.param.read_text(encoding="utf-8").strip()

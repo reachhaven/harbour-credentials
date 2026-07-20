@@ -74,8 +74,11 @@ The `LegalPersonCredential` is the **compliance stamp**. Its
 | `rulesVersion` | `CD25.10` | Loire compliance document version |
 | `validatedCriteria` | `[PA1.1]` | Specific criteria checked |
 
-The `evidence` field contains the Trust Anchor's VP — proving Haven was
-authorized to issue this credential.
+The `evidence` field carries `harbour:CredentialEvidenceBatch` — a Trust
+Anchor admin's single batch authorization signature plus this credential's
+Merkle inclusion proof. The Trust Anchor is the `issuer`; Haven's Signing
+Service only executes the proof under the mandate key in the Trust Anchor's
+DID document ([ADR-006](../decisions/006-sovereign-issuers.md)).
 
 ---
 
@@ -218,11 +221,13 @@ graph LR
 
 A verifier checks:
 
-1. **`LegalPersonCredential`** signed by Haven? → Trusted issuer
+1. **`LegalPersonCredential`** proof `kid` names a verification method in
+   the Trust Anchor's (the issuer's) DID document? → Trusted issuer
 2. SRI hashes match the three GX VCs? → Integrity verified
 3. `labelLevel` = SC? → Gaia-X compliant
 4. CRSet entry not revoked? → Still valid
-5. Evidence VP from Trust Anchor? → Authorization chain intact
+5. Batch evidence authorized by a Trust Anchor admin (leaf folds to the
+   signed Merkle root)? → Authorization chain intact
 
 ### Employee presents to a service
 
@@ -257,11 +262,11 @@ The employee selectively discloses only what's needed:
 | Company data entry | 👤 Form | — | Only the company knows its data |
 | VAT verification | — | ⚙️ VIES API | Deterministic lookup, no human judgment |
 | GX VC creation | — | ⚙️ Haven builds 3 VCs | Standard format, no decisions needed |
-| Trust Anchor auth | — | ⚙️ TA presents VP | Pre-configured trust relationship |
-| Compliance credential | — | ⚙️ Haven issues | Rule-based: 3 VCs present + valid → issue |
+| Trust Anchor auth | 👤 TA admin signs batch authorization | — | Human authorization is the point (ADR-006) |
+| Compliance credential | — | ⚙️ Haven signs proof (TA's mandate key) | Rule-based: 3 VCs present + valid → sign |
 | Employee data entry | 👤 Confirm details | — | Only the employee knows their data |
-| Employer approval | 👤 Admin panel | — | Business decision |
-| Employee credential | — | ⚙️ Haven issues | Employer VP valid → issue |
+| Employer approval | 👤 Org admin signs batch authorization | — | Business decision, recorded as evidence |
+| Employee credential | — | ⚙️ Haven signs proof (org's mandate key) | Admin authorization valid → sign |
 | Transaction review | 👤 Approve in wallet | — | Must be explicit user consent |
 | Blockchain execution | — | ⚙️ Haven executes | Technical step, consent already given |
 | Receipt issuance | — | ⚙️ Haven issues | Automatic after successful execution |

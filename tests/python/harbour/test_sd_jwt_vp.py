@@ -727,7 +727,10 @@ class TestEdgeCases:
                     "txn": {"resource_id": "asset:xyz"},
                 },
             },
-            {"type": "harbour:CredentialEvidence", "verifiablePresentation": "eyJ..."},
+            {
+                "type": "harbour:CredentialEvidenceBatch",
+                "authorizedBy": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
+            },
         ]
 
         vp = issue_sd_jwt_vp(

@@ -28,7 +28,41 @@ export {
   type VpVerifyOptions,
 } from "./verifier.js";
 
-export { issueSdJwtVc, verifySdJwtVc } from "./sd-jwt.js";
+export {
+  issueSdJwtVc,
+  verifySdJwtVc,
+  buildSdJwtPayload,
+  signSdJwt,
+  SD_JWT_VC_TYP,
+  ACCEPTED_SD_JWT_VC_TYPS,
+} from "./sd-jwt.js";
+
+export {
+  computeLeaf,
+  hashNode,
+  merkleRoot,
+  merkleRootB64url,
+  inclusionProof,
+  verifyInclusion,
+  buildBatch,
+  b64urlEncode,
+  b64urlDecode,
+  type MerkleProofStep,
+} from "./merkle.js";
+
+export {
+  AUTHORIZATION_JWT_TYP,
+  EVIDENCE_TYPE,
+  STATEMENT_TEMPLATE,
+  composeAuthorizationMessage,
+  extractRootFromMessage,
+  signAuthorization,
+  verifyAuthorization,
+  buildBatchEvidence,
+  verifyBatchEvidence,
+  type BatchEvidence,
+  type AuthorizationOptions,
+} from "./batch-evidence.js";
 
 export { derToX5c, x5cToDer, importPublicKeyFromX5c } from "./x509.js";
 

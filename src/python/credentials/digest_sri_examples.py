@@ -1,15 +1,23 @@
 """Fill and verify ``digestSRI`` integrity hashes in the Gaia-X examples.
 
-The three plain Gaia-X input VCs are the single source of truth:
+The plain Gaia-X input VCs are the single source of truth, one trio per
+organization:
 
-    gx:LegalPerson -> examples/gaiax/gx-legal-person.json
-    gx:VatID       -> examples/gaiax/gx-registration-number.json
-    gx:Issuer      -> examples/gaiax/gx-terms-and-conditions.json
+    Example Corporation (default)
+      gx:LegalPerson -> examples/gaiax/gx-legal-person.json
+      gx:VatID       -> examples/gaiax/gx-registration-number.json
+      gx:Issuer      -> examples/gaiax/gx-terms-and-conditions.json
+
+    Trust Anchor (Haven GmbH)
+      gx:LegalPerson -> examples/gaiax/gx-trust-anchor-legal-person.json
+      gx:VatID       -> examples/gaiax/gx-trust-anchor-registration-number.json
+      gx:Issuer      -> examples/gaiax/gx-trust-anchor-terms-and-conditions.json
 
 Every ``harbour.gx:CompliantCredentialReference`` in the example credentials
-references one of these by ``harbour.gx:credentialType``. Its ``harbour.gx:digestSRI``
-is the Subresource Integrity hash of the referenced credential
-(:mod:`harbour.digest_sri`).
+references one of these by ``harbour.gx:credentialType``; the owning
+organization is identified by the reference's ``@id`` DID prefix. Its
+``harbour.gx:digestSRI`` is the Subresource Integrity hash of the referenced
+credential (:mod:`harbour.digest_sri`).
 
 Every ``harbour.gx:digestSRI`` is taken over the source-of-truth **input VC**
 for its ``credentialType`` -- in every file, including presentations. This keeps
@@ -43,11 +51,23 @@ from typing import Any, Iterator
 
 from harbour.digest_sri import canonical_json, compute_digest_sri, verify_digest_sri
 
-# Map credentialType -> input VC filename (the source of truth).
+# Map credentialType -> input VC filename (the default source of truth,
+# describing the example organization).
 INPUT_FILES = {
     "gx:LegalPerson": "gx-legal-person.json",
     "gx:VatID": "gx-registration-number.json",
     "gx:Issuer": "gx-terms-and-conditions.json",
+}
+
+# Per-organization source overrides: org DID -> {credentialType -> filename}.
+# The Trust Anchor holds a normal LegalPersonCredential (ADR-006) whose
+# references point at its own gx input trio rather than the default one.
+ORG_INPUT_FILES = {
+    "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774": {
+        "gx:LegalPerson": "gx-trust-anchor-legal-person.json",
+        "gx:VatID": "gx-trust-anchor-registration-number.json",
+        "gx:Issuer": "gx-trust-anchor-terms-and-conditions.json",
+    },
 }
 
 _REF_TYPE = "harbour.gx:CompliantCredentialReference"
@@ -66,7 +86,7 @@ def _find_repo_root() -> Path:
 
 
 def load_input_vcs(gaiax_dir: Path) -> dict[str, dict]:
-    """Load the three plain Gaia-X input VCs keyed by their credentialSubject type."""
+    """Load the default plain Gaia-X input VCs keyed by their credentialSubject type."""
     inputs: dict[str, dict] = {}
     for credential_type, filename in INPUT_FILES.items():
         path = gaiax_dir / filename
@@ -74,6 +94,20 @@ def load_input_vcs(gaiax_dir: Path) -> dict[str, dict]:
             raise FileNotFoundError(f"Missing source-of-truth input VC: {path}")
         inputs[credential_type] = json.loads(path.read_text(encoding="utf-8"))
     return inputs
+
+
+def load_org_input_vcs(gaiax_dir: Path) -> dict[str, dict[str, dict]]:
+    """Load per-organization input VCs: org DID -> {credentialType: gx VC}."""
+    sources: dict[str, dict[str, dict]] = {}
+    for org_did, files in ORG_INPUT_FILES.items():
+        for credential_type, filename in files.items():
+            path = gaiax_dir / filename
+            if not path.exists():
+                raise FileNotFoundError(f"Missing source-of-truth input VC: {path}")
+            sources.setdefault(org_did, {})[credential_type] = json.loads(
+                path.read_text(encoding="utf-8")
+            )
+    return sources
 
 
 def iter_reference_nodes(node: Any) -> Iterator[dict]:
@@ -88,7 +122,24 @@ def iter_reference_nodes(node: Any) -> Iterator[dict]:
             yield from iter_reference_nodes(item)
 
 
-def fill_file(path: Path, inputs: dict[str, dict]) -> bool:
+def _resolve_referent(
+    ref: dict, inputs: dict[str, dict], org_sources: dict[str, dict[str, dict]]
+) -> dict | None:
+    """The gx VC a reference's digestSRI is taken over.
+
+    A reference whose ``@id`` org DID has its own input trio (``ORG_INPUT_FILES``)
+    resolves to that org's gx VC; otherwise to the default input VC.
+    """
+    ct = ref.get(_CREDENTIAL_TYPE_KEY)
+    org_did = str(ref.get("@id", "")).split("#", 1)[0]
+    if org_did in org_sources and ct in org_sources[org_did]:
+        return org_sources[org_did][ct]
+    return inputs.get(ct)
+
+
+def fill_file(
+    path: Path, inputs: dict[str, dict], org_sources: dict[str, dict[str, dict]]
+) -> bool:
     """Rewrite *path* with real digestSRI values (and canonical embedded VCs).
 
     Returns ``True`` if the file content changed.
@@ -97,16 +148,15 @@ def fill_file(path: Path, inputs: dict[str, dict]) -> bool:
     obj = json.loads(original)
 
     for ref in iter_reference_nodes(obj):
-        credential_type = ref[_CREDENTIAL_TYPE_KEY]
-        if credential_type not in inputs:
+        referent = _resolve_referent(ref, inputs, org_sources)
+        if referent is None:
             raise ValueError(
-                f"{path.name}: reference to unknown credentialType "
-                f"{credential_type!r} (no input VC source of truth)"
+                f"{path.name}: cannot resolve referent for credentialType "
+                f"{ref.get(_CREDENTIAL_TYPE_KEY)!r} / @id {ref.get('@id')!r}"
             )
-        source_vc = inputs[credential_type]
-        ref[_DIGEST_KEY] = compute_digest_sri(source_vc)
+        ref[_DIGEST_KEY] = compute_digest_sri(referent)
         if _EMBEDDED_KEY in ref:
-            ref[_EMBEDDED_KEY] = canonical_json(source_vc)
+            ref[_EMBEDDED_KEY] = canonical_json(referent)
 
     updated = json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
     if updated != original:
@@ -115,7 +165,9 @@ def fill_file(path: Path, inputs: dict[str, dict]) -> bool:
     return False
 
 
-def check_file(path: Path, inputs: dict[str, dict]) -> tuple[list[str], int]:
+def check_file(
+    path: Path, inputs: dict[str, dict], org_sources: dict[str, dict[str, dict]]
+) -> tuple[list[str], int]:
     """Verify every digestSRI in *path*.
 
     Returns ``(errors, reference_count)`` where *errors* is a list of
@@ -128,20 +180,20 @@ def check_file(path: Path, inputs: dict[str, dict]) -> tuple[list[str], int]:
     for ref in refs:
         credential_type = ref.get(_CREDENTIAL_TYPE_KEY)
         stored = ref.get(_DIGEST_KEY)
-        if credential_type not in inputs:
+        referent = _resolve_referent(ref, inputs, org_sources)
+        if referent is None:
             errors.append(
-                f"{path.name}: reference to unknown credentialType {credential_type!r}"
+                f"{path.name}: cannot resolve referent for credentialType "
+                f"{credential_type!r} / @id {ref.get('@id')!r}"
             )
             continue
-        source_vc = inputs[credential_type]
 
-        # The digest must match the source-of-truth input VC.
-        if not verify_digest_sri(source_vc, stored):
+        if not verify_digest_sri(referent, stored):
             errors.append(
-                f"{path.name}: {credential_type} digestSRI does not match "
-                f"{INPUT_FILES[credential_type]}\n"
+                f"{path.name}: {credential_type} digestSRI does not match its "
+                f"source VC\n"
                 f"      stored:   {stored}\n"
-                f"      expected: {compute_digest_sri(source_vc)}"
+                f"      expected: {compute_digest_sri(referent)}"
             )
             continue
 
@@ -168,6 +220,8 @@ def check_file(path: Path, inputs: dict[str, dict]) -> tuple[list[str], int]:
 def collect_target_files(gaiax_dir: Path) -> list[Path]:
     """All gaiax example files that may carry digestSRI references (excludes inputs)."""
     input_names = set(INPUT_FILES.values())
+    for files in ORG_INPUT_FILES.values():
+        input_names.update(files.values())
     return [
         p
         for p in sorted(gaiax_dir.glob("*.json"))
@@ -217,15 +271,21 @@ Examples:
         sys.exit(1)
 
     inputs = load_input_vcs(gaiax_dir)
+    org_sources = load_org_input_vcs(gaiax_dir)
     targets = collect_target_files(gaiax_dir)
 
     if args.write:
         print(f"Filling digestSRI hashes in {gaiax_dir}/ ...")
         for credential_type, vc in inputs.items():
             print(f"  {credential_type}: {compute_digest_sri(vc)}")
+        for org_did, by_type in org_sources.items():
+            for credential_type, vc in by_type.items():
+                print(
+                    f"  [org {org_did[-8:]}] {credential_type}: {compute_digest_sri(vc)}"
+                )
         changed = 0
         for path in targets:
-            if fill_file(path, inputs):
+            if fill_file(path, inputs, org_sources):
                 changed += 1
                 print(f"  updated {path.name}")
         print(f"Done. {changed} file(s) updated.")
@@ -236,7 +296,7 @@ Examples:
     all_errors: list[str] = []
     total_refs = 0
     for path in targets:
-        errors, ref_count = check_file(path, inputs)
+        errors, ref_count = check_file(path, inputs, org_sources)
         total_refs += ref_count
         if ref_count:
             status = "FAIL" if errors else "ok"

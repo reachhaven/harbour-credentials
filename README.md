@@ -207,51 +207,60 @@ python -m harbour.x509 generate --key key.jwk --subject "Test Issuer" --output c
 ```text
 src/
 ├── python/
-│   ├── harbour/           # Crypto library
-│   │   ├── keys.py        # Key generation, JWK, DID:key
-│   │   ├── signer.py      # VC/VP signing
-│   │   ├── verifier.py    # VC/VP verification
-│   │   ├── sd_jwt.py      # SD-JWT-VC issue/verify
-│   │   ├── kb_jwt.py      # Key Binding JWT
-│   │   └── x509.py        # X.509 certificates
-│   └── credentials/       # Credential processing pipeline
-│       └── example_signer.py
+│   ├── harbour/               # Crypto library
+│   │   ├── keys.py            # Key generation, JWK, did:key / did:ethr
+│   │   ├── signer.py          # VC/VP signing (VC-JOSE-COSE)
+│   │   ├── verifier.py        # VC/VP verification
+│   │   ├── sd_jwt.py          # SD-JWT-VC issue/verify
+│   │   ├── kb_jwt.py          # Key Binding JWT
+│   │   ├── sd_jwt_vp.py       # SD-JWT VP issue/verify with evidence
+│   │   ├── delegation.py      # Delegated signing (OID4VP transaction_data)
+│   │   ├── merkle.py          # Merkle tree (batched evidence)
+│   │   ├── batch_evidence.py  # Batched credential evidence build/verify
+│   │   ├── digest_sri.py      # W3C SRI digests (RFC 8785 canonicalization)
+│   │   ├── x509.py            # X.509 certificates
+│   │   └── generate_artifacts.py  # LinkML -> OWL/SHACL/JSON-LD (Python-only)
+│   └── credentials/           # Story pipeline (CLI-only, not a library export)
+│       ├── example_signer.py
+│       ├── verify_signed_examples.py
+│       └── digest_sri_examples.py
 └── typescript/
-    └── harbour/           # Crypto library (feature parity)
-        ├── keys.ts
-        ├── signer.ts
-        ├── verifier.ts
-        ├── sd-jwt.ts
-        └── x509.ts
+    └── harbour/               # Crypto library (feature parity, camelCase API)
+        ├── keys.ts / sign.ts / verify.ts / sd-jwt.ts / kb-jwt.ts
+        ├── sd-jwt-vp.ts / delegation.ts / merkle.ts / batch-evidence.ts
+        ├── digest-sri.ts / x509.ts / index.ts
+        └── story-sign.ts / story-verify.ts / story-digests.ts  # pipeline (CLI-only)
 
 submodules/
 ├── ontology-management-base/  # Validation pipeline, SHACL tools
 └── w3id.org/                  # W3ID context resolution
 
 examples/
-├── legal-person-credential.json       # Harbour skeleton credentials
-├── natural-person-credential.json     # (canonical unsigned JSON-LD)
-├── gaiax/                             # Gaia-X domain extensions
-└── did-ethr/                          # Example did:ethr DID documents used by examples
+├── credential-with-evidence.json  # Core harbour skeleton (envelope + batch evidence)
+├── gaiax/                         # Gaia-X domain journey (4 actors, see examples/README.md)
+├── gaiax_external/                # Third-party Gaia-X credentials (not our pipeline)
+└── did-ethr/                      # Example did:ethr DID documents used by examples
 
 tests/
 ├── fixtures/                      # Shared test fixtures
-│   ├── keys/                      # Test keypairs
+│   ├── keys/                      # Role keypairs (trust-anchor, haven, company, ...)
 │   ├── tokens/                    # Signed token fixtures
 │   └── sample-vc.json             # Shared unsigned VC payload
 ├── interop/                       # Cross-runtime interop tests
 ├── python/                        # Python tests
 │   ├── harbour/                   # harbour module tests
-│   └── credentials/               # credentials module tests
+│   └── credentials/               # credentials pipeline + validation tests
 └── typescript/harbour/            # TypeScript tests
 
 linkml/
 ├── harbour-core-credential.yaml   # Harbour base credential framework
-└── harbour-gx-credential.yaml    # Gaia-X domain layer (participant/service types)
+├── harbour-gx-credential.yaml     # Gaia-X domain layer
+├── harbour-core-delegation.yaml   # Delegated-signing transaction types (no SHACL)
+└── w3c-vc.yaml                    # W3C VC v2 shim
 
-artifacts/                         # Generated per domain (make generate)
+artifacts/                         # Generated per domain (make generate, gitignored)
 ├── harbour-core-credential/       # Base OWL/SHACL/context
-└── harbour-gx-credential/        # Domain OWL/SHACL/context
+└── harbour-gx-credential/         # Domain OWL/SHACL/context
 ```
 
 ## Testing
@@ -293,7 +302,7 @@ make story help
 ## Documentation
 
 - [Architecture Decision Records](docs/decisions/)
-- [API Documentation](docs/README.md)
+- [Documentation site source](docs/index.md) (published via MkDocs on release)
 
 ## License
 

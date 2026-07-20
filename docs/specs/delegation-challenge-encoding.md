@@ -200,7 +200,7 @@ The delegated consent is captured as `evidence` in a Verifiable Credential or di
     "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129"
   },
   "evidence": [{
-    "type": ["CredentialEvidence"],
+    "type": ["harbour:SignatureEvidence"],
     "verifiablePresentation": {
       "@context": ["https://www.w3.org/ns/credentials/v2"],
       "type": ["VerifiablePresentation"],
