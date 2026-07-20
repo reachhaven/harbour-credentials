@@ -717,6 +717,8 @@ _DID_PATTERN_CASES = [
 ]
 
 
+@_skip_no_artifacts
+@_skip_no_omb
 class TestDidPatternViolations:
     """Non-DID values in DID-valued slots must trigger sh:pattern violations."""
 
