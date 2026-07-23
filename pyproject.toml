@@ -37,6 +37,19 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=6.0",
     "rdflib>=7.0.0",
+    # LinkML compiler — ASCS-eV fork (feat/envited-x-pipeline). Installed directly
+    # from git so no submodule/recursive clone is required to run `just generate`.
+    # Mirrors ontology-management-base's own [dev] pin (single source of truth for
+    # the compiler version).
+    "linkml @ git+https://github.com/ASCS-eV/linkml.git@feat/envited-x-pipeline#subdirectory=packages/linkml",
+    # Required by the fork's OWL generator (linkml.utils.rdf_canonicalize) but not
+    # declared as a hard dependency there.
+    "pyoxigraph>=0.4",
+    # ontology-management-base — the `omb` package that ships the committed
+    # Gaia-X `artifacts/gx/*` shapes and the SHACL validation suite consumed by
+    # `just validate-shacl`. Installed editable from the flat submodule via the
+    # [tool.uv.sources] entry below (no recursive submodule clone required).
+    "ontology-management-base",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -54,6 +67,14 @@ Issues = "https://github.com/reachhaven/harbour-credentials/issues"
 where = ["src/python"]
 include = ["harbour*", "credentials*"]
 
+# uv dependency sources. The ontology-management-base (`omb`) package is resolved
+# from the flat submodule and installed editable, replacing the old
+# `pip install -e submodules/ontology-management-base` step. The LinkML fork stays
+# an inline git reference in the [dev] extra above (single source of truth for the
+# compiler version, mirroring OMB's own [dev] pin).
+[tool.uv.sources]
+ontology-management-base = { path = "submodules/ontology-management-base", editable = true }
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"
@@ -68,6 +89,7 @@ known-first-party = ["harbour", "credentials"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src/python"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

@@ -5,8 +5,9 @@ asserts that SHACL validation catches each specific error. Every test
 starts from a known-good credential, applies a single mutation, and
 checks that the OMB validation suite reports the expected violation.
 
-Validation uses the ``ShaclValidator`` from the ontology-management-base
-submodule — the same pipeline used in production (RDFS inference enabled).
+Validation goes through OMB's public ``omb.api.validate_data`` API (from the
+installable ``ontology-management-base`` package) — the same pipeline used in
+production ``make validate shacl`` (RDFS inference enabled).
 
 The test output is designed for debuggability:
 - Each test ID clearly describes the mutation (e.g., "LegalPerson-missing-issuer")
@@ -26,7 +27,6 @@ Requires generated artifacts (``make generate``) and the OMB submodule.
 
 import copy
 import json
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,7 +71,7 @@ _skip_no_artifacts = pytest.mark.skipif(
 )
 
 _skip_no_omb = pytest.mark.skipif(
-    not (_OMB / "src" / "tools" / "validators" / "shacl" / "validator.py").exists(),
+    not (_OMB / "omb" / "validators" / "shacl" / "validator.py").exists(),
     reason="ontology-management-base submodule not initialised",
 )
 
@@ -128,29 +128,15 @@ def _format_violations(violations: list[ShaclViolation]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# OMB validation suite bootstrap
+# OMB validation API
 # ---------------------------------------------------------------------------
-
-
-def _make_validator():
-    """Create a ShaclValidator using the OMB validation suite.
-
-    Registers harbour artifact directories so the resolver can discover
-    OWL ontologies, SHACL shapes, and JSON-LD contexts.  Uses the default
-    ``rdfs`` inference mode — the same pipeline as production validation.
-    """
-    sys.path.insert(0, str(_OMB))
-    from src.tools.utils.registry_resolver import RegistryResolver
-    from src.tools.validators.shacl.validator import ShaclValidator
-
-    resolver = RegistryResolver(_OMB)
-    resolver.register_artifact_directory(_ARTIFACTS_DIR)
-    return ShaclValidator(
-        root_dir=_OMB,
-        inference_mode="rdfs",
-        verbose=False,
-        resolver=resolver,
-    )
+#
+# Validation goes through OMB's public, side-effect-free ``omb.api.validate_data``
+# entry point (from the installable ``ontology-management-base`` package). It
+# builds the registry resolver, registers harbour's generated artifacts, applies
+# RDFS inference and runs SHACL — the same pipeline as production ``make validate
+# shacl`` — so harbour no longer wires up ``RegistryResolver`` / ``ShaclValidator``
+# by hand.
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +146,26 @@ def _make_validator():
 
 @pytest.fixture(scope="session")
 def shacl_validator():
-    """OMB ShaclValidator with harbour artifacts registered."""
-    return _make_validator()
+    """Return a ``validate(files)`` callable backed by ``omb.api.validate_data``.
+
+    Mirrors production ``make validate shacl``: harbour's generated artifacts
+    plus OMB's data root (committed ``gx`` shapes + base ``imports``), RDFS
+    inference, non-strict IRI resolution, and online DID/context resolution
+    allowed. Returns an ``omb`` ``ValidationResult`` (``.conforms``,
+    ``.report_graph``, ``.report_text``).
+    """
+    from omb.api import validate_data
+
+    def _validate_files(files):
+        return validate_data(
+            files,
+            artifacts=[_ARTIFACTS_DIR],
+            root_dir=_OMB,
+            strict=False,
+            allow_online=True,
+        )
+
+    return _validate_files
 
 
 # ---------------------------------------------------------------------------
@@ -173,11 +177,16 @@ def _validate(
     credential: dict,
     validator,
 ) -> tuple[bool, list[ShaclViolation], str]:
-    """Validate a credential dict via the OMB validation suite.
+    """Validate a credential dict via OMB's ``validate_data`` API.
 
-    Writes the credential to a temp file and runs the full ShaclValidator
+    Writes the credential to a temp file and runs the full validation
     pipeline (context inlining, schema discovery, RDFS inference, SHACL
-    validation) — identical to production ``make validate``.
+    validation) — identical to production ``make validate shacl``.
+
+    Args:
+        credential: The credential JSON to validate.
+        validator: The ``validate(files)`` callable from the
+            ``shacl_validator`` fixture.
 
     Returns:
         (conforms, violations, results_text)
@@ -189,7 +198,7 @@ def _validate(
         temp_path = Path(f.name)
 
     try:
-        result = validator.validate([temp_path])
+        result = validator([temp_path])
         violations = (
             _extract_violations(result.report_graph)
             if result.report_graph is not None

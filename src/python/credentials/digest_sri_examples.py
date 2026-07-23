@@ -27,7 +27,7 @@ Modes:
     provably the same credential.
   * ``--check`` (default) recomputes and verifies every digestSRI without
     modifying any file, failing if a value is stale or tampered. This is the
-    integrity step run by ``make story``.
+    integrity step run by ``just story``.
 
 CLI Usage:
     python -m credentials.digest_sri_examples            # check (default)
@@ -186,7 +186,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m credentials.digest_sri_examples           # verify all (used by `make story`)
+  python -m credentials.digest_sri_examples           # verify all (used by `just story`)
   python -m credentials.digest_sri_examples --write   # recompute and write hashes
         """,
     )

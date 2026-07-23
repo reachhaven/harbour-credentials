@@ -8,30 +8,31 @@
 pip install harbour-credentials
 ```
 
-### From Source
+### From Source (development)
+
+Requires [uv](https://docs.astral.sh/uv/) and [just](https://just.systems) on
+your PATH (plus Node.js 22 with Corepack for the TypeScript recipes):
 
 ```bash
 git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 
-# Create virtual environment
-python -m venv .venv
+# Set up the full dev environment: flat submodules + uv sync (deps, LinkML fork,
+# editable omb) + pre-commit hooks + TypeScript deps.
+just setup
+```
 
+`just` recipes run through `uv run`, which creates and syncs an isolated `.venv`
+from `uv.lock` on demand — no manual venv creation or activation is needed. Use
+`just install-dev` to re-sync only the Python environment. Activate the venv only
+for direct `python`/`pip` commands:
+
+```bash
 # PowerShell
 .\.venv\Scripts\Activate.ps1
 
 # macOS / Linux / Git Bash
 source .venv/bin/activate
-
-# Install with dev dependencies
-pip install -e ".[dev]"
-```
-
-### Development Setup
-
-```bash
-make setup
-make install dev
 ```
 
 ## TypeScript
@@ -58,7 +59,7 @@ corepack yarn build
 
 ```bash
 python -m harbour.keys --help
-make test
+just test
 ```
 
 **TypeScript:**

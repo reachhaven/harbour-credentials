@@ -60,7 +60,7 @@ classDiagram
         credentialStatus : CRSetEntry[] ⟨required⟩
     }
 
-    class ComplianceCredential {
+    class HarbourComplianceCredential {
         <<abstract>>
         evidence : Evidence[] ⟨required⟩
     }
@@ -80,8 +80,8 @@ classDiagram
     }
 
     W3C_VC_Envelope <|-- HarbourCredential : imports + strengthens
-    HarbourCredential <|-- ComplianceCredential
-    ComplianceCredential <|-- LegalPersonCredential
+    HarbourCredential <|-- HarbourComplianceCredential
+    HarbourComplianceCredential <|-- LegalPersonCredential
     HarbourCredential <|-- NaturalPersonCredential
 ```
 
@@ -90,7 +90,7 @@ classDiagram
 The W3C VC Data Model v2.0 defines most envelope fields as optional.
 `HarbourCredential` tightens these for the harbour profile:
 
-| Field | W3C VC v2.0 | HarbourCredential | ComplianceCredential / NPC |
+| Field | W3C VC v2.0 | HarbourCredential | HarbourComplianceCredential / NPC |
 |-------|-------------|-------------------|---------------------------|
 | `issuer` | optional | **required** | **required** |
 | `validFrom` | optional | **required** | **required** |
@@ -102,7 +102,7 @@ The W3C VC Data Model v2.0 defines most envelope fields as optional.
     Evidence is optional at the base `HarbourCredential` level (e.g. the
     Trust Anchor's self-signed `LinkedCredentialService` credential has no
     evidence — it is the root of trust). Domain-specific types
-    (`ComplianceCredential`, `NaturalPersonCredential`) make evidence
+    (`HarbourComplianceCredential`, `NaturalPersonCredential`) make evidence
     **required** via `slot_usage` overrides.
 
 !!! note "Downstream overrides"
@@ -374,7 +374,7 @@ flowchart LR
 | **SHACL** (`.shacl.ttl`) | Validation constraints (required, ranges, cardinality) | `HarbourShaclGenerator` |
 | **JSON-LD Context** (`.context.jsonld`) | Term-to-IRI mappings for JSON-LD serialisation | `DomainContextGenerator` |
 
-Run `make generate` to regenerate all artifacts from schemas.
+Run `just generate` to regenerate all artifacts from schemas.
 
 ---
 
@@ -394,8 +394,8 @@ For quick reference, every class defined across all three schema files:
 | `TrustAnchorService` | core | — | *(Service union)* | Core |
 | `LinkedCredentialService` | core | — | *(Service union)* | Core |
 | `CRSetRevocationRegistryService` | core | — | *(Service union)* | Core |
-| `ComplianceCredential` | gx | ✅ | `HarbourCredential` | Gaia-X |
-| `LegalPersonCredential` | gx | — | `ComplianceCredential` | Gaia-X |
+| `HarbourComplianceCredential` | gx | ✅ | `HarbourCredential` | Gaia-X |
+| `LegalPersonCredential` | gx | — | `HarbourComplianceCredential` | Gaia-X |
 | `NaturalPersonCredential` | gx | — | `HarbourCredential` | Gaia-X |
 | `HarbourLegalPerson` | gx | — | — | Gaia-X |
 | `CompliantCredentialReference` | gx | — | — | Gaia-X |

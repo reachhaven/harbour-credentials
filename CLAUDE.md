@@ -8,54 +8,65 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Supports SD-JWT-VC (EUDI/OIDC4VP) + VC-JOSE-COSE (Gaia-X) formats with ES256 (P-256) as the primary algorithm.
 
-The library is validated end-to-end by the **Harbour Credential Lifecycle** (see `examples/README.md`): a 4-actor narrative — Trust Anchor → Signing Service → Legal Person (organization) → Natural Person (employee) — that is signed and verified in *both* runtimes via the **story pipeline** (`make story`), proving interoperability. Understanding this trust model (below) is the fastest way to grasp the codebase.
+The library is validated end-to-end by the **Harbour Credential Lifecycle** (see `examples/README.md`): a 4-actor narrative — Trust Anchor → Signing Service → Legal Person (organization) → Natural Person (employee) — that is signed and verified in *both* runtimes via the **story pipeline** (`just story`), proving interoperability. Understanding this trust model (below) is the fastest way to grasp the codebase.
 
 ## Essential Commands
 
 ```bash
-# First-time setup (creates venv, installs deps + ASCS-eV LinkML fork, bootstraps TS, inits submodules)
-make setup
-source .venv/bin/activate
+# First-time setup (inits flat submodules, uv-syncs deps + ASCS-eV LinkML fork +
+# editable omb, installs hooks, bootstraps TS). Requires `uv` and `just` on PATH.
+just setup
+# `just` recipes run through `uv run` — no venv activation needed. Activate only
+# for direct python/pip: source .venv/bin/activate
 
 # --- Tests ---
-make test            # Python tests only (excludes interop)
-make test full       # Python + SHACL validation + TypeScript
-make test ts         # TypeScript (vitest) only
-make test interop    # Cross-runtime interop tests only
-make test cov        # Python tests with coverage -> htmlcov/index.html + terminal report
+just test            # Python tests only (excludes interop)
+just test-full       # Python + SHACL validation + TypeScript
+just test-ts         # TypeScript (vitest) only
+just test-interop    # Cross-runtime interop tests only
+just test-cov        # Python tests with coverage -> htmlcov/index.html + terminal report
 
-# Run a single Python test file / a single test by name
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/python/harbour/test_sign.py -v
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/python/harbour/test_sign.py -v -k "test_name"
+# Run a single Python test file / a single test by name (pytest gets pythonpath from pyproject)
+uv run --extra dev pytest tests/python/harbour/test_sign.py -v
+uv run --extra dev pytest tests/python/harbour/test_sign.py -v -k "test_name"
 
 # Run TypeScript tests (from the TS package dir)
-cd src/typescript/harbour && yarn test
-cd src/typescript/harbour && yarn vitest run --config vitest.config.ts ../../../tests/typescript/harbour/sign.test.ts
+cd src/typescript/harbour && corepack yarn test
+cd src/typescript/harbour && corepack yarn vitest run --config vitest.config.ts ../../../tests/typescript/harbour/sign.test.ts
 
 # Run interop tests directly (requires both Python and TS deps)
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/interop/test_cross_runtime.py -v
+uv run --extra dev pytest tests/interop/test_cross_runtime.py -v
 
 # --- Credential lifecycle story pipeline (end-to-end sign/verify/validate of examples/) ---
-make story           # Python: generate -> sign -> verify -> SHACL-validate
-make story ts        # Same pipeline in TypeScript
-make story cross     # Cross-runtime: TS signs -> Python verifies, then Python signs -> TS verifies
+just story           # Python: generate -> sign -> verify -> SHACL-validate
+just story-ts        # Same pipeline in TypeScript
+just story-cross     # Cross-runtime: TS signs -> Python verifies, then Python signs -> TS verifies
 
 # --- Schema / artifacts ---
-make generate        # Generate OWL/SHACL/JSON-LD artifacts from LinkML schemas (needs ASCS-eV LinkML fork)
-make validate        # Structural validation tests (pytest tests/python/credentials/test_validation.py)
-make validate shacl  # SHACL conformance on example credentials (via ontology-management-base submodule)
+just generate        # Generate OWL/SHACL/JSON-LD artifacts from LinkML schemas (needs ASCS-eV LinkML fork)
+just validate        # Structural validation tests (pytest tests/python/credentials/test_validation.py)
+just validate-shacl  # SHACL conformance on example credentials (via ontology-management-base / omb)
 
 # --- Quality / build / compound pipelines ---
-make build           # Build TypeScript (tsc)
-make lint            # All pre-commit hooks (ruff, JSON-LD/Turtle, markdownlint); `make lint ts` for tsc --noEmit
-make format          # ruff format + ruff check --fix
-make check           # generate + validate
-make all             # lint + check + test full (the full local CI pipeline)
+just build           # Build TypeScript (tsc)
+just lint            # All pre-commit hooks (ruff, JSON-LD/Turtle, markdownlint); `just lint-ts` for tsc --noEmit
+just format          # ruff format + ruff check --fix
+just check           # generate + validate
+just all             # lint + check + test (the full local CI pipeline)
 ```
 
-**Subcommand pattern:** Grouped targets (`setup`, `install`, `test`, `validate`, `lint`, `format`, `story`, `build`) take the first trailing word as a subcommand — e.g. `make test full` dispatches to the internal `_test_all` target. Run `make <target> help` to list a target's subcommands.
+**Recipe naming:** the former grouped Makefile targets are now individual `just`
+recipes (`setup`, `install`, `install-dev`, `test`, `test-full`, `test-ts`,
+`validate`, `validate-shacl`, `lint`, `lint-ts`, `format`, `story`, `story-ts`,
+`build`, …) — e.g. the old `make test full` is now `just test-full`. Run
+`just --list` to see every recipe with its description.
 
-**Important:** Python tests require `PYTHONPATH=src/python:$PYTHONPATH` when running pytest directly (use `make test` to get this automatically). On Windows PowerShell the separator is `;`: `$env:PYTHONPATH="src/python;$env:PYTHONPATH"`. The Makefile also honors a `VENV` override (`make setup VENV=/path`) and auto-detects a parent `../../.venv` for shared/monorepo workspaces.
+**Important:** `just` recipes run Python through `uv run --frozen --extra dev`, which
+syncs an isolated `.venv` from `uv.lock` on demand (no manual venv / activation, no
+`PYTHONPATH` juggling — pytest gets `pythonpath = ["src/python"]` from `pyproject.toml`).
+When invoking pytest directly, prefer `uv run --extra dev pytest ...`; the editable
+`omb` submodule is a `[tool.uv.sources]` path dependency, so `uv sync --extra dev`
+requires the `ontology-management-base` submodule to be checked out first.
 
 ## Architecture
 
@@ -107,7 +118,7 @@ The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, hav
 - `tests/python/credentials/` — pipeline + LinkML/SHACL validation tests
 - `tests/typescript/harbour/` — vitest tests (config: `src/typescript/harbour/vitest.config.ts`)
 - `tests/interop/` — cross-runtime tests; **auto-skip** if TS deps are unavailable
-- `tests/validation-probe/` — ontology-loading probe JSON used by Makefile validation targets (not in the pytest suite)
+- `tests/validation-probe/` — ontology-loading probe JSON used by the `just validate-shacl` recipe (not in the pytest suite)
 
 ### TypeScript Toolchain
 
@@ -118,14 +129,17 @@ The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, hav
 
 ### Submodules
 
-Clone with `--recurse-submodules`. If already cloned: `git submodule update --init --recursive --depth 1` (both use shallow clones).
+Submodules are cloned **flat** — direct submodules only, never recursively. `just setup` initializes them for you; to do it manually: `git submodule update --init` (this honors each submodule's `shallow` setting in `.gitmodules`). Do **not** use `--recursive`, and do **not** force `--depth 1` — `service-characteristics` is pinned to an older commit and is intentionally cloned in full.
 
-- `submodules/ontology-management-base/` — SHACL validation suite (ASCS-eV fork). **Nested inside it** is the ASCS-eV LinkML fork (`.../submodules/linkml/packages/linkml`) that `make setup` installs — `make generate` depends on it (it passes fork-only params like `normalize_prefixes`). Against stock LinkML, `make generate` fails with a `TypeError`.
+- `submodules/ontology-management-base/` — SHACL validation suite + committed Gaia-X (`gx`) artifacts, branch `feat/omb-installable-package`. Installed **editable** as the `omb` package by `uv sync --extra dev` (run via `just setup`, wired through `[tool.uv.sources]`) and drives `just validate-shacl`.
+- `submodules/service-characteristics/` — Gaia-X LinkML schema source (GitLab, pinned to `f4be530`/v2.2.1 — the commit OMB's `gx` artifacts were generated from). Provides the `gaia-x` schema that `harbour-gx-credential.yaml` imports via `linkml/importmap.json`; required by `just generate`. Formerly nested inside `ontology-management-base`, now a **direct** submodule so the tree can be cloned flat.
 - `submodules/w3id.org/` — W3ID context resolution (`.htaccess` redirects for `w3id.org/reachhaven/harbour/...` IRIs to GitHub Pages)
+
+The ASCS-eV **LinkML compiler fork** (branch `feat/envited-x-pipeline`, `packages/linkml`) is **not** a submodule — it is declared as a git dependency in the `.[dev]` extra of `pyproject.toml` and installed by `just setup` / `just install-dev`. `just generate` depends on it (it passes fork-only params like `normalize_prefixes`); against stock LinkML, `just generate` fails with a `TypeError`.
 
 ### LinkML → Artifacts Pipeline
 
-`linkml/*.yaml` schemas generate `artifacts/` (OWL ontology, SHACL shapes, JSON-LD context) via `make generate` → `generate_artifacts.py`. Schemas: `harbour-core-credential` (base VC envelope, revocation, evidence, DID docs), `harbour-gx-credential` (Gaia-X layer), `harbour-core-delegation` (OID4VP transaction types; no SHACL — canonical JSON must stay un-expanded for SHA-256 hashing), `w3c-vc` (VC v2 shim).
+`linkml/*.yaml` schemas generate `artifacts/` (OWL ontology, SHACL shapes, JSON-LD context) via `just generate` → `generate_artifacts.py`. Schemas: `harbour-core-credential` (base VC envelope, revocation, evidence, DID docs), `harbour-gx-credential` (Gaia-X layer), `harbour-core-delegation` (OID4VP transaction types; no SHACL — canonical JSON must stay un-expanded for SHA-256 hashing), `w3c-vc` (VC v2 shim).
 
 **Revocation = CRSet model** (commit #7, breaking): a `credentialStatus` entry carries `statusServiceOperator` (bare DID), `statusIndex` (lookup key), and optional `statusId` (convenience URL for SHACL closed-shape compatibility — *not* the trust root). A verifier resolves the operator DID, discovers the `harbour:CRSetRevocationRegistryService` by type, and checks `registryEndpoint` + `statusIndex`.
 
@@ -195,7 +209,7 @@ Every harbour module has an argparse `main()` with `--help`: `python -m harbour.
 
 1. **Cross-reference the spec copies in `docs/specs/references/`.** LinkML files use bracketed citation tags (`[VCDM2]`, `[DID Core]`, `[OID4VP]`, `[SD-JWT]`, `[VC-CTX]`, …) pointing at specific spec sections — verify against the normative text before changing a slot range, class hierarchy, or constraint, and leave a YAML comment citing the rationale.
 2. **Never use `range: Any` in LinkML** — `linkml:Any` triggers closed-shape SHACL violations. Use `uri` for identifiers or a named class for structured objects.
-3. **Validate before committing** — run `make validate shacl` (and `make story`) to catch inference/closed-shape issues that CI will otherwise flag.
+3. **Validate before committing** — run `just validate-shacl` (and `just story`) to catch inference/closed-shape issues that CI will otherwise flag.
 
 ## Git Commit Policy
 
@@ -204,7 +218,7 @@ Every harbour module has an argparse `main()` with `--help`: `python -m harbour.
 - Always sign commits with `-s -S` (Signed-off-by + GPG signature)
 - **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or any mention of AI tools in commit messages
 - Use conventional commit format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`, `ci:`); a `!` marks breaking changes (e.g. `feat(linkml)!: ...`). These feed the git-cliff changelog.
-- Run `make all` (or at least `make test full` + `make lint`) before committing
+- Run `just all` (or at least `just test-full` + `just lint`) before committing
 
 ```bash
 git commit -s -S -m "feat(harbour): add KB-JWT support"
@@ -212,7 +226,7 @@ git commit -s -S -m "feat(harbour): add KB-JWT support"
 
 ### CI / Release (context)
 
-Pushing/PR-ing to `main` runs `ci.yml` (lint + generate + validate + tests + stories, on Python 3.12/3.13 and Node 22 across Linux/macOS/Windows). Pre-commit hooks (installed by `make setup`) run ruff, JSON-LD/Turtle, and markdownlint on commit. Releases are **tag-driven**: pushing a `v*.*.*` tag (or running the Release workflow with a tag input) generates a changelog with git-cliff, publishes TypeDoc + MkDocs, and deploys w3id artifacts to GitHub Pages via `make release-artifacts`. Versions in `pyproject.toml` / `package.json` are bumped manually.
+Pushing/PR-ing to `main` runs `ci.yml` (lint + generate + validate + tests + stories, on Python 3.12/3.13 and Node 22 across Linux/macOS/Windows). Pre-commit hooks (installed by `just setup`) run ruff, JSON-LD/Turtle, and markdownlint on commit. Releases are **tag-driven**: pushing a `v*.*.*` tag (or running the Release workflow with a tag input) generates a changelog with git-cliff, publishes TypeDoc + MkDocs, and deploys w3id artifacts to GitHub Pages via `just release-artifacts`. Versions in `pyproject.toml` / `package.json` are bumped manually.
 
 ## Change Documentation
 
@@ -238,7 +252,7 @@ When asked to prepare a commit or PR, default to writing these gitignored files 
 - Forgetting CLI `main()` with `--help` on new Python modules
 - Breaking feature parity between Python and TypeScript (add the mirror change + an interop test)
 - Trying to export the credential/story pipeline (`credentials/*`, `story-*.ts`) as library functions — they are CLI-only
-- Confusing `make validate` (structural pytest) with `make validate shacl` (SHACL conformance)
+- Confusing `just validate` (structural pytest) with `just validate-shacl` (SHACL conformance)
 - Committing generated/gitignored outputs (`examples/**/signed/`, `artifacts/*`, `htmlcov/`, `.coverage`)
 - Using `range: Any` in LinkML schemas, or changing a schema without checking `docs/specs/references/`
 - Committing without `-s -S` signing, or adding AI attribution to a commit message

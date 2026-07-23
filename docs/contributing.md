@@ -7,15 +7,24 @@ Thank you for your interest in contributing to Harbour Credentials!
 1. **Fork and clone** the repository:
 
    ```bash
-   git clone --recurse-submodules https://github.com/YOUR_USERNAME/harbour-credentials.git
+   git clone https://github.com/YOUR_USERNAME/harbour-credentials.git
    cd harbour-credentials
    ```
 
-2. **Set up the development environment**:
+   > Submodules are cloned flat (direct submodules only) by `just setup` in the
+   > next step. To initialize them manually: `git submodule update --init`
+   > (do **not** force `--depth 1`). The LinkML compiler fork is installed as a
+   > `.[dev]` git dependency, not a submodule; the `omb` submodule is installed
+   > editable by `uv sync --extra dev`.
+
+2. **Set up the development environment** (requires [uv](https://docs.astral.sh/uv/)
+   and [just](https://just.systems), plus Node.js 22 with Corepack for TypeScript):
 
    ```bash
-   make setup
+   just setup
 
+   # `just` recipes run through `uv run` — activation is optional, only for
+   # direct python/pip commands:
    # PowerShell
    .\.venv\Scripts\Activate.ps1
 
@@ -26,8 +35,8 @@ Thank you for your interest in contributing to Harbour Credentials!
 3. **Verify everything works**:
 
    ```bash
-   make test full
-   make lint
+   just test-full
+   just lint
    ```
 
 ## Development Workflow
@@ -51,32 +60,32 @@ Thank you for your interest in contributing to Harbour Credentials!
 - Python 3.12+ with type hints on public APIs
 - Use `pathlib.Path` (not `os.path`)
 - All modules must have `main()` with `argparse` and `--help`
-- Run `make lint` and `make format` before committing
+- Run `just lint` and `just format` before committing
 
 #### TypeScript
 
 - TypeScript 5.x with strict mode
 - Use `async/await` for crypto operations
 - Export types alongside functions
-- Run `make lint ts` before committing
+- Run `just lint-ts` before committing
 
 ### Testing
 
 ```bash
 # Run all tests
-make test full
+just test-full
 
 # Python only
-make test
+just test
 
 # TypeScript only
-make test ts
+just test-ts
 
 # Single Python test file
-PYTHONPATH=src/python:$PYTHONPATH pytest tests/python/harbour/test_keys.py -v
+uv run --extra dev pytest tests/python/harbour/test_keys.py -v
 
 # Single TypeScript test
-cd src/typescript/harbour && yarn vitest run --config vitest.config.ts ../../../tests/typescript/harbour/keys.test.ts
+cd src/typescript/harbour && corepack yarn vitest run --config vitest.config.ts ../../../tests/typescript/harbour/keys.test.ts
 ```
 
 ### Feature Parity
@@ -118,8 +127,8 @@ git commit -s -S -m "feat(harbour): add feature"
 
 ### Before Submitting
 
-- [ ] All tests pass (`make test full`)
-- [ ] Linting passes (`make lint`)
+- [ ] All tests pass (`just test-full`)
+- [ ] Linting passes (`just lint`)
 - [ ] Documentation is updated if needed
 - [ ] Commit messages follow conventional format
 - [ ] Commits are signed (`-s -S`)
