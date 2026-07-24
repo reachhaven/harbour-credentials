@@ -174,7 +174,7 @@ def main() -> None:
     signed_dirs = _discover_signed_dirs(repo_root)
     if not signed_dirs:
         raise RuntimeError(
-            "No signed example directories found. Run `make story-sign` first."
+            "No signed example directories found. Run `just story-sign` first."
         )
 
     total = VerificationCounts()

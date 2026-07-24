@@ -37,6 +37,23 @@ dev = [
     "pytest>=8.0.0",
     "pytest-cov>=6.0",
     "rdflib>=7.0.0",
+    # LinkML compiler — ASCS-eV fork. Pinned to the EXACT commit that the
+    # pinned `ontology-management-base` (0.3.0) locks in its dev dependencies —
+    # i.e. the compiler that generated OMB's vendored Gaia-X `gx` artifacts — so
+    # `just generate` produces artifacts consistent with OMB's shapes. Keep this
+    # SHA in lockstep with the `ontology-management-base` version whenever it is
+    # bumped. (fork branch: feat/envited-x-pipeline)
+    "linkml @ git+https://github.com/ASCS-eV/linkml.git@6aa7702c159a9af2c95149de8e73e5f74c1094c0#subdirectory=packages/linkml",
+    # Required by the fork's OWL generator (linkml.utils.rdf_canonicalize) but not
+    # declared as a hard dependency there.
+    "pyoxigraph>=0.4",
+    # ontology-management-base — the `omb` package that ships the committed
+    # Gaia-X `artifacts/gx/*` shapes and the SHACL validation suite consumed by
+    # `just validate-shacl`. Installed from PyPI (the published wheel vendors the
+    # gx artifacts + cs/cred imports under omb/data/), so no OMB submodule /
+    # recursive clone is required. This version determines which LinkML compiler
+    # commit to hard-pin above (keep the two in lockstep on every OMB bump).
+    "ontology-management-base>=0.3.0",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -68,6 +85,7 @@ known-first-party = ["harbour", "credentials"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src/python"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

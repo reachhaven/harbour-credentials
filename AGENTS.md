@@ -32,25 +32,26 @@ tests/
 ## Build, Test, and Development Commands
 
 ```bash
-# Install dev dependencies
-make setup
-make install dev
+# Set up the dev environment (submodules + uv sync + hooks + TS deps)
+just setup
+# Re-sync only the Python dev environment
+just install-dev
 
 # Run all tests (Python + TypeScript)
-make test full
+just test-full
 
 # Run Python tests only
-make test
+just test
 
 # Run TypeScript tests only
-make test ts
+just test-ts
 
 # Lint and format
-make lint
-make format
+just lint
+just format
 
 # Build TypeScript
-make build
+just build
 ```
 
 ## Git Commit & Pull Request Policy
@@ -118,9 +119,9 @@ Brief description of the changes.
 
 ## Testing
 
-- [ ] Python tests pass (`make test`)
-- [ ] TypeScript tests pass (`make test ts`)
-- [ ] All tests pass (`make test full`)
+- [ ] Python tests pass (`just test`)
+- [ ] TypeScript tests pass (`just test-ts`)
+- [ ] All tests pass (`just test-full`)
 
 ## Related Issues
 
@@ -151,7 +152,7 @@ When defining or modifying LinkML schemas, JSON-LD examples, or DID documents:
      (e.g. DID Core `serviceEndpoint`)
    - A named class for structured objects with a defined schema
      (e.g. OID4VP `TransactionData`)
-5. **Validate examples against SHACL** (`make validate`) to catch inference
+5. **Validate examples against SHACL** (`just validate-shacl`) to catch inference
    issues before they reach CI.
 
 ## Coding Style
@@ -162,14 +163,14 @@ When defining or modifying LinkML schemas, JSON-LD examples, or DID documents:
 - Use `pathlib.Path` (not `os.path`)
 - 4-space indentation
 - CLI modules must have `main()` with `argparse` and `--help`
-- Run `make lint` before committing
+- Run `just lint` before committing
 
 ### TypeScript
 
 - TypeScript 5.x with strict mode
 - Use async/await for crypto operations
 - Export types alongside functions
-- Run `make lint ts` before committing
+- Run `just lint-ts` before committing
 
 ## Module CLI Requirements
 

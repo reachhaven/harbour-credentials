@@ -7,7 +7,7 @@
  * (and its inline `harbour.gx:embeddedCredential`, when present), recomputed
  * with the real `verifyDigestSri` function.
  *
- * Run via `yarn story:digests` (invoked by `make story ts`).
+ * Run via `yarn story:digests` (invoked by `just story-ts`).
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";

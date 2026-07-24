@@ -32,17 +32,22 @@ jobs:
   build:
     name: 🔨 Build Documentation
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ inputs.ref }}
+          submodules: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          enable-cache: true
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,18 +57,15 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Install Python dependencies
-        run: python3 -m pip install -e ".[docs]"
-
       - name: Install TypeScript dependencies
         working-directory: src/typescript/harbour
-        run: yarn install --immutable
+        run: corepack yarn install --immutable
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Build MkDocs site
-        run: mkdocs build --strict --site-dir site
+        run: uv run --frozen --extra docs mkdocs build --strict --site-dir site
 
       - name: Generate TypeScript API docs into site
         working-directory: src/typescript/harbour

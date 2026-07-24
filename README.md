@@ -22,12 +22,21 @@ JOSE signing and verification library for W3C Verifiable Credentials, supporting
 pip install harbour-credentials
 ```
 
-Or for development:
+Or for development. This requires [uv](https://docs.astral.sh/uv/) and
+[just](https://just.systems) on your PATH (plus Node.js 22 with Corepack for the
+TypeScript recipes):
 
 ```bash
-git clone --recurse-submodules https://github.com/reachhaven/harbour-credentials.git
+git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
-make setup
+just setup
+```
+
+No activation is required for `just` recipes — they run through `uv run`, which
+creates and syncs an isolated `.venv` on demand. Activate it only for direct
+`python`/`pip` commands:
+
+```bash
 # PowerShell
 .\.venv\Scripts\Activate.ps1
 
@@ -35,23 +44,36 @@ make setup
 source .venv/bin/activate
 ```
 
-> **Note:** The `--recurse-submodules` flag is required to clone the ontology-management-base and w3id.org submodules.
+> **Note:** Submodules are cloned **flat** (direct submodules only —
+> `service-characteristics` and `w3id.org` — never recursively). `just setup`
+> initializes them for you with `git submodule update --init` (which honors each
+> submodule's `shallow` setting in `.gitmodules`; do **not** force `--depth 1`, as
+> `service-characteristics` is pinned to an older commit and is cloned in full).
 >
-> `make setup` installs Python dev dependencies (`.[dev]`), LinkML, pre-commit hooks, and bootstraps TypeScript dependencies with `corepack yarn install` in `src/typescript/harbour`.
-> Use `make install dev` only if you need to refresh an existing Python environment.
+> The ASCS-eV **LinkML compiler fork** is **not** a submodule — it is installed
+> from git as a `.[dev]` dependency, so no recursive clone is needed for
+> `just generate`. The `ontology-management-base` (`omb`) package is installed
+> **from PyPI** by `uv sync --extra dev` (its wheel vendors the `gx` artifacts),
+> so no OMB submodule is required.
+>
+> `just setup` initializes the submodules, syncs the Python dev environment
+> (`.[dev]`, including the LinkML fork and `omb` from PyPI), installs pre-commit
+> hooks, and bootstraps TypeScript dependencies with `corepack yarn install` in
+> `src/typescript/harbour`. Use `just install-dev` to only (re)sync the Python
+> environment.
 
 If you already cloned without submodules:
 
 ```bash
-git submodule update --init --recursive --depth 1
+git submodule update --init
 ```
 
 ### TypeScript/JavaScript
 
 ```bash
-# If you already ran `make setup`, TypeScript dependencies are already bootstrapped.
+# If you already ran `just setup`, TypeScript dependencies are already bootstrapped.
 # Otherwise:
-make setup ts
+just setup-ts
 ```
 
 ## Quick Start
@@ -166,16 +188,16 @@ Validate harbour credentials against SHACL shapes using the ontology-management-
 
 ```bash
 # Generate artifacts from LinkML schemas
-make generate
+just generate
 
 # Validate examples against SHACL shapes (harbour + gx)
-make validate shacl
+just validate-shacl
 
 # Run structural validation tests
-make validate
+just validate
 
-# See validation subcommands
-make validate help
+# See every recipe
+just --list
 ```
 
 ## CLI Usage
@@ -225,7 +247,7 @@ src/
         └── x509.ts
 
 submodules/
-├── ontology-management-base/  # Validation pipeline, SHACL tools
+├── service-characteristics/   # Gaia-X LinkML schema source (gaia-x import for just generate)
 └── w3id.org/                  # W3ID context resolution
 
 examples/
@@ -249,7 +271,7 @@ linkml/
 ├── harbour-core-credential.yaml   # Harbour base credential framework
 └── harbour-gx-credential.yaml    # Gaia-X domain layer (participant/service types)
 
-artifacts/                         # Generated per domain (make generate)
+artifacts/                         # Generated per domain (just generate)
 ├── harbour-core-credential/       # Base OWL/SHACL/context
 └── harbour-gx-credential/        # Domain OWL/SHACL/context
 ```
@@ -258,36 +280,35 @@ artifacts/                         # Generated per domain (make generate)
 
 ```bash
 # Python tests
-make test
+just test
 
-# TypeScript tests (requires make build first)
-make build
-make test ts
+# TypeScript tests (requires just build first)
+just build
+just test-ts
 
-# Cross-runtime interop tests (requires make build first)
-make test interop
+# Cross-runtime interop tests (requires just build first)
+just test-interop
 
 # Full pipeline: Python + SHACL conformance + TypeScript (builds TS automatically)
-make test full
+just test-full
 
 # Python tests with coverage
-make test cov
+just test-cov
 
 # Credential lifecycle story (Python: generate → sign → verify → SHACL validate)
-make story
+just story
 
 # Credential lifecycle story (TypeScript: generate → sign → verify → SHACL validate)
-make story ts
+just story-ts
 
 # Cross-runtime story (TS-sign → Python-verify, then Python-sign → TS-verify)
-make story cross
+just story-cross
 
 # Lint
-make lint
+just lint
 
-# See grouped subcommands
-make test help
-make story help
+# See every recipe
+just --list
 ```
 
 ## Documentation

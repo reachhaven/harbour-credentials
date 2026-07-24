@@ -15,19 +15,23 @@ jobs:
   lint-python:
     name: Lint (Python)
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          submodules: true
 
-      - name: Install dependencies
-        run: make install dev
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Run pre-commit
-        run: make lint
+        run: just lint
 
   lint-markdown:
     name: Lint (Markdown)
@@ -52,8 +56,12 @@ jobs:
         with:
           node-version: "22"
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Lint TypeScript
-        run: make lint ts
+        run: just lint-ts
 
   generate-validate:
     name: Generate & Validate (${{ matrix.os }})
@@ -62,29 +70,29 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          enable-cache: true
 
-      - name: Install dependencies and submodules
-        run: |
-          make install dev
-          make setup submodules
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Generate artifacts
-        run: make generate
+        run: just generate
 
       - name: Validate credentials
-        run: make validate
+        run: just validate
 
       - name: Validate examples (SHACL conformance)
-        run: make validate shacl
+        run: just validate-shacl
 
   test-python:
     name: Test (Python) (${{ matrix.os }}, py${{ matrix.python-version }})
@@ -94,19 +102,23 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.12", "3.13"]
     runs-on: ${{ matrix.os }}
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          submodules: true
 
-      - name: Install dependencies
-        run: make install dev
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Run tests
-        run: make test
+        run: just test
 
   test-ts:
     name: Test (TypeScript) (${{ matrix.os }})
@@ -122,8 +134,12 @@ jobs:
         with:
           node-version: "22"
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Run tests
-        run: make test ts
+        run: just test-ts
 
   test-interop:
     name: Cross-Runtime Interop (${{ matrix.os }})
@@ -133,26 +149,30 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     needs: [test-python, test-ts]
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          submodules: true
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install Python dependencies
-        run: make install dev
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Build TypeScript
-        run: make build ts
+        run: just build
 
       - name: Run interop tests
-        run: make test interop
+        run: just test-interop
 
   # --- Credential Lifecycle Story ---
   story:
@@ -163,23 +183,23 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     needs: [generate-validate]
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          enable-cache: true
 
-      - name: Install dependencies and submodules
-        run: |
-          make install dev
-          make setup submodules
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Run credential storyline (generate → sign → verify → SHACL validate)
-        run: make story
+        run: just story
 
   story-ts:
     name: Credential Story — TypeScript (${{ matrix.os }})
@@ -189,27 +209,27 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     needs: [generate-validate, test-ts]
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          enable-cache: true
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install dependencies and submodules
-        run: |
-          make install dev
-          make setup submodules
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Run TypeScript credential storyline
-        run: make story ts
+        run: just story-ts
 
   story-cross:
     name: Cross-Runtime Story (${{ matrix.os }})
@@ -219,24 +239,24 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     needs: [story, story-ts]
+    env:
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          enable-cache: true
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install dependencies and submodules
-        run: |
-          make install dev
-          make setup submodules
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Run cross-runtime story verification
-        run: make story cross
+        run: just story-cross
