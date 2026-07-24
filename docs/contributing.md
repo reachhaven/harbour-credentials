@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Harbour Credentials!
    > Submodules are cloned flat (direct submodules only) by `just setup` in the
    > next step. To initialize them manually: `git submodule update --init`
    > (do **not** force `--depth 1`). The LinkML compiler fork is installed as a
-   > `.[dev]` git dependency, not a submodule; the `omb` submodule is installed
-   > editable by `uv sync --extra dev`.
+   > `.[dev]` git dependency, not a submodule; the `omb` package is installed
+   > from PyPI by `uv sync --extra dev` (no OMB submodule required).
 
 2. **Set up the development environment** (requires [uv](https://docs.astral.sh/uv/)
    and [just](https://just.systems), plus Node.js 22 with Corepack for TypeScript):

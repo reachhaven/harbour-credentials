@@ -62,7 +62,7 @@ def _can_run_node_jose() -> bool:
 # Skip if TypeScript runtime dependencies are unavailable
 pytestmark = pytest.mark.skipif(
     not _can_run_node_jose(),
-    reason="TypeScript runtime dependencies unavailable (run 'make setup ts').",
+    reason="TypeScript runtime dependencies unavailable (run 'just setup-ts').",
 )
 
 

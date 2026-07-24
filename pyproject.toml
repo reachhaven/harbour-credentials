@@ -51,8 +51,8 @@ dev = [
     # Gaia-X `artifacts/gx/*` shapes and the SHACL validation suite consumed by
     # `just validate-shacl`. Installed from PyPI (the published wheel vendors the
     # gx artifacts + cs/cred imports under omb/data/), so no OMB submodule /
-    # recursive clone is required. The pinned version is the source of truth for
-    # the LinkML compiler fork (declared in OMB's own dev dependencies).
+    # recursive clone is required. This version determines which LinkML compiler
+    # commit to hard-pin above (keep the two in lockstep on every OMB bump).
     "ontology-management-base>=0.3.0",
 ]
 docs = [

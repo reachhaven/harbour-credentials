@@ -168,7 +168,7 @@ def test_credential_subject_has_type(credential_file):
 
 _skip_no_harbour_artifacts = pytest.mark.skipif(
     not HARBOUR_CONTEXT_PATH.exists(),
-    reason="Generated harbour artifacts not found — run 'make generate'",
+    reason="Generated harbour artifacts not found — run 'just generate'",
 )
 
 
@@ -210,7 +210,7 @@ class TestHarbourContextConsistency:
 
 _skip_no_domain_artifacts = pytest.mark.skipif(
     not DOMAIN_CONTEXT_PATH.exists(),
-    reason="Generated harbour-gx-credential artifacts not found — run 'make generate'",
+    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
 )
 
 
@@ -265,7 +265,7 @@ class TestDomainContextConsistency:
 
 @pytest.mark.skipif(
     not HARBOUR_SHACL_PATH.exists(),
-    reason="Generated harbour artifacts not found — run 'make generate'",
+    reason="Generated harbour artifacts not found — run 'just generate'",
 )
 class TestHarbourShaclShapes:
     """Verify that SHACL shapes exist for harbour base types."""
@@ -329,7 +329,7 @@ class TestHarbourShaclShapes:
 
 @pytest.mark.skipif(
     not DOMAIN_SHACL_PATH.exists(),
-    reason="Generated harbour-gx-credential artifacts not found — run 'make generate'",
+    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
 )
 class TestDomainShaclShapes:
     """Verify that SHACL shapes exist for harbour-gx-credential types."""

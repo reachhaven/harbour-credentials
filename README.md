@@ -57,7 +57,7 @@ source .venv/bin/activate
 > so no OMB submodule is required.
 >
 > `just setup` initializes the submodules, syncs the Python dev environment
-> (`.[dev]`, including the LinkML fork and editable `omb`), installs pre-commit
+> (`.[dev]`, including the LinkML fork and `omb` from PyPI), installs pre-commit
 > hooks, and bootstraps TypeScript dependencies with `corepack yarn install` in
 > `src/typescript/harbour`. Use `just install-dev` to only (re)sync the Python
 > environment.

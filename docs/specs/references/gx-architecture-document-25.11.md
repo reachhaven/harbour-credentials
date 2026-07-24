@@ -8,10 +8,11 @@
 
 ## Local Artifacts
 
-The Gaia-X ontology, SHACL shapes, and JSON-LD context are maintained
-locally in the ontology-management-base (OMB) submodule:
+The Gaia-X ontology, SHACL shapes, and JSON-LD context are vendored in the
+`ontology-management-base` (OMB) package (installed from PyPI), under
+`omb/data/`:
 
-| File | Path (relative to OMB root) |
+| File | Path (relative to `omb/data/`) |
 |------|-----------------------------|
 | OWL ontology | `artifacts/gx/gx.owl.ttl` |
 | SHACL shapes | `artifacts/gx/gx.shacl.ttl` |
