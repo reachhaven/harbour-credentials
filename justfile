@@ -15,15 +15,14 @@
 # Run a Python command inside the project's dev environment. `--frozen` uses the
 # committed uv.lock as-is (no re-resolution — the dev extra pins linkml from a git
 # branch, which uv would otherwise re-check on every call), syncing `.venv` from
-# the lock; `--extra dev` selects the dev dependencies (ruff, pytest, linkml, the
-# editable `omb` submodule, …) from the locked graph.
+# the lock; `--extra dev` selects the dev dependencies (ruff, pytest, linkml, omb,
+# …) from the locked graph.
 run := "uv run --frozen --extra dev"
 
 # TypeScript toolchain (Yarn via Corepack — never a bare `yarn`).
 yarn := "corepack yarn"
 
 TS_DIR := "src/typescript/harbour"
-OMB_SUBMODULE_DIR := "submodules/ontology-management-base"
 SVC_SUBMODULE_DIR := "submodules/service-characteristics"
 RELEASE_DIR := "site/w3id/reachhaven/harbour"
 
@@ -36,7 +35,7 @@ default:
 
 # ===== Setup / install =====
 
-# Init flat submodules + create the dev env (.venv, dev deps, editable omb) + hooks + TS deps.
+# Init flat submodules + create the dev env (.venv, dev deps) + hooks + TS deps.
 setup: setup-submodules
     uv sync --extra dev
     {{run}} pre-commit install
@@ -48,17 +47,16 @@ setup-submodules:
     #!/usr/bin/env bash
     set -euo pipefail
     # Direct submodules of this repo (no nesting):
-    #   - ontology-management-base : installable `omb` package + committed Gaia-X
-    #     artifacts/gx/* shapes (installed editable by `uv sync --extra dev`).
     #   - service-characteristics  : Gaia-X LinkML schema source imported by
     #     `just generate` via linkml/importmap.json; pinned to the commit OMB's gx
     #     artifacts were generated from — deliberately NOT shallow.
     #   - w3id.org                 : W3ID context redirects.
-    # The LinkML compiler fork is NOT a submodule: it is a git dependency in the
-    # [dev] extra of pyproject.toml, so no recursive submodule clone is required.
+    # ontology-management-base (the `omb` package) is installed from PyPI, and the
+    # LinkML compiler fork is a git dependency in the [dev] extra of pyproject.toml,
+    # so neither requires a submodule or recursive clone.
     echo "Setting up submodules (flat, non-recursive)..."
     if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
-        git submodule update --init {{OMB_SUBMODULE_DIR}} {{SVC_SUBMODULE_DIR}} submodules/w3id.org
+        git submodule update --init {{SVC_SUBMODULE_DIR}} submodules/w3id.org
     fi
     if [ -f "{{SVC_SUBMODULE_DIR}}/linkml/gaia-x.yaml" ]; then
         echo "OK: service-characteristics schemas present (gaia-x import source)"

@@ -661,11 +661,11 @@ requires-dist = [
     { name = "base58", specifier = ">=2.1.0" },
     { name = "cryptography", specifier = ">=44.0.0" },
     { name = "joserfc", specifier = ">=1.0.0" },
-    { name = "linkml", marker = "extra == 'dev'", git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml&rev=feat%2Fenvited-x-pipeline" },
+    { name = "linkml", marker = "extra == 'dev'", git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml&rev=6aa7702c159a9af2c95149de8e73e5f74c1094c0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "ontology-management-base", marker = "extra == 'dev'", editable = "submodules/ontology-management-base" },
+    { name = "ontology-management-base", marker = "extra == 'dev'", specifier = ">=0.3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = "==4.5.1" },
     { name = "pycryptodome", specifier = ">=3.20" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.0" },
@@ -909,7 +909,7 @@ wheels = [
 [[package]]
 name = "linkml"
 version = "0.0.0.post4622.dev0+6aa7702c"
-source = { git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml&rev=feat%2Fenvited-x-pipeline#6aa7702c159a9af2c95149de8e73e5f74c1094c0" }
+source = { git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml&rev=6aa7702c159a9af2c95149de8e73e5f74c1094c0#6aa7702c159a9af2c95149de8e73e5f74c1094c0" }
 dependencies = [
     { name = "antlr4-python3-runtime" },
     { name = "click" },
@@ -941,7 +941,7 @@ dependencies = [
 [[package]]
 name = "linkml-runtime"
 version = "0.0.0.post4622.dev0+6aa7702c"
-source = { git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml_runtime&rev=feat%2Fenvited-x-pipeline#6aa7702c159a9af2c95149de8e73e5f74c1094c0" }
+source = { git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml_runtime&rev=6aa7702c159a9af2c95149de8e73e5f74c1094c0#6aa7702c159a9af2c95149de8e73e5f74c1094c0" }
 dependencies = [
     { name = "click" },
     { name = "curies" },
@@ -1171,38 +1171,15 @@ wheels = [
 [[package]]
 name = "ontology-management-base"
 version = "0.3.0"
-source = { editable = "submodules/ontology-management-base" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "oxrdflib" },
     { name = "pyshacl" },
     { name = "rdflib" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "keycloak-client", marker = "extra == 'publish'", specifier = ">=0.15.4" },
-    { name = "mkdocs-awesome-pages-plugin", marker = "extra == 'docs'", specifier = ">=2.9.3" },
-    { name = "mkdocs-exclude", marker = "extra == 'docs'", specifier = ">=1.0.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "oxrdflib", specifier = ">=0.5.0" },
-    { name = "pyshacl", specifier = ">=0.31.0" },
-    { name = "rdflib", specifier = ">=7.6.0" },
-    { name = "requests", marker = "extra == 'publish'", specifier = ">=2.32.5" },
-]
-provides-extras = ["publish", "docs"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "linkml", git = "https://github.com/ASCS-eV/linkml.git?subdirectory=packages%2Flinkml&rev=feat%2Fenvited-x-pipeline" },
-    { name = "mkdocs-awesome-pages-plugin", specifier = ">=2.9.3" },
-    { name = "mkdocs-exclude", specifier = ">=1.0.0" },
-    { name = "mkdocs-material", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.24.0" },
-    { name = "pre-commit", specifier = "==4.5.1" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "ruff", specifier = ">=0.15.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/f8/61/ee8bcddd7b4c105f21fb2547c64a7ce278bfe430ddd1801a39bd8e8c7ce9/ontology_management_base-0.3.0.tar.gz", hash = "sha256:ab30f6f0bf4f7745d70c53645f07c787a494f1ae9d1b2200fd9c082191d402a6", size = 1572679, upload-time = "2026-07-24T06:03:13.226Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/3e/21850bacba55282c4a856b6db46d45f227550b5c13028c8d3de3e1eb2b33/ontology_management_base-0.3.0-py3-none-any.whl", hash = "sha256:e002420ed37137c4cd3b422c98a0b1d866c7124d36e86e7cb84ae2281601ccbc", size = 1697859, upload-time = "2026-07-24T06:03:11.367Z" },
 ]
 
 [[package]]

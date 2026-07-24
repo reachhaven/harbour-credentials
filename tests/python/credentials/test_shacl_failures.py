@@ -7,7 +7,7 @@ checks that the OMB validation suite reports the expected violation.
 
 Validation goes through OMB's public ``omb.api.validate_data`` API (from the
 installable ``ontology-management-base`` package) — the same pipeline used in
-production ``make validate shacl`` (RDFS inference enabled).
+production ``just validate-shacl`` (RDFS inference enabled).
 
 The test output is designed for debuggability:
 - Each test ID clearly describes the mutation (e.g., "LegalPerson-missing-issuer")
@@ -22,10 +22,12 @@ To debug a single test::
 
     pytest tests/python/credentials/test_shacl_failures.py -v -k "missing_issuer"
 
-Requires generated artifacts (``make generate``) and the OMB submodule.
+Requires generated artifacts (``just generate``) and the ``ontology-management-base``
+package (installed from PyPI via the ``.[dev]`` extra).
 """
 
 import copy
+import importlib.util
 import json
 import tempfile
 from dataclasses import dataclass
@@ -43,8 +45,6 @@ from rdflib import RDF, Namespace
 _REPO_ROOT = Path(__file__).resolve().parent
 while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
     _REPO_ROOT = _REPO_ROOT.parent
-
-_OMB = _REPO_ROOT / "submodules" / "ontology-management-base"
 
 _CORE_SHACL = (
     _REPO_ROOT / "artifacts/harbour-core-credential/harbour-core-credential.shacl.ttl"
@@ -67,12 +67,12 @@ HARBOUR_GX = Namespace("https://w3id.org/reachhaven/harbour/gx/v1/")
 
 _skip_no_artifacts = pytest.mark.skipif(
     not _GX_SHACL.exists(),
-    reason="Generated artifacts not found — run 'make generate' first",
+    reason="Generated artifacts not found — run 'just generate' first",
 )
 
 _skip_no_omb = pytest.mark.skipif(
-    not (_OMB / "omb" / "validators" / "shacl" / "validator.py").exists(),
-    reason="ontology-management-base submodule not initialised",
+    importlib.util.find_spec("omb") is None,
+    reason="ontology-management-base (omb) package not installed",
 )
 
 
@@ -134,9 +134,9 @@ def _format_violations(violations: list[ShaclViolation]) -> str:
 # Validation goes through OMB's public, side-effect-free ``omb.api.validate_data``
 # entry point (from the installable ``ontology-management-base`` package). It
 # builds the registry resolver, registers harbour's generated artifacts, applies
-# RDFS inference and runs SHACL — the same pipeline as production ``make validate
-# shacl`` — so harbour no longer wires up ``RegistryResolver`` / ``ShaclValidator``
-# by hand.
+# RDFS inference and runs SHACL — the same pipeline as production ``just
+# validate-shacl`` — so harbour no longer wires up ``RegistryResolver`` /
+# ``ShaclValidator`` by hand.
 
 
 # ---------------------------------------------------------------------------
@@ -148,11 +148,11 @@ def _format_violations(violations: list[ShaclViolation]) -> str:
 def shacl_validator():
     """Return a ``validate(files)`` callable backed by ``omb.api.validate_data``.
 
-    Mirrors production ``make validate shacl``: harbour's generated artifacts
-    plus OMB's data root (committed ``gx`` shapes + base ``imports``), RDFS
-    inference, non-strict IRI resolution, and online DID/context resolution
-    allowed. Returns an ``omb`` ``ValidationResult`` (``.conforms``,
-    ``.report_graph``, ``.report_text``).
+    Mirrors production ``just validate-shacl``: harbour's generated artifacts
+    plus OMB's built-in data root (the committed ``gx`` shapes + base ``imports``
+    vendored in the installed ``omb`` package), RDFS inference, non-strict IRI
+    resolution, and online DID/context resolution allowed. Returns an ``omb``
+    ``ValidationResult`` (``.conforms``, ``.report_graph``, ``.report_text``).
     """
     from omb.api import validate_data
 
@@ -160,7 +160,6 @@ def shacl_validator():
         return validate_data(
             files,
             artifacts=[_ARTIFACTS_DIR],
-            root_dir=_OMB,
             strict=False,
             allow_online=True,
         )
@@ -181,7 +180,7 @@ def _validate(
 
     Writes the credential to a temp file and runs the full validation
     pipeline (context inlining, schema discovery, RDFS inference, SHACL
-    validation) — identical to production ``make validate shacl``.
+    validation) — identical to production ``just validate-shacl``.
 
     Args:
         credential: The credential JSON to validate.

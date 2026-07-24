@@ -14,7 +14,7 @@ The library is validated end-to-end by the **Harbour Credential Lifecycle** (see
 
 ```bash
 # First-time setup (inits flat submodules, uv-syncs deps + ASCS-eV LinkML fork +
-# editable omb, installs hooks, bootstraps TS). Requires `uv` and `just` on PATH.
+# omb from PyPI, installs hooks, bootstraps TS). Requires `uv` and `just` on PATH.
 just setup
 # `just` recipes run through `uv run` — no venv activation needed. Activate only
 # for direct python/pip: source .venv/bin/activate
@@ -64,9 +64,9 @@ recipes (`setup`, `install`, `install-dev`, `test`, `test-full`, `test-ts`,
 **Important:** `just` recipes run Python through `uv run --frozen --extra dev`, which
 syncs an isolated `.venv` from `uv.lock` on demand (no manual venv / activation, no
 `PYTHONPATH` juggling — pytest gets `pythonpath = ["src/python"]` from `pyproject.toml`).
-When invoking pytest directly, prefer `uv run --extra dev pytest ...`; the editable
-`omb` submodule is a `[tool.uv.sources]` path dependency, so `uv sync --extra dev`
-requires the `ontology-management-base` submodule to be checked out first.
+When invoking pytest directly, prefer `uv run --extra dev pytest ...`. The
+`omb` package is installed from PyPI (`ontology-management-base>=0.3.0`) by
+`uv sync --extra dev`, so no OMB submodule checkout is required.
 
 ## Architecture
 
@@ -131,11 +131,12 @@ The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, hav
 
 Submodules are cloned **flat** — direct submodules only, never recursively. `just setup` initializes them for you; to do it manually: `git submodule update --init` (this honors each submodule's `shallow` setting in `.gitmodules`). Do **not** use `--recursive`, and do **not** force `--depth 1` — `service-characteristics` is pinned to an older commit and is intentionally cloned in full.
 
-- `submodules/ontology-management-base/` — SHACL validation suite + committed Gaia-X (`gx`) artifacts, branch `feat/omb-installable-package`. Installed **editable** as the `omb` package by `uv sync --extra dev` (run via `just setup`, wired through `[tool.uv.sources]`) and drives `just validate-shacl`.
-- `submodules/service-characteristics/` — Gaia-X LinkML schema source (GitLab, pinned to `f4be530`/v2.2.1 — the commit OMB's `gx` artifacts were generated from). Provides the `gaia-x` schema that `harbour-gx-credential.yaml` imports via `linkml/importmap.json`; required by `just generate`. Formerly nested inside `ontology-management-base`, now a **direct** submodule so the tree can be cloned flat.
+- `submodules/service-characteristics/` — Gaia-X LinkML schema source (GitLab, pinned to `f4be530` — the exact commit OMB pins and generated its committed `gx` artifacts from). Provides the `gaia-x` schema that `harbour-gx-credential.yaml` imports via `linkml/importmap.json`; required by `just generate`. Nested inside `ontology-management-base` upstream, but kept as a **direct** submodule here so the tree can be cloned flat (OMB itself is consumed from PyPI, not as a submodule).
 - `submodules/w3id.org/` — W3ID context resolution (`.htaccess` redirects for `w3id.org/reachhaven/harbour/...` IRIs to GitHub Pages)
 
-The ASCS-eV **LinkML compiler fork** (branch `feat/envited-x-pipeline`, `packages/linkml`) is **not** a submodule — it is declared as a git dependency in the `.[dev]` extra of `pyproject.toml` and installed by `just setup` / `just install-dev`. `just generate` depends on it (it passes fork-only params like `normalize_prefixes`); against stock LinkML, `just generate` fails with a `TypeError`.
+The `ontology-management-base` (`omb`) package — the SHACL validation suite plus the committed Gaia-X (`gx`) artifacts that drive `just validate-shacl` — is **not** a submodule: it is installed from **PyPI** (`ontology-management-base>=0.3.0`, its wheel vendors the `gx` artifacts + `cs`/`cred` imports under `omb/data/`) by `uv sync --extra dev`. To keep artifact generation consistent with OMB's committed shapes, harbour **hard-pins the LinkML compiler fork to the exact commit that OMB 0.3.0 locks** (`6aa7702c159a9af2c95149de8e73e5f74c1094c0`) in its own `.[dev]` extra — bump this SHA in lockstep whenever the pinned OMB version changes.
+
+The ASCS-eV **LinkML compiler fork** (fork branch `feat/envited-x-pipeline`, pinned to commit `6aa7702c` under `packages/linkml`) is **not** a submodule — it is declared as a git dependency in the `.[dev]` extra of `pyproject.toml` and installed by `just setup` / `just install-dev`. `just generate` depends on it (it passes fork-only params like `normalize_prefixes`); against stock LinkML, `just generate` fails with a `TypeError`.
 
 ### LinkML → Artifacts Pipeline
 

@@ -18,7 +18,7 @@ git clone https://github.com/reachhaven/harbour-credentials.git
 cd harbour-credentials
 
 # Set up the full dev environment: flat submodules + uv sync (deps, LinkML fork,
-# editable omb) + pre-commit hooks + TypeScript deps.
+# omb from PyPI) + pre-commit hooks + TypeScript deps.
 just setup
 ```
 

@@ -45,17 +45,16 @@ source .venv/bin/activate
 ```
 
 > **Note:** Submodules are cloned **flat** (direct submodules only —
-> `ontology-management-base`, `service-characteristics`, and `w3id.org` — never
-> recursively). `just setup` initializes them for you with
-> `git submodule update --init` (which honors each submodule's `shallow` setting
-> in `.gitmodules`; do **not** force `--depth 1`, as `service-characteristics` is
-> pinned to an older commit and is cloned in full).
+> `service-characteristics` and `w3id.org` — never recursively). `just setup`
+> initializes them for you with `git submodule update --init` (which honors each
+> submodule's `shallow` setting in `.gitmodules`; do **not** force `--depth 1`, as
+> `service-characteristics` is pinned to an older commit and is cloned in full).
 >
 > The ASCS-eV **LinkML compiler fork** is **not** a submodule — it is installed
 > from git as a `.[dev]` dependency, so no recursive clone is needed for
-> `just generate`. The `ontology-management-base` (`omb`) submodule is installed
-> **editable** by `uv sync --extra dev` (via `[tool.uv.sources]`), so no separate
-> install step is required.
+> `just generate`. The `ontology-management-base` (`omb`) package is installed
+> **from PyPI** by `uv sync --extra dev` (its wheel vendors the `gx` artifacts),
+> so no OMB submodule is required.
 >
 > `just setup` initializes the submodules, syncs the Python dev environment
 > (`.[dev]`, including the LinkML fork and editable `omb`), installs pre-commit
@@ -248,7 +247,6 @@ src/
         └── x509.ts
 
 submodules/
-├── ontology-management-base/  # Validation pipeline, SHACL tools + committed gx artifacts (omb package)
 ├── service-characteristics/   # Gaia-X LinkML schema source (gaia-x import for just generate)
 └── w3id.org/                  # W3ID context resolution
 
