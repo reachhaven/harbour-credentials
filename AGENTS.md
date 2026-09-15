@@ -153,7 +153,16 @@ When defining or modifying LinkML schemas, JSON-LD examples, or DID documents:
    - A named class for structured objects with a defined schema
      (e.g. OID4VP `TransactionData`)
 5. **Validate examples against SHACL** (`just validate-shacl`) to catch inference
-   issues before they reach CI.
+   issues before they reach CI.  It runs two passes — credentials, then the
+   `examples/did-ethr/` DID documents — because a `did:ethr:…` IRI is both a
+   closed `credentialSubject` and a DID document root, and validating them in one
+   merged graph turns every DID property into a `ClosedConstraintComponent`
+   violation.
+6. **Never repin `submodules/service-characteristics` by hand.**  Harbour's gx
+   layer is compiled from that source and validated against the Gaia-X shapes
+   vendored in the installed `omb` wheel; the two agree only when the submodule
+   sits on `omb/data/artifacts/gx/UPSTREAM_COMMIT`.  `just check-gx-pin` and
+   `tests/python/credentials/test_gx_pin.py` enforce it.
 
 ## Coding Style
 

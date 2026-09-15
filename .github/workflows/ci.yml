@@ -85,6 +85,9 @@ jobs:
         with:
           tool: just
 
+      - name: Check Gaia-X pin (service-characteristics vs. omb gx artifacts)
+        run: just check-gx-pin
+
       - name: Generate artifacts
         run: just generate
 

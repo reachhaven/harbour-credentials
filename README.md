@@ -48,7 +48,9 @@ source .venv/bin/activate
 > `service-characteristics` and `w3id.org` — never recursively). `just setup`
 > initializes them for you with `git submodule update --init` (which honors each
 > submodule's `shallow` setting in `.gitmodules`; do **not** force `--depth 1`, as
-> `service-characteristics` is pinned to an older commit and is cloned in full).
+> `service-characteristics` is pinned to a specific upstream tag and is cloned in
+> full). That pin must match the Gaia-X artifacts vendored by the installed `omb`
+> wheel — `just check-gx-pin` asserts it, and `just setup` runs it for you.
 >
 > The ASCS-eV **LinkML compiler fork** is **not** a submodule — it is installed
 > from git as a `.[dev]` dependency, so no recursive clone is needed for
@@ -190,8 +192,13 @@ Validate harbour credentials against SHACL shapes using the ontology-management-
 # Generate artifacts from LinkML schemas
 just generate
 
-# Validate examples against SHACL shapes (harbour + gx)
+# Validate examples against SHACL shapes (harbour + gx).
+# Credentials and DID documents are validated in separate passes, because a
+# did:ethr:... IRI is both a closed credentialSubject and a DID document root.
 just validate-shacl
+
+# Validate a single file or folder
+just validate-shacl examples/gaiax/legal-person-credential.json
 
 # Run structural validation tests
 just validate
@@ -247,7 +254,8 @@ src/
         └── x509.ts
 
 submodules/
-├── service-characteristics/   # Gaia-X LinkML schema source (gaia-x import for just generate)
+├── service-characteristics/   # Gaia-X LinkML schema source (gaia-x import for just generate);
+│                              # pinned to omb's gx UPSTREAM_COMMIT — see just check-gx-pin
 └── w3id.org/                  # W3ID context resolution
 
 examples/

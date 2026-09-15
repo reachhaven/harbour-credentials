@@ -46,6 +46,8 @@ just story-cross     # Cross-runtime: TS signs -> Python verifies, then Python s
 just generate        # Generate OWL/SHACL/JSON-LD artifacts from LinkML schemas (needs ASCS-eV LinkML fork)
 just validate        # Structural validation tests (pytest tests/python/credentials/test_validation.py)
 just validate-shacl  # SHACL conformance on example credentials (via ontology-management-base / omb)
+just validate-shacl examples/gaiax/legal-person-credential.json   # ... or one file/folder
+just check-gx-pin    # Assert submodules/service-characteristics matches omb's vendored gx artifacts
 
 # --- Quality / build / compound pipelines ---
 just build           # Build TypeScript (tsc)
@@ -65,7 +67,7 @@ recipes (`setup`, `install`, `install-dev`, `test`, `test-full`, `test-ts`,
 syncs an isolated `.venv` from `uv.lock` on demand (no manual venv / activation, no
 `PYTHONPATH` juggling — pytest gets `pythonpath = ["src/python"]` from `pyproject.toml`).
 When invoking pytest directly, prefer `uv run --extra dev pytest ...`. The
-`omb` package is installed from PyPI (`ontology-management-base>=0.3.0`) by
+`omb` package is installed from PyPI (`ontology-management-base>=0.5.0`) by
 `uv sync --extra dev`, so no OMB submodule checkout is required.
 
 ## Architecture
@@ -118,7 +120,6 @@ The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, hav
 - `tests/python/credentials/` — pipeline + LinkML/SHACL validation tests
 - `tests/typescript/harbour/` — vitest tests (config: `src/typescript/harbour/vitest.config.ts`)
 - `tests/interop/` — cross-runtime tests; **auto-skip** if TS deps are unavailable
-- `tests/validation-probe/` — ontology-loading probe JSON used by the `just validate-shacl` recipe (not in the pytest suite)
 
 ### TypeScript Toolchain
 
@@ -131,10 +132,12 @@ The role keys used for signing live in `tests/fixtures/keys/` (trust-anchor, hav
 
 Submodules are cloned **flat** — direct submodules only, never recursively. `just setup` initializes them for you; to do it manually: `git submodule update --init` (this honors each submodule's `shallow` setting in `.gitmodules`). Do **not** use `--recursive`, and do **not** force `--depth 1` — `service-characteristics` is pinned to an older commit and is intentionally cloned in full.
 
-- `submodules/service-characteristics/` — Gaia-X LinkML schema source (GitLab, pinned to `f4be530` — the exact commit OMB pins and generated its committed `gx` artifacts from). Provides the `gaia-x` schema that `harbour-gx-credential.yaml` imports via `linkml/importmap.json`; required by `just generate`. Nested inside `ontology-management-base` upstream, but kept as a **direct** submodule here so the tree can be cloned flat (OMB itself is consumed from PyPI, not as a submodule).
+- `submodules/service-characteristics/` — Gaia-X LinkML schema source (GitLab, pinned to `6316558` = upstream **v2.5.0** — the exact commit OMB pins and generated its committed `gx` artifacts from). Provides the `gaia-x` schema that `harbour-gx-credential.yaml` imports via `linkml/importmap.json`; required by `just generate`. Nested inside `ontology-management-base` upstream, but kept as a **direct** submodule here so the tree can be cloned flat (OMB itself is consumed from PyPI, not as a submodule). **Never repin it by hand:** the correct commit is whatever the installed `omb` wheel records in `omb/data/artifacts/gx/UPSTREAM_COMMIT`, and both `just check-gx-pin` and `tests/python/credentials/test_gx_pin.py` fail the build when the two drift apart.
 - `submodules/w3id.org/` — W3ID context resolution (`.htaccess` redirects for `w3id.org/reachhaven/harbour/...` IRIs to GitHub Pages)
 
-The `ontology-management-base` (`omb`) package — the SHACL validation suite plus the committed Gaia-X (`gx`) artifacts that drive `just validate-shacl` — is **not** a submodule: it is installed from **PyPI** (`ontology-management-base>=0.3.0`, its wheel vendors the `gx` artifacts + `cs`/`cred` imports under `omb/data/`) by `uv sync --extra dev`. To keep artifact generation consistent with OMB's committed shapes, harbour **hard-pins the LinkML compiler fork to the exact commit that OMB 0.3.0 locks** (`6aa7702c159a9af2c95149de8e73e5f74c1094c0`) in its own `.[dev]` extra — bump this SHA in lockstep whenever the pinned OMB version changes.
+The `ontology-management-base` (`omb`) package — the SHACL validation suite plus the committed Gaia-X (`gx`) artifacts that drive `just validate-shacl` — is **not** a submodule: it is installed from **PyPI** (`ontology-management-base>=0.5.0`, its wheel vendors the `gx` artifacts + `cs`/`cred` imports under `omb/data/`) by `uv sync --extra dev`. To keep artifact generation consistent with OMB's committed shapes, harbour **hard-pins the LinkML compiler fork to the exact commit that OMB 0.5.0 locks** (`6aa7702c159a9af2c95149de8e73e5f74c1094c0`) in its own `.[dev]` extra — bump this SHA in lockstep whenever the pinned OMB version changes.
+
+**Bumping `omb` is a three-pin move.** The wheel version, the LinkML compiler SHA above, and the `service-characteristics` gitlink all describe one Gaia-X release; changing one without the others produces artifacts that no longer match the shapes they are validated against. The order is: bump `ontology-management-base` in `pyproject.toml` → `uv lock` → read `UPSTREAM_COMMIT` out of the new wheel and repin the submodule (`just check-gx-pin` prints the exact commands on failure) → check the LinkML SHA against the new OMB release's `uv.lock` → `just generate` and inspect the artifact diff.
 
 The ASCS-eV **LinkML compiler fork** (fork branch `feat/envited-x-pipeline`, pinned to commit `6aa7702c` under `packages/linkml`) is **not** a submodule — it is declared as a git dependency in the `.[dev]` extra of `pyproject.toml` and installed by `just setup` / `just install-dev`. `just generate` depends on it (it passes fork-only params like `normalize_prefixes`); against stock LinkML, `just generate` fails with a `TypeError`.
 
@@ -254,6 +257,8 @@ When asked to prepare a commit or PR, default to writing these gitignored files 
 - Breaking feature parity between Python and TypeScript (add the mirror change + an interop test)
 - Trying to export the credential/story pipeline (`credentials/*`, `story-*.ts`) as library functions — they are CLI-only
 - Confusing `just validate` (structural pytest) with `just validate-shacl` (SHACL conformance)
+- Feeding credentials and `examples/did-ethr/` to `omb` in one validation run — `just validate-shacl` validates them in **separate passes** on purpose (a `did:ethr:…` IRI is both a credentialSubject of a closed shape and a DID document root; merged, every DID property becomes a `ClosedConstraintComponent` violation)
+- Repinning `submodules/service-characteristics` independently of the `omb` version (see Submodules — it is a three-pin move, guarded by `just check-gx-pin`)
 - Committing generated/gitignored outputs (`examples/**/signed/`, `artifacts/*`, `htmlcov/`, `.coverage`)
 - Using `range: Any` in LinkML schemas, or changing a schema without checking `docs/specs/references/`
 - Committing without `-s -S` signing, or adding AI attribution to a commit message

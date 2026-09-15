@@ -38,6 +38,7 @@ default:
 # Init flat submodules + create the dev env (.venv, dev deps) + hooks + TS deps.
 setup: setup-submodules
     uv sync --extra dev
+    @just check-gx-pin
     {{run}} pre-commit install
     cd {{TS_DIR}} && {{yarn}} install
     @echo "[OK] Dev environment ready. Run recipes with: just <recipe>"
@@ -49,7 +50,8 @@ setup-submodules:
     # Direct submodules of this repo (no nesting):
     #   - service-characteristics  : Gaia-X LinkML schema source imported by
     #     `just generate` via linkml/importmap.json; pinned to the commit OMB's gx
-    #     artifacts were generated from — deliberately NOT shallow.
+    #     artifacts were generated from — deliberately NOT shallow. `just
+    #     check-gx-pin` asserts that pin against the installed omb wheel.
     #   - w3id.org                 : W3ID context redirects.
     # ontology-management-base (the `omb` package) is installed from PyPI, and the
     # LinkML compiler fork is a git dependency in the [dev] extra of pyproject.toml,
@@ -65,6 +67,30 @@ setup-submodules:
         echo "         Run: git submodule update --init {{SVC_SUBMODULE_DIR}}" >&2
         exit 1
     fi
+
+# Assert the service-characteristics pin matches the gx artifacts in the omb wheel.
+check-gx-pin:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # `just generate` compiles harbour's gx layer against the gaia-x LinkML source in
+    # submodules/service-characteristics, while `just validate-shacl` validates the
+    # result against the gx SHACL shapes vendored inside the installed omb wheel. The
+    # two only agree if the submodule sits on the very commit those shapes were
+    # generated from — which the wheel records in omb/data/artifacts/gx/UPSTREAM_COMMIT.
+    # Comparing against the wheel means an omb bump cannot silently leave the pin behind.
+    expected=$({{run}} python -c "import omb, pathlib; print((pathlib.Path(omb.__file__).parent / 'data/artifacts/gx/UPSTREAM_COMMIT').read_text().strip())")
+    actual=$(git -C {{SVC_SUBMODULE_DIR}} rev-parse HEAD)
+    if [ "$expected" != "$actual" ]; then
+        omb_version=$({{run}} python -c "import importlib.metadata as m; print(m.version('ontology-management-base'))")
+        gx_ref=$({{run}} python -c "import omb, pathlib; print((pathlib.Path(omb.__file__).parent / 'data/artifacts/gx/UPSTREAM_REF').read_text().strip())")
+        echo "ERROR: submodules/service-characteristics is out of step with omb ${omb_version}." >&2
+        echo "       omb vendors gx ${gx_ref} generated from ${expected}" >&2
+        echo "       submodule HEAD is                        ${actual}" >&2
+        echo "       Fix: git -C {{SVC_SUBMODULE_DIR}} fetch origin ${expected} && \\" >&2
+        echo "            git -C {{SVC_SUBMODULE_DIR}} checkout ${expected} && git add {{SVC_SUBMODULE_DIR}}" >&2
+        exit 1
+    fi
+    echo "OK: service-characteristics matches the gx artifacts vendored by omb ($expected)"
 
 # Bootstrap the TypeScript toolchain only.
 setup-ts:
@@ -102,12 +128,39 @@ validate-shacl path="":
     # Env: HARBOUR_VALIDATE_ALLOW_ONLINE=0 -> --offline (no did:web/http(s) fallback);
     #      HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES overrides the required-ontology
     #      gate (default 1 for the full example set, 0 when a path is given).
+    #
+    # Credentials and DID documents are validated in SEPARATE runs. omb merges every
+    # requested document into one graph, and a subject like
+    # did:ethr:0x14a34:0xa682... is both the credentialSubject of a closed
+    # harbour.gx:LegalPerson shape and the root of a DID document carrying
+    # sec:verificationMethod / didcore:service. Merged, the DID document's properties
+    # land on the credential's closed node and every one of them is a
+    # ClosedConstraintComponent violation. Validating each set in its own run keeps the
+    # IRIs apart. (omb < 0.5.0 never surfaced this: it silently dropped DID documents
+    # from the validated set and only registered them for reference resolution.)
     echo "Running SHACL data conformance check on examples..."
     allow_online="${HARBOUR_VALIDATE_ALLOW_ONLINE:-1}"
     enforce="${HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES:-}"
     target_path="{{path}}"
     allow_online_flag=""
     if [ "$allow_online" = "0" ]; then allow_online_flag="--offline"; fi
+
+    # Run one conformance pass; echoes the suite output and leaves it in $run_output.
+    run_output=""
+    run_conformance() {
+        local tmp_output
+        tmp_output=$(mktemp)
+        local status=0
+        {{run}} python -m omb.validators.validation_suite \
+            --run check-data-conformance \
+            $allow_online_flag \
+            --data-paths "$@" \
+            --artifacts artifacts > "$tmp_output" 2>&1 || status=$?
+        cat "$tmp_output"
+        run_output="$tmp_output"
+        return "$status"
+    }
+
     if [ -n "$target_path" ]; then
         if [ -d "$target_path" ]; then
             json_count=$(find "$target_path" -maxdepth 1 -type f \( -name '*.json' -o -name '*.jsonld' \) | wc -l)
@@ -125,40 +178,42 @@ validate-shacl path="":
             exit 1
         fi
         : "${enforce:=0}"
-        data_paths=( "$target_path" examples/did-ethr/ tests/validation-probe/ontology-loading-probe.json )
+        status=0
+        run_conformance "$target_path" || status=$?
+        if [ "$status" -ne 0 ]; then rm -f "$run_output"; exit "$status"; fi
     else
         : "${enforce:=1}"
-        data_paths=( examples/*.json examples/gaiax/*.json examples/did-ethr/ tests/validation-probe/ontology-loading-probe.json )
-    fi
-    tmp_output=$(mktemp)
-    if {{run}} python -m omb.validators.validation_suite \
-            --run check-data-conformance \
-            $allow_online_flag \
-            --data-paths "${data_paths[@]}" \
-            --artifacts artifacts > "$tmp_output" 2>&1; then
         status=0
-    else
-        status=$?
+        run_conformance examples/*.json examples/gaiax/*.json || status=$?
+        if [ "$status" -ne 0 ]; then rm -f "$run_output"; exit "$status"; fi
     fi
-    cat "$tmp_output"
-    if [ "$status" -ne 0 ]; then
-        rm -f "$tmp_output"
-        exit "$status"
-    fi
+
+    # The required-ontology gate reads the credential pass: it is the run that has to
+    # pull in the gx layer and the cs/cred imports. A stale or half-resolved catalog
+    # otherwise "passes" by validating against nothing.
     if [ "$enforce" = "1" ]; then
         for required in \
             "imports/cs/cs.owl.ttl" \
             "imports/cred/cred.owl.ttl" \
             "artifacts/harbour-gx-credential/harbour-gx-credential.owl.ttl" \
             "artifacts/gx/gx.owl.ttl" ; do
-            if ! grep -q "$required" "$tmp_output" ; then
+            if ! grep -q "$required" "$run_output" ; then
                 echo "ERROR: Required ontology not loaded by validation suite: $required" >&2
-                rm -f "$tmp_output"
+                rm -f "$run_output"
                 exit 1
             fi
         done
     fi
-    rm -f "$tmp_output"
+    rm -f "$run_output"
+
+    # Second pass: the did:ethr documents, in a graph of their own (see above).
+    if [ -z "$target_path" ]; then
+        echo "Running SHACL data conformance check on DID documents..."
+        status=0
+        run_conformance examples/did-ethr/ || status=$?
+        rm -f "$run_output"
+        if [ "$status" -ne 0 ]; then exit "$status"; fi
+    fi
     echo "OK: SHACL validation complete"
 
 # ===== Lint / format =====

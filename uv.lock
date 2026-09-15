@@ -665,7 +665,7 @@ requires-dist = [
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "ontology-management-base", marker = "extra == 'dev'", specifier = ">=0.3.0" },
+    { name = "ontology-management-base", marker = "extra == 'dev'", specifier = ">=0.5.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = "==4.5.1" },
     { name = "pycryptodome", specifier = ">=3.20" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.0" },
@@ -1170,16 +1170,16 @@ wheels = [
 
 [[package]]
 name = "ontology-management-base"
-version = "0.3.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "oxrdflib" },
     { name = "pyshacl" },
     { name = "rdflib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/61/ee8bcddd7b4c105f21fb2547c64a7ce278bfe430ddd1801a39bd8e8c7ce9/ontology_management_base-0.3.0.tar.gz", hash = "sha256:ab30f6f0bf4f7745d70c53645f07c787a494f1ae9d1b2200fd9c082191d402a6", size = 1572679, upload-time = "2026-07-24T06:03:13.226Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/6b/2a1d495beef98e090a1790171846f6ef36874a86109db6be6cbc5dc283f1/ontology_management_base-0.5.0.tar.gz", hash = "sha256:4cd0a3166f8426d05095248c5f71a35ea9e883b64ed67a2d0e401092c2b114aa", size = 1775655, upload-time = "2026-09-15T14:49:10.475Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/3e/21850bacba55282c4a856b6db46d45f227550b5c13028c8d3de3e1eb2b33/ontology_management_base-0.3.0-py3-none-any.whl", hash = "sha256:e002420ed37137c4cd3b422c98a0b1d866c7124d36e86e7cb84ae2281601ccbc", size = 1697859, upload-time = "2026-07-24T06:03:11.367Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/af/c2692cfd7bbcb8cda9e1da12d231712ed284e0dae741d12f005f389077b3/ontology_management_base-0.5.0-py3-none-any.whl", hash = "sha256:7ac6494a31a56b274bbd8e0275fda2b1355d31ef51fc554d746fdfe090fd96ea", size = 1899999, upload-time = "2026-09-15T14:49:08.916Z" },
 ]
 
 [[package]]
