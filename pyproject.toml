@@ -56,7 +56,8 @@ dev = [
     #   * the LinkML compiler commit hard-pinned above;
     #   * the `submodules/service-characteristics` gitlink, which must equal
     #     `omb/data/artifacts/gx/UPSTREAM_COMMIT` in the wheel — `just
-    #     setup-submodules` and tests/python/credentials/test_gx_pin.py enforce it.
+    #     check-gx-pin` (run by `just setup` and CI) and
+    #     tests/python/credentials/test_gx_pin.py enforce it.
     "ontology-management-base>=0.5.0",
 ]
 docs = [

@@ -21,7 +21,7 @@ just setup
 
 # --- Tests ---
 just test            # Python tests only (excludes interop)
-just test-full       # Python + SHACL validation + TypeScript
+just test-full       # generate + sign examples + Python + SHACL validation + TypeScript
 just test-ts         # TypeScript (vitest) only
 just test-interop    # Cross-runtime interop tests only
 just test-cov        # Python tests with coverage -> htmlcov/index.html + terminal report
@@ -262,5 +262,5 @@ When asked to prepare a commit or PR, default to writing these gitignored files 
 - Committing generated/gitignored outputs (`examples/**/signed/`, `artifacts/*`, `htmlcov/`, `.coverage`)
 - Using `range: Any` in LinkML schemas, or changing a schema without checking `docs/specs/references/`
 - Committing without `-s -S` signing, or adding AI attribution to a commit message
-- Running pytest without `PYTHONPATH=src/python:$PYTHONPATH`
+- Running pytest outside `uv run --extra dev` (the `src/python` import path comes from `pyproject.toml`'s `pythonpath`, but the dev dependencies come from the uv environment)
 - Using different API conventions between Python and TypeScript

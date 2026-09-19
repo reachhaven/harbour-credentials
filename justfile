@@ -11,12 +11,17 @@
 #
 # Requires `uv` (https://docs.astral.sh/uv/), `just` (https://just.systems) and,
 # for the TypeScript recipes, Node.js 22 with Corepack on PATH.
+#
+# The interpreter comes from `.python-version` (3.12, the primary version CI tests).
+# Without it uv would build `.venv` on the newest CPython it can find, which is not
+# necessarily a version this project is tested on. CI overrides it per matrix leg
+# with `UV_PYTHON`, which takes precedence over the file.
 
 # Run a Python command inside the project's dev environment. `--frozen` uses the
-# committed uv.lock as-is (no re-resolution — the dev extra pins linkml from a git
-# branch, which uv would otherwise re-check on every call), syncing `.venv` from
-# the lock; `--extra dev` selects the dev dependencies (ruff, pytest, linkml, omb,
-# …) from the locked graph.
+# committed uv.lock as-is — never re-resolving or rewriting it, which matters because
+# the dev extra carries a git dependency (the ASCS-eV LinkML fork) — and syncs `.venv`
+# from that lock; `--extra dev` selects the dev dependencies (ruff, pytest, linkml,
+# omb, …) from the locked graph.
 run := "uv run --frozen --extra dev"
 
 # TypeScript toolchain (Yarn via Corepack — never a bare `yarn`).
@@ -78,14 +83,30 @@ check-gx-pin:
     # two only agree if the submodule sits on the very commit those shapes were
     # generated from — which the wheel records in omb/data/artifacts/gx/UPSTREAM_COMMIT.
     # Comparing against the wheel means an omb bump cannot silently leave the pin behind.
+    #
+    # Two halves of the pin can drift apart, so both are checked: the gitlink recorded
+    # in the index (what a commit records and what a fresh clone / CI checks out) and
+    # the commit the local submodule working tree is actually on. A repin that was
+    # checked out but never `git add`ed leaves the repository still pinned to the old
+    # Gaia-X — exactly the drift this guard exists to catch.
     expected=$({{run}} python -c "import omb, pathlib; print((pathlib.Path(omb.__file__).parent / 'data/artifacts/gx/UPSTREAM_COMMIT').read_text().strip())")
-    actual=$(git -C {{SVC_SUBMODULE_DIR}} rev-parse HEAD)
-    if [ "$expected" != "$actual" ]; then
+    gitlink=$(git ls-files -s -- {{SVC_SUBMODULE_DIR}} | awk '$1 == "160000" { print $2 }')
+    if [ -z "$gitlink" ]; then
+        echo "ERROR: {{SVC_SUBMODULE_DIR}} is not registered as a submodule in this index." >&2
+        exit 1
+    fi
+    if [ ! -e "{{SVC_SUBMODULE_DIR}}/.git" ]; then
+        echo "ERROR: {{SVC_SUBMODULE_DIR}} is not initialized — run: just setup-submodules" >&2
+        exit 1
+    fi
+    worktree=$(git -C {{SVC_SUBMODULE_DIR}} rev-parse HEAD)
+    if [ "$expected" != "$gitlink" ] || [ "$expected" != "$worktree" ]; then
         omb_version=$({{run}} python -c "import importlib.metadata as m; print(m.version('ontology-management-base'))")
         gx_ref=$({{run}} python -c "import omb, pathlib; print((pathlib.Path(omb.__file__).parent / 'data/artifacts/gx/UPSTREAM_REF').read_text().strip())")
         echo "ERROR: submodules/service-characteristics is out of step with omb ${omb_version}." >&2
         echo "       omb vendors gx ${gx_ref} generated from ${expected}" >&2
-        echo "       submodule HEAD is                        ${actual}" >&2
+        echo "       recorded gitlink is                      ${gitlink}" >&2
+        echo "       submodule working tree HEAD is           ${worktree}" >&2
         echo "       Fix: git -C {{SVC_SUBMODULE_DIR}} fetch origin ${expected} && \\" >&2
         echo "            git -C {{SVC_SUBMODULE_DIR}} checkout ${expected} && git add {{SVC_SUBMODULE_DIR}}" >&2
         exit 1
@@ -125,6 +146,11 @@ validate-shacl path="":
     set -euo pipefail
     # Optional path validates a single Harbour .json/.jsonld file or folder, e.g.
     #   just validate-shacl examples/gaiax/legal-person-credential.json
+    # A folder is expanded to its own .json/.jsonld files and NOT handed to omb as a
+    # directory: omb walks a directory recursively, which would drag the gitignored
+    # examples/**/signed/ output of `just story-sign` into the graph (the decoded
+    # evidence VPs are fragments, not standalone credentials, so the run fails). The
+    # default no-path run globs the example files for the same reason.
     # Env: HARBOUR_VALIDATE_ALLOW_ONLINE=0 -> --offline (no did:web/http(s) fallback);
     #      HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES overrides the required-ontology
     #      gate (default 1 for the full example set, 0 when a path is given).
@@ -162,9 +188,12 @@ validate-shacl path="":
     }
 
     if [ -n "$target_path" ]; then
+        targets=()
         if [ -d "$target_path" ]; then
-            json_count=$(find "$target_path" -maxdepth 1 -type f \( -name '*.json' -o -name '*.jsonld' \) | wc -l)
-            if [ "$json_count" -eq 0 ]; then
+            while IFS= read -r data_file; do
+                targets+=("$data_file")
+            done < <(find "$target_path" -maxdepth 1 -type f \( -name '*.json' -o -name '*.jsonld' \) | sort)
+            if [ "${#targets[@]}" -eq 0 ]; then
                 echo "ERROR: No .json or .jsonld files found under $target_path" >&2
                 exit 1
             fi
@@ -173,13 +202,14 @@ validate-shacl path="":
                 *.json|*.jsonld) ;;
                 *) echo "ERROR: Harbour SHACL validation only supports .json/.jsonld files or directories: $target_path" >&2; exit 1 ;;
             esac
+            targets=("$target_path")
         else
             echo "ERROR: Validation path not found: $target_path" >&2
             exit 1
         fi
         : "${enforce:=0}"
         status=0
-        run_conformance "$target_path" || status=$?
+        run_conformance "${targets[@]}" || status=$?
         if [ "$status" -ne 0 ]; then rm -f "$run_output"; exit "$status"; fi
     else
         : "${enforce:=1}"
@@ -210,7 +240,7 @@ validate-shacl path="":
     if [ -z "$target_path" ]; then
         echo "Running SHACL data conformance check on DID documents..."
         status=0
-        run_conformance examples/did-ethr/ || status=$?
+        run_conformance examples/did-ethr/*.json || status=$?
         rm -f "$run_output"
         if [ "$status" -ne 0 ]; then exit "$status"; fi
     fi
@@ -257,8 +287,16 @@ test-ts:
 test-interop:
     {{run}} python -m pytest tests/interop/ -v
 
-# Full test suite: build TS + Python tests + SHACL conformance + TypeScript tests.
-test-full: build test validate-shacl test-ts
+# `generate` and `story-sign` lead the dependency list because they produce inputs the
+# suite reads and `just clean` removes (as does a fresh clone — both are gitignored):
+#   * artifacts/          — the SHACL conformance run and the artifact tests read it;
+#                           without it this recipe fails instead of testing anything.
+#   * examples/**/signed/ — test_verify_signed_jwt is parametrized over the signed
+#                           JWTs, so an empty directory collapses 7 assertions into a
+#                           single degenerate [NOTSET] skip rather than failing.
+
+# Full suite: artifacts + signed examples + TS build + Python tests + SHACL + TS tests.
+test-full: generate story-sign build test validate-shacl test-ts
     @echo "OK: All tests complete"
 
 # ===== Build (TypeScript) =====
@@ -337,11 +375,16 @@ release-artifacts:
 
 # ===== Cleaning =====
 
-# Remove build artifacts, caches, and the local uv-managed virtual environment.
+# Remove generated artifacts, caches, and the local uv-managed virtual environment.
 clean:
     #!/usr/bin/env bash
     set -euo pipefail
-    rm -rf .venv build/ dist/ *.egg-info/ .pytest_cache/ .coverage htmlcov/
+    # artifacts/, site/ and examples/**/signed/ are generated output, not inputs.
+    # Leaving artifacts/ behind keeps stale domains from renamed schemas registered
+    # with omb on every `just validate-shacl` run, validating against shapes no
+    # schema produces any more. `just generate` and `just story` rebuild them.
+    rm -rf .venv build/ dist/ *.egg-info/ .pytest_cache/ .ruff_cache/ .coverage htmlcov/
+    rm -rf artifacts/ site/ examples/signed examples/gaiax/signed
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
     find . -type f -name "*.pyc" -delete 2>/dev/null || true
     echo "OK: Cleaned"

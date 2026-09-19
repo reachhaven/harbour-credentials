@@ -297,7 +297,8 @@ just test-ts
 # Cross-runtime interop tests (requires just build first)
 just test-interop
 
-# Full pipeline: Python + SHACL conformance + TypeScript (builds TS automatically)
+# Full pipeline: Python + SHACL conformance + TypeScript
+# (generates artifacts and builds TS automatically)
 just test-full
 
 # Python tests with coverage
