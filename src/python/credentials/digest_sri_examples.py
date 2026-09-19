@@ -3,6 +3,7 @@
 The three plain Gaia-X input VCs are the single source of truth:
 
     gx:LegalPerson -> examples/gaiax/gx-legal-person.json
+    gx:NaturalPerson -> examples/gaiax/gx-natural-person.json
     gx:VatID       -> examples/gaiax/gx-registration-number.json
     gx:Issuer      -> examples/gaiax/gx-terms-and-conditions.json
 
@@ -48,6 +49,7 @@ INPUT_FILES = {
     "gx:LegalPerson": "gx-legal-person.json",
     "gx:VatID": "gx-registration-number.json",
     "gx:Issuer": "gx-terms-and-conditions.json",
+    "gx:NaturalPerson": "gx-natural-person.json",
 }
 
 _REF_TYPE = "harbour.gx:CompliantCredentialReference"

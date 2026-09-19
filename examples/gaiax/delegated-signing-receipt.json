@@ -55,7 +55,7 @@
             "validFrom": "2024-01-15T00:00:00Z",
             "credentialSubject": {
               "id": "did:ethr:0x14a34:0x272c04206c826047add586cbf7f4ffc4386da129",
-              "type": "harbour.gx:NaturalPerson",
+              "type": "harbour.gx:HarbourNaturalPerson",
               "memberOf": "did:ethr:0x14a34:0xa682b9044de0a1ad3429e8c6a0be0ed45d01da93"
             },
             "credentialStatus": [

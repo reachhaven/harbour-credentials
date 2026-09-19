@@ -391,8 +391,8 @@ class TestDomainShaclShapes:
         expected_shapes = [
             "harbour.gx:LegalPersonCredential",
             "harbour.gx:NaturalPersonCredential",
-            "harbour.gx:LegalPerson",
-            "harbour.gx:NaturalPerson",
+            "harbour.gx:HarbourLegalPerson",
+            "harbour.gx:HarbourNaturalPerson",
         ]
         for shape in expected_shapes:
             assert f"{shape} a sh:NodeShape" in content, (

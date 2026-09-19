@@ -59,6 +59,8 @@ SH = Namespace("http://www.w3.org/ns/shacl#")
 CRED = Namespace("https://www.w3.org/2018/credentials#")
 HARBOUR = Namespace("https://w3id.org/reachhaven/harbour/core/v1/")
 HARBOUR_GX = Namespace("https://w3id.org/reachhaven/harbour/gx/v1/")
+# schema.org — the `sdo:` prefix normalises to `schema:` in the artifacts.
+SDO = Namespace("https://schema.org/")
 
 # ---------------------------------------------------------------------------
 # Skip if artifacts haven't been generated
@@ -384,9 +386,22 @@ _MISSING_FIELD_CASES = [
         str(CRED.evidence),
         "NaturalPersonCredential-missing-evidence",
     ),
-    # Note: NaturalPerson subject has NO minCount constraints on givenName/familyName
-    # (they are optional per SHACL). The shape IS sh:closed, so wrong property names
-    # are caught by ClosedConstraintComponent tests instead.
+    # --- NaturalPerson subject (compliance attestation) ---
+    # Mirrors the LegalPerson subject cases: entity data lives in the referenced
+    # gx:NaturalPerson VC, so the attestation's required slots are the reference
+    # itself and the employment link Gaia-X does not model.
+    (
+        "natural-person-credential.json",
+        ("credentialSubject", "harbour.gx:compliantNaturalPersonVC"),
+        str(HARBOUR_GX.compliantNaturalPersonVC),
+        "NaturalPerson-missing-compliantNaturalPersonVC",
+    ),
+    (
+        "natural-person-credential.json",
+        ("credentialSubject", "memberOf"),
+        str(SDO.memberOf),
+        "NaturalPerson-missing-memberOf",
+    ),
 ]
 
 

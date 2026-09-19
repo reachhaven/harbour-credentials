@@ -40,7 +40,7 @@ The examples use a **two-tier layout**:
   `https://w3id.org/gaia-x/development#` context.
 
 Credential types in the Gaia-X layer use the `harbour.gx:` namespace prefix
-(e.g. `harbour.gx:LegalPersonCredential`, `harbour.gx:NaturalPerson`) while core
+(e.g. `harbour.gx:LegalPersonCredential`, `harbour.gx:HarbourNaturalPerson`) while core
 types use `harbour:` (e.g. `harbour:CRSetEntry`, `harbour:CredentialEvidence`).
 
 ## Credential Issuance Model
