@@ -14,9 +14,8 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parent
-while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
-    _REPO_ROOT = _REPO_ROOT.parent
+# tests/python/credentials/test_validation.py -> repository root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 EXAMPLES_DIR = _REPO_ROOT / "examples"
 
@@ -256,6 +255,55 @@ class TestDomainContextConsistency:
             assert has_vocab or ":" in aid, (
                 f"{cls} has unprefixed @id without @vocab: {aid}"
             )
+
+
+def _colliding_vocab_terms(context_path: Path) -> list[tuple[str, str]]:
+    """Terms whose ``@vocab``-relative ``@id`` is itself a term in the same context.
+
+    JSON-LD IRI expansion resolves a term reference before falling back to
+    ``@vocab``, so ``{"HarbourLegalPerson": {"@id": "LegalPerson"}}`` expands to
+    whatever ``LegalPerson`` maps to (``gx:LegalPerson``, from the imported Gaia-X
+    vocabulary) rather than to ``@vocab + "LegalPerson"``.
+    """
+    ctx = _load_json(context_path).get("@context", {})
+    collisions = []
+    for term, entry in ctx.items():
+        if not isinstance(entry, dict):
+            continue
+        target = entry.get("@id")
+        if not isinstance(target, str):
+            continue
+        if ":" in target or target.startswith("@") or target == term:
+            continue
+        if target in ctx:
+            collisions.append((term, target))
+    return collisions
+
+
+@pytest.mark.skipif(
+    not DOMAIN_CONTEXT_PATH.exists(),
+    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
+)
+def test_domain_context_terms_are_unambiguous():
+    """No harbour term may expand to an imported (e.g. gx:) IRI of the same name."""
+    collisions = _colliding_vocab_terms(DOMAIN_CONTEXT_PATH)
+    assert not collisions, (
+        "Context terms resolve to an imported vocabulary instead of @vocab: "
+        + ", ".join(f"{term} -> '{target}'" for term, target in collisions)
+    )
+
+
+@pytest.mark.skipif(
+    not HARBOUR_CONTEXT_PATH.exists(),
+    reason="Generated harbour artifacts not found — run 'just generate'",
+)
+def test_harbour_context_terms_are_unambiguous():
+    """Same guard for the core context."""
+    collisions = _colliding_vocab_terms(HARBOUR_CONTEXT_PATH)
+    assert not collisions, (
+        "Context terms resolve to an imported vocabulary instead of @vocab: "
+        + ", ".join(f"{term} -> '{target}'" for term, target in collisions)
+    )
 
 
 # ---------------------------------------------------------------------------

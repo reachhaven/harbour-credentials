@@ -42,9 +42,8 @@ from rdflib import RDF, Namespace
 # Repository paths
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).resolve().parent
-while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
-    _REPO_ROOT = _REPO_ROOT.parent
+# tests/python/credentials/test_shacl_failures.py -> repository root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _CORE_SHACL = (
     _REPO_ROOT / "artifacts/harbour-core-credential/harbour-core-credential.shacl.ttl"

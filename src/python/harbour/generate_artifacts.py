@@ -51,6 +51,45 @@ DOMAINS = [
 SHACL_SKIP_DOMAINS = {"harbour-core-delegation"}
 
 
+def _disambiguate_vocab_terms(ctx_obj: dict) -> list[str]:
+    """Rewrite ``@vocab``-relative class terms that collide with an imported term.
+
+    A term definition of the form ``{"@id": "LocalName"}`` is only unambiguous while
+    no other term in the same context is called ``LocalName``; otherwise JSON-LD
+    expands it to *that* term's IRI rather than ``@vocab + LocalName``.  Each such
+    entry is rewritten to a prefixed IRI for the schema's own namespace.
+
+    Returns the names of the terms that were rewritten.
+    """
+    vocab = ctx_obj.get("@vocab")
+    if not isinstance(vocab, str):
+        return []
+    # Prefer the context's own prefix for the default namespace (e.g. "harbour.gx")
+    # so the rewritten value keeps the compact style of the rest of the context.
+    prefix = next(
+        (
+            key
+            for key, val in ctx_obj.items()
+            if key != "@vocab" and isinstance(val, str) and val == vocab
+        ),
+        None,
+    )
+    rewritten = []
+    for term, entry in ctx_obj.items():
+        if not isinstance(entry, dict):
+            continue
+        target = entry.get("@id")
+        if not isinstance(target, str):
+            continue
+        if ":" in target or target.startswith("@") or target == term:
+            continue
+        if target not in ctx_obj:
+            continue  # resolves via @vocab, unambiguously
+        entry["@id"] = f"{prefix}:{target}" if prefix else f"{vocab}{target}"
+        rewritten.append(term)
+    return rewritten
+
+
 def main() -> None:
     importmap_path = LINKML_DIR / "importmap.json"
     importmap = None
@@ -125,6 +164,22 @@ def main() -> None:
             for key, val in ctx_obj.items():
                 if isinstance(val, dict) and val.get("@type") == "rdf:JSON":
                     val["@type"] = "@json"
+
+        # Disambiguate own-namespace class terms whose local name collides with an
+        # imported term.  LinkML emits ``{"@id": "<LocalName>"}`` for a class in the
+        # schema's own namespace and relies on ``@vocab`` to expand it.  JSON-LD IRI
+        # expansion resolves a term reference *before* falling back to ``@vocab``
+        # [JSON-LD 1.1 §IRI Expansion], so when an imported vocabulary defines a term
+        # with that exact local name the harbour term silently expands to the imported
+        # IRI — e.g. ``HarbourLegalPerson`` -> ``gx:LegalPerson`` instead of
+        # ``harbour.gx:LegalPerson``.  Pin such entries to an explicit prefixed IRI.
+        if isinstance(ctx_obj, dict):
+            disambiguated = _disambiguate_vocab_terms(ctx_obj)
+            if disambiguated:
+                print(
+                    f"    pinned {len(disambiguated)} colliding context term(s): "
+                    f"{', '.join(disambiguated)}"
+                )
 
         ctx_data["@context"] = ctx_obj
         ctx_text = json.dumps(ctx_data, indent=3, ensure_ascii=False)
