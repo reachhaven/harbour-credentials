@@ -111,7 +111,7 @@
       "validUntil": "2025-01-16T00:00:00Z",
       "credentialSubject": {
         "id": "did:ethr:0x14a34:0xd1d2d3d4d5d6d7d8d9d0d1d2d3d4d5d6d7d8d9d0",
-        "type": "harbour.gx:LegalPerson",
+        "type": "harbour.gx:HarbourLegalPerson",
         "harbour.gx:compliantLegalPersonVC": {
           "type": "harbour.gx:CompliantCredentialReference",
           "harbour.gx:credentialType": "gx:LegalPerson",

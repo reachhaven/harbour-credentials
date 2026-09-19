@@ -14,9 +14,8 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parent
-while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
-    _REPO_ROOT = _REPO_ROOT.parent
+# tests/python/credentials/test_validation.py -> repository root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 EXAMPLES_DIR = _REPO_ROOT / "examples"
 
@@ -168,7 +167,7 @@ def test_credential_subject_has_type(credential_file):
 
 _skip_no_harbour_artifacts = pytest.mark.skipif(
     not HARBOUR_CONTEXT_PATH.exists(),
-    reason="Generated harbour artifacts not found — run 'make generate'",
+    reason="Generated harbour artifacts not found — run 'just generate'",
 )
 
 
@@ -210,7 +209,7 @@ class TestHarbourContextConsistency:
 
 _skip_no_domain_artifacts = pytest.mark.skipif(
     not DOMAIN_CONTEXT_PATH.exists(),
-    reason="Generated harbour-gx-credential artifacts not found — run 'make generate'",
+    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
 )
 
 
@@ -258,6 +257,55 @@ class TestDomainContextConsistency:
             )
 
 
+def _colliding_vocab_terms(context_path: Path) -> list[tuple[str, str]]:
+    """Terms whose ``@vocab``-relative ``@id`` is itself a term in the same context.
+
+    JSON-LD IRI expansion resolves a term reference before falling back to
+    ``@vocab``, so ``{"HarbourLegalPerson": {"@id": "LegalPerson"}}`` expands to
+    whatever ``LegalPerson`` maps to (``gx:LegalPerson``, from the imported Gaia-X
+    vocabulary) rather than to ``@vocab + "LegalPerson"``.
+    """
+    ctx = _load_json(context_path).get("@context", {})
+    collisions = []
+    for term, entry in ctx.items():
+        if not isinstance(entry, dict):
+            continue
+        target = entry.get("@id")
+        if not isinstance(target, str):
+            continue
+        if ":" in target or target.startswith("@") or target == term:
+            continue
+        if target in ctx:
+            collisions.append((term, target))
+    return collisions
+
+
+@pytest.mark.skipif(
+    not DOMAIN_CONTEXT_PATH.exists(),
+    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
+)
+def test_domain_context_terms_are_unambiguous():
+    """No harbour term may expand to an imported (e.g. gx:) IRI of the same name."""
+    collisions = _colliding_vocab_terms(DOMAIN_CONTEXT_PATH)
+    assert not collisions, (
+        "Context terms resolve to an imported vocabulary instead of @vocab: "
+        + ", ".join(f"{term} -> '{target}'" for term, target in collisions)
+    )
+
+
+@pytest.mark.skipif(
+    not HARBOUR_CONTEXT_PATH.exists(),
+    reason="Generated harbour artifacts not found — run 'just generate'",
+)
+def test_harbour_context_terms_are_unambiguous():
+    """Same guard for the core context."""
+    collisions = _colliding_vocab_terms(HARBOUR_CONTEXT_PATH)
+    assert not collisions, (
+        "Context terms resolve to an imported vocabulary instead of @vocab: "
+        + ", ".join(f"{term} -> '{target}'" for term, target in collisions)
+    )
+
+
 # ---------------------------------------------------------------------------
 # 3. SHACL conformance — harbour base shapes
 # ---------------------------------------------------------------------------
@@ -265,7 +313,7 @@ class TestDomainContextConsistency:
 
 @pytest.mark.skipif(
     not HARBOUR_SHACL_PATH.exists(),
-    reason="Generated harbour artifacts not found — run 'make generate'",
+    reason="Generated harbour artifacts not found — run 'just generate'",
 )
 class TestHarbourShaclShapes:
     """Verify that SHACL shapes exist for harbour base types."""
@@ -329,7 +377,7 @@ class TestHarbourShaclShapes:
 
 @pytest.mark.skipif(
     not DOMAIN_SHACL_PATH.exists(),
-    reason="Generated harbour-gx-credential artifacts not found — run 'make generate'",
+    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
 )
 class TestDomainShaclShapes:
     """Verify that SHACL shapes exist for harbour-gx-credential types."""
@@ -343,8 +391,8 @@ class TestDomainShaclShapes:
         expected_shapes = [
             "harbour.gx:LegalPersonCredential",
             "harbour.gx:NaturalPersonCredential",
-            "harbour.gx:LegalPerson",
-            "harbour.gx:NaturalPerson",
+            "harbour.gx:HarbourLegalPerson",
+            "harbour.gx:HarbourNaturalPerson",
         ]
         for shape in expected_shapes:
             assert f"{shape} a sh:NodeShape" in content, (

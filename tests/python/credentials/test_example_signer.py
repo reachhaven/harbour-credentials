@@ -246,7 +246,7 @@ class TestProcessGaiaxExample:
 
         # Subject should have compliance data (no entity data)
         subject = vc_payload["credentialSubject"]
-        assert subject["type"] == "harbour.gx:LegalPerson"
+        assert subject["type"] == "harbour.gx:HarbourLegalPerson"
         assert "harbour.gx:labelLevel" in subject
 
     def test_process_gaiax_natural_person(self, signing_key, tmp_path):
@@ -265,10 +265,13 @@ class TestProcessGaiaxExample:
         vc_payload = verify_vc_jose(vc_jwt, public_key)
         assert "harbour.gx:NaturalPersonCredential" in vc_payload["type"]
 
-        # Subject should have the NaturalPerson data directly
+        # Subject is the natural-person compliance attestation
         subject = vc_payload["credentialSubject"]
-        assert subject["type"] == "harbour.gx:NaturalPerson"
-        assert "givenName" in subject
+        assert subject["type"] == "harbour.gx:HarbourNaturalPerson"
+        # Pure compliance attestation: entity data lives in the referenced
+        # gx:NaturalPerson VC, so the subject carries the reference, not the name.
+        assert "harbour.gx:compliantNaturalPersonVC" in subject
+        assert "memberOf" in subject
 
     def test_process_all_gaiax_examples(self, signing_key, tmp_path):
         """Process all Gaia-X examples and verify each produces a valid JWT."""

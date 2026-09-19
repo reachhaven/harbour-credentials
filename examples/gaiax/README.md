@@ -17,7 +17,7 @@ Holding a valid one means Haven has verified all three underlying Gaia-X VCs:
 The three input VCs are **plain Gaia-X** (no harbour envelope type). The
 `LegalPersonCredential` is the **compliance output** — Haven's stamp.
 
-The `harbour.gx:LegalPerson` SHACL shape enforces all three VC references
+The `harbour.gx:HarbourLegalPerson` SHACL shape enforces all three VC references
 via `sh:minCount 1` — machine-readable enforcement that the Gaia-X Loire
 specification is missing.
 
@@ -34,6 +34,7 @@ and properties, while core envelope types use `harbour:`.
 | `gx-legal-person.json` | Company (self-signed) | gx:LegalPerson self-description with name, addresses |
 | `gx-registration-number.json` | Haven (notary) | gx:VatID with notary verification evidence |
 | `gx-terms-and-conditions.json` | Company (self-signed) | gx:Issuer with T&C acceptance hash |
+| `gx-natural-person.json` | Employee (self-signed) | gx:NaturalPerson self-description with first/last name, email |
 
 ### Output VCs (harbour compliance credentials)
 

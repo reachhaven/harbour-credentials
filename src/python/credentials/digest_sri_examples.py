@@ -3,6 +3,7 @@
 The three plain Gaia-X input VCs are the single source of truth:
 
     gx:LegalPerson -> examples/gaiax/gx-legal-person.json
+    gx:NaturalPerson -> examples/gaiax/gx-natural-person.json
     gx:VatID       -> examples/gaiax/gx-registration-number.json
     gx:Issuer      -> examples/gaiax/gx-terms-and-conditions.json
 
@@ -27,7 +28,7 @@ Modes:
     provably the same credential.
   * ``--check`` (default) recomputes and verifies every digestSRI without
     modifying any file, failing if a value is stale or tampered. This is the
-    integrity step run by ``make story``.
+    integrity step run by ``just story``.
 
 CLI Usage:
     python -m credentials.digest_sri_examples            # check (default)
@@ -48,6 +49,7 @@ INPUT_FILES = {
     "gx:LegalPerson": "gx-legal-person.json",
     "gx:VatID": "gx-registration-number.json",
     "gx:Issuer": "gx-terms-and-conditions.json",
+    "gx:NaturalPerson": "gx-natural-person.json",
 }
 
 _REF_TYPE = "harbour.gx:CompliantCredentialReference"
@@ -186,7 +188,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m credentials.digest_sri_examples           # verify all (used by `make story`)
+  python -m credentials.digest_sri_examples           # verify all (used by `just story`)
   python -m credentials.digest_sri_examples --write   # recompute and write hashes
         """,
     )

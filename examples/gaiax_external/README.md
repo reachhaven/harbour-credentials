@@ -49,7 +49,7 @@ by the **live clearing house** (not a hand-authored sample), this is a
 trust these example values and instead emits/verifies the standards-correct
 base64 form (see [`docs/specs/references/subresource-integrity.md`](../../docs/specs/references/subresource-integrity.md)
 and the `harbour.digest_sri` / `digest-sri.ts` modules, checked by
-`make story`).
+`just story`).
 
 > The hash **values** themselves cannot be independently verified from this file:
 > the three referenced input VCs (`gx:LegalPerson`, `gx:Issuer`, `gx:VatID`) are
@@ -61,7 +61,7 @@ and the `harbour.digest_sri` / `digest-sri.ts` modules, checked by
 The envelope `type` is just `["VerifiableCredential"]`, with the domain type
 `gx:LabelCredential` carried on `credentialSubject`. This matches the structure
 required by Gaia-X's closed (`sh:closed true`) SHACL shapes — the same concern
-Harbour addresses by keeping `harbour.gx:LegalPerson` a **separate compliance
+Harbour addresses by keeping `harbour.gx:HarbourLegalPerson` a **separate compliance
 attestation type** rather than extending `gx:LegalPerson` (see
 [`linkml/harbour-gx-credential.yaml`](../../linkml/harbour-gx-credential.yaml)
 and [`docs/schema/credential-model.md`](../../docs/schema/credential-model.md)).
