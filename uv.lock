@@ -665,7 +665,7 @@ requires-dist = [
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "ontology-management-base", marker = "extra == 'dev'", specifier = ">=0.5.0" },
+    { name = "ontology-management-base", marker = "extra == 'dev'", specifier = "~=0.5.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = "==4.5.1" },
     { name = "pycryptodome", specifier = ">=3.20" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.0" },

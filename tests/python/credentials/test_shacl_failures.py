@@ -296,7 +296,7 @@ class TestPositiveBaseline:
 # ---------------------------------------------------------------------------
 
 # Each tuple: (example_file, field_path, expected_shacl_path, test_id)
-# field_path is the key chain to remove, e.g. ("issuer",) or ("credentialSubject", "givenName")
+# field_path is the key chain to remove, e.g. ("issuer",) or ("credentialSubject", "memberOf")
 _MISSING_FIELD_CASES = [
     # --- LegalPersonCredential envelope ---
     (

@@ -157,7 +157,7 @@ sequenceDiagram
     Note over E,BC: Phase 2 — User Consent (OID4VP)
     E->>E: 👤 Review transaction in wallet
     E->>E: 👤 Approve — wallet builds SD-JWT VP
-    Note right of E: Selective disclosure:<br/>✅ memberOf (employer DID)<br/>❌ givenName, familyName, email<br/>KB-JWT binds nonce to tx hash
+    Note right of E: Disclosed:<br/>✅ memberOf (employer DID)<br/>✅ gx:NaturalPerson VC reference (digest only)<br/>Name/email stay in the gx:NaturalPerson VC<br/>KB-JWT binds nonce to tx hash
     E->>H: Submit consent VP
 
     Note over E,BC: Phase 3 — Execution

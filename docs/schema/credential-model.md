@@ -398,4 +398,4 @@ For quick reference, every class defined across all three schema files:
 | `NaturalPersonCredential` | gx | — | `HarbourCredential` | Gaia-X |
 | `HarbourLegalPerson` | gx | — | — | Gaia-X |
 | `CompliantCredentialReference` | gx | — | — | Gaia-X |
-| `HarbourNaturalPerson` | gx | — | `gx:Participant` | Gaia-X |
+| `HarbourNaturalPerson` | gx | — | — | Gaia-X |

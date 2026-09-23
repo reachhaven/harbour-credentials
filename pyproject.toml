@@ -58,7 +58,7 @@ dev = [
     #     `omb/data/artifacts/gx/UPSTREAM_COMMIT` in the wheel — `just
     #     check-gx-pin` (run by `just setup` and CI) and
     #     tests/python/credentials/test_gx_pin.py enforce it.
-    "ontology-management-base>=0.5.0",
+    "ontology-management-base~=0.5.0",
 ]
 docs = [
     "mkdocs>=1.6.0",

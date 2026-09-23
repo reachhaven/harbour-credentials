@@ -41,9 +41,7 @@ default:
 # ===== Setup / install =====
 
 # Init flat submodules + create the dev env (.venv, dev deps) + hooks + TS deps.
-setup: setup-submodules
-    uv sync --extra dev
-    @just check-gx-pin
+setup: setup-submodules install-dev check-gx-pin
     {{run}} pre-commit install
     cd {{TS_DIR}} && {{yarn}} install
     @echo "[OK] Dev environment ready. Run recipes with: just <recipe>"
@@ -158,7 +156,7 @@ validate-shacl path="":
     # Credentials and DID documents are validated in SEPARATE runs. omb merges every
     # requested document into one graph, and a subject like
     # did:ethr:0x14a34:0xa682... is both the credentialSubject of a closed
-    # harbour.gx:LegalPerson shape and the root of a DID document carrying
+    # harbour.gx:HarbourLegalPerson shape and the root of a DID document carrying
     # sec:verificationMethod / didcore:service. Merged, the DID document's properties
     # land on the credential's closed node and every one of them is a
     # ClosedConstraintComponent violation. Validating each set in its own run keeps the

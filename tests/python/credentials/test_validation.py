@@ -280,26 +280,16 @@ def _colliding_vocab_terms(context_path: Path) -> list[tuple[str, str]]:
     return collisions
 
 
-@pytest.mark.skipif(
-    not DOMAIN_CONTEXT_PATH.exists(),
-    reason="Generated harbour-gx-credential artifacts not found — run 'just generate'",
+@pytest.mark.parametrize(
+    "context_path",
+    [
+        pytest.param(DOMAIN_CONTEXT_PATH, marks=_skip_no_domain_artifacts, id="gx"),
+        pytest.param(HARBOUR_CONTEXT_PATH, marks=_skip_no_harbour_artifacts, id="core"),
+    ],
 )
-def test_domain_context_terms_are_unambiguous():
+def test_context_terms_are_unambiguous(context_path):
     """No harbour term may expand to an imported (e.g. gx:) IRI of the same name."""
-    collisions = _colliding_vocab_terms(DOMAIN_CONTEXT_PATH)
-    assert not collisions, (
-        "Context terms resolve to an imported vocabulary instead of @vocab: "
-        + ", ".join(f"{term} -> '{target}'" for term, target in collisions)
-    )
-
-
-@pytest.mark.skipif(
-    not HARBOUR_CONTEXT_PATH.exists(),
-    reason="Generated harbour artifacts not found — run 'just generate'",
-)
-def test_harbour_context_terms_are_unambiguous():
-    """Same guard for the core context."""
-    collisions = _colliding_vocab_terms(HARBOUR_CONTEXT_PATH)
+    collisions = _colliding_vocab_terms(context_path)
     assert not collisions, (
         "Context terms resolve to an imported vocabulary instead of @vocab: "
         + ", ".join(f"{term} -> '{target}'" for term, target in collisions)

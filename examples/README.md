@@ -205,10 +205,11 @@ sd_jwt = issue_sd_jwt_vc(
     credential,
     private_key,
     vct="https://w3id.org/reachhaven/harbour/gx/v1/NaturalPersonCredential",
-    disclosable=["credentialSubject.givenName", "credentialSubject.familyName",
-                 "credentialSubject.email", "credentialSubject.memberOf"],
+    disclosable=["credentialSubject.memberOf"],
 )
-# Nested structure preserved — sensitive values hidden behind _sd digests
+# The credential carries no PII: first/last name and email live in the separate
+# gx:NaturalPerson VC (gx-natural-person.json), referenced by the digest-bound
+# harbour.gx:compliantNaturalPersonVC, which stays always-disclosed.
 ```
 
 ---
@@ -221,7 +222,8 @@ blockchain transaction directly, she delegates it to the Harbour Signing Service
 The signing service creates an OID4VP `transaction_data` object describing the
 purchase. Alice's wallet creates an **SD-JWT VP** with:
 
-- Her `NaturalPersonCredential` (PII redacted — only `memberOf` disclosed)
+- Her `NaturalPersonCredential` (no PII inside — `memberOf` plus the digest-bound
+  `compliantNaturalPersonVC` reference)
 - A **KB-JWT** binding her signature to the `transaction_data` hash
 - `DelegatedSignatureEvidence` with the challenge string
 
@@ -236,8 +238,8 @@ sequenceDiagram
     SS->>SS: Compute challenge:<br/>nonce HARBOUR_DELEGATE sha256(tx_data)
     SS->>A: OID4VP authorization request<br/>(transaction_data, nonce, audience)
     A->>A: Review transaction details
-    A->>A: Select disclosures (redact PII)
-    A->>A: Create SD-JWT VP:<br/>• NaturalPersonCredential (memberOf only)<br/>• KB-JWT (sd_hash + tx_data_hash)<br/>• DelegatedSignatureEvidence
+    A->>A: Select disclosures (memberOf)
+    A->>A: Create SD-JWT VP:<br/>• NaturalPersonCredential (memberOf + gx:NaturalPerson ref)<br/>• KB-JWT (sd_hash + tx_data_hash)<br/>• DelegatedSignatureEvidence
     A->>SS: SD-JWT VP (consent proof)
     SS->>SS: Verify VP:<br/>✓ Credential signature<br/>✓ KB-JWT binding<br/>✓ transaction_data_hash match<br/>✓ Challenge integrity
 ```
@@ -247,10 +249,8 @@ sequenceDiagram
 | Claim | Disclosed? | Why |
 |-------|-----------|-----|
 | `memberOf` | Yes | Trust chain — proves organizational affiliation |
-| `name` | Yes | Non-PII display name |
-| `givenName` | No | PII — redacted |
-| `familyName` | No | PII — redacted |
-| `email` | No | PII — redacted |
+| `compliantNaturalPersonVC` | Yes | Digest-bound link to the verified `gx:NaturalPerson` VC (no PII) |
+| first/last name, email | Not in this credential | Held in the separate `gx:NaturalPerson` VC, which is not presented |
 
 ### Wire format
 

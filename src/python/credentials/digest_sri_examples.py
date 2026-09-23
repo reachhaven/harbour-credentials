@@ -1,11 +1,11 @@
 """Fill and verify ``digestSRI`` integrity hashes in the Gaia-X examples.
 
-The three plain Gaia-X input VCs are the single source of truth:
+The four plain Gaia-X input VCs are the single source of truth:
 
-    gx:LegalPerson -> examples/gaiax/gx-legal-person.json
+    gx:LegalPerson   -> examples/gaiax/gx-legal-person.json
     gx:NaturalPerson -> examples/gaiax/gx-natural-person.json
-    gx:VatID       -> examples/gaiax/gx-registration-number.json
-    gx:Issuer      -> examples/gaiax/gx-terms-and-conditions.json
+    gx:VatID         -> examples/gaiax/gx-registration-number.json
+    gx:Issuer        -> examples/gaiax/gx-terms-and-conditions.json
 
 Every ``harbour.gx:CompliantCredentialReference`` in the example credentials
 references one of these by ``harbour.gx:credentialType``. Its ``harbour.gx:digestSRI``

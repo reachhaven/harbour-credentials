@@ -30,6 +30,9 @@ jobs:
         with:
           tool: just
 
+      - name: Check uv.lock is in sync with pyproject.toml
+        run: uv lock --check
+
       - name: Run pre-commit
         run: just lint
 

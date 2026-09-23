@@ -54,7 +54,7 @@ just build           # Build TypeScript (tsc)
 just lint            # All pre-commit hooks (ruff, JSON-LD/Turtle, markdownlint); `just lint-ts` for tsc --noEmit
 just format          # ruff format + ruff check --fix
 just check           # generate + validate
-just all             # lint + check + test (the full local CI pipeline)
+just all             # lint + check + Python tests (no TS / validate-shacl / story — see test-full)
 ```
 
 **Recipe naming:** the former grouped Makefile targets are now individual `just`
@@ -222,7 +222,7 @@ Every harbour module has an argparse `main()` with `--help`: `python -m harbour.
 - Always sign commits with `-s -S` (Signed-off-by + GPG signature)
 - **Never include AI attribution** — no `Co-Authored-By`, `Generated-By`, or any mention of AI tools in commit messages
 - Use conventional commit format (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`, `ci:`); a `!` marks breaking changes (e.g. `feat(linkml)!: ...`). These feed the git-cliff changelog.
-- Run `just all` (or at least `just test-full` + `just lint`) before committing
+- Run `just lint` + `just test-full` before committing (`just all` alone skips the TypeScript tests, SHACL conformance and the story pipeline)
 
 ```bash
 git commit -s -S -m "feat(harbour): add KB-JWT support"
