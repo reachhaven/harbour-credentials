@@ -65,7 +65,7 @@ strongest provided `base64-value`.
 | Hash algorithm | `sha256` (default; `sha384` / `sha512` supported) |
 | Encoding | Standard base64 (RFC 4648 §4), per this spec |
 | Implementation | `harbour.digest_sri` (Python) / `digest-sri.ts` (TypeScript) |
-| Verification | `make story` → `credentials.digest_sri_examples --check` and `yarn story:digests` |
+| Verification | `just story` → `credentials.digest_sri_examples --check` and `yarn story:digests` |
 
 Example (a Harbour credential reference):
 

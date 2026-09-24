@@ -8,10 +8,11 @@
 
 ## Local Artifacts
 
-The Gaia-X ontology, SHACL shapes, and JSON-LD context are maintained
-locally in the ontology-management-base (OMB) submodule:
+The Gaia-X ontology, SHACL shapes, and JSON-LD context are vendored in the
+`ontology-management-base` (OMB) package (installed from PyPI), under
+`omb/data/`:
 
-| File | Path (relative to OMB root) |
+| File | Path (relative to `omb/data/`) |
 |------|-----------------------------|
 | OWL ontology | `artifacts/gx/gx.owl.ttl` |
 | SHACL shapes | `artifacts/gx/gx.shacl.ttl` |
@@ -61,14 +62,14 @@ Because `gx:LegalPersonShape` has `sh:closed true`:
   will **fail** SHACL validation.
 - Harbour cannot extend `gx:LegalPerson` with additional properties.
 - Therefore Harbour uses a **separate compliance attestation type**:
-  `harbour.gx:LegalPerson` carries only compliance enforcement slots
+  `harbour.gx:HarbourLegalPerson` carries only compliance enforcement slots
   (VC references + metadata). Entity data lives in the referenced
   plain `gx:LegalPerson` input VC.
 
 ### Compliance Pattern
 
 ```
-harbour.gx:LegalPerson                 # compliance attestation node
+harbour.gx:HarbourLegalPerson          # compliance attestation node
   ├── harbour.gx:compliantLegalPersonVC # → gx:LegalPerson VC ref + digestSRI
   ├── harbour.gx:compliantRegistrationVC # → gx:VatID VC ref + digestSRI
   ├── harbour.gx:compliantTermsVC       # → gx:Issuer VC ref + digestSRI
@@ -106,9 +107,12 @@ gx nodes, compliance metadata stays on the harbour node.
 - `LegalPersonCredential` IS the compliance credential — holding a valid
   one means Haven verified the three underlying Gaia-X VCs (LegalPerson,
   VatID, Issuer/T&C). See [GX-CD 25.10](gx-compliance-document-25.10.md).
-- `harbour.gx:LegalPerson` is a pure compliance attestation type with
+- `harbour.gx:HarbourLegalPerson` is a pure compliance attestation type with
   SHACL-enforced `CompliantCredentialReference` slots.
-- `harbour.gx:NaturalPerson` extends `gx:Participant` directly.
+- `harbour.gx:HarbourNaturalPerson` is the same pattern for individuals:
+  `gx:NaturalPerson` exists as of Gaia-X v2.5.0 but its shape is also
+  `sh:closed true`, so entity data lives in a referenced `gx:NaturalPerson`
+  VC and the attestation adds only `sdo:memberOf`.
 - Domain SHACL is generated with `exclude_imports=True` to keep
   harbour shapes separate from gx shapes.
 - Version tracking via `artifacts/gx/VERSION` and `verify-version.sh`.

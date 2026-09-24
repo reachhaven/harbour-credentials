@@ -7,7 +7,7 @@
  * (and its inline `harbour.gx:embeddedCredential`, when present), recomputed
  * with the real `verifyDigestSri` function.
  *
- * Run via `yarn story:digests` (invoked by `make story ts`).
+ * Run via `yarn story:digests` (invoked by `just story-ts`).
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -41,6 +41,7 @@ const INPUT_FILES: Record<string, string> = {
   "gx:LegalPerson": "gx-legal-person.json",
   "gx:VatID": "gx-registration-number.json",
   "gx:Issuer": "gx-terms-and-conditions.json",
+  "gx:NaturalPerson": "gx-natural-person.json",
 };
 
 const CREDENTIAL_TYPE_KEY = "harbour.gx:credentialType";

@@ -5,8 +5,9 @@ asserts that SHACL validation catches each specific error. Every test
 starts from a known-good credential, applies a single mutation, and
 checks that the OMB validation suite reports the expected violation.
 
-Validation uses the ``ShaclValidator`` from the ontology-management-base
-submodule — the same pipeline used in production (RDFS inference enabled).
+Validation goes through OMB's public ``omb.api.validate_data`` API (from the
+installable ``ontology-management-base`` package) — the same pipeline used in
+production ``just validate-shacl`` (RDFS inference enabled).
 
 The test output is designed for debuggability:
 - Each test ID clearly describes the mutation (e.g., "LegalPerson-missing-issuer")
@@ -21,12 +22,13 @@ To debug a single test::
 
     pytest tests/python/credentials/test_shacl_failures.py -v -k "missing_issuer"
 
-Requires generated artifacts (``make generate``) and the OMB submodule.
+Requires generated artifacts (``just generate``) and the ``ontology-management-base``
+package (installed from PyPI via the ``.[dev]`` extra).
 """
 
 import copy
+import importlib.util
 import json
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,11 +42,8 @@ from rdflib import RDF, Namespace
 # Repository paths
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).resolve().parent
-while _REPO_ROOT.name != "harbour-credentials" and _REPO_ROOT != _REPO_ROOT.parent:
-    _REPO_ROOT = _REPO_ROOT.parent
-
-_OMB = _REPO_ROOT / "submodules" / "ontology-management-base"
+# tests/python/credentials/test_shacl_failures.py -> repository root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _CORE_SHACL = (
     _REPO_ROOT / "artifacts/harbour-core-credential/harbour-core-credential.shacl.ttl"
@@ -60,6 +59,8 @@ SH = Namespace("http://www.w3.org/ns/shacl#")
 CRED = Namespace("https://www.w3.org/2018/credentials#")
 HARBOUR = Namespace("https://w3id.org/reachhaven/harbour/core/v1/")
 HARBOUR_GX = Namespace("https://w3id.org/reachhaven/harbour/gx/v1/")
+# schema.org — the `sdo:` prefix normalises to `schema:` in the artifacts.
+SDO = Namespace("https://schema.org/")
 
 # ---------------------------------------------------------------------------
 # Skip if artifacts haven't been generated
@@ -67,12 +68,12 @@ HARBOUR_GX = Namespace("https://w3id.org/reachhaven/harbour/gx/v1/")
 
 _skip_no_artifacts = pytest.mark.skipif(
     not _GX_SHACL.exists(),
-    reason="Generated artifacts not found — run 'make generate' first",
+    reason="Generated artifacts not found — run 'just generate' first",
 )
 
 _skip_no_omb = pytest.mark.skipif(
-    not (_OMB / "src" / "tools" / "validators" / "shacl" / "validator.py").exists(),
-    reason="ontology-management-base submodule not initialised",
+    importlib.util.find_spec("omb") is None,
+    reason="ontology-management-base (omb) package not installed",
 )
 
 
@@ -128,29 +129,15 @@ def _format_violations(violations: list[ShaclViolation]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# OMB validation suite bootstrap
+# OMB validation API
 # ---------------------------------------------------------------------------
-
-
-def _make_validator():
-    """Create a ShaclValidator using the OMB validation suite.
-
-    Registers harbour artifact directories so the resolver can discover
-    OWL ontologies, SHACL shapes, and JSON-LD contexts.  Uses the default
-    ``rdfs`` inference mode — the same pipeline as production validation.
-    """
-    sys.path.insert(0, str(_OMB))
-    from src.tools.utils.registry_resolver import RegistryResolver
-    from src.tools.validators.shacl.validator import ShaclValidator
-
-    resolver = RegistryResolver(_OMB)
-    resolver.register_artifact_directory(_ARTIFACTS_DIR)
-    return ShaclValidator(
-        root_dir=_OMB,
-        inference_mode="rdfs",
-        verbose=False,
-        resolver=resolver,
-    )
+#
+# Validation goes through OMB's public, side-effect-free ``omb.api.validate_data``
+# entry point (from the installable ``ontology-management-base`` package). It
+# builds the registry resolver, registers harbour's generated artifacts, applies
+# RDFS inference and runs SHACL — the same pipeline as production ``just
+# validate-shacl`` — so harbour no longer wires up ``RegistryResolver`` /
+# ``ShaclValidator`` by hand.
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +147,25 @@ def _make_validator():
 
 @pytest.fixture(scope="session")
 def shacl_validator():
-    """OMB ShaclValidator with harbour artifacts registered."""
-    return _make_validator()
+    """Return a ``validate(files)`` callable backed by ``omb.api.validate_data``.
+
+    Mirrors production ``just validate-shacl``: harbour's generated artifacts
+    plus OMB's built-in data root (the committed ``gx`` shapes + base ``imports``
+    vendored in the installed ``omb`` package), RDFS inference, non-strict IRI
+    resolution, and online DID/context resolution allowed. Returns an ``omb``
+    ``ValidationResult`` (``.conforms``, ``.report_graph``, ``.report_text``).
+    """
+    from omb.api import validate_data
+
+    def _validate_files(files):
+        return validate_data(
+            files,
+            artifacts=[_ARTIFACTS_DIR],
+            strict=False,
+            allow_online=True,
+        )
+
+    return _validate_files
 
 
 # ---------------------------------------------------------------------------
@@ -173,11 +177,16 @@ def _validate(
     credential: dict,
     validator,
 ) -> tuple[bool, list[ShaclViolation], str]:
-    """Validate a credential dict via the OMB validation suite.
+    """Validate a credential dict via OMB's ``validate_data`` API.
 
-    Writes the credential to a temp file and runs the full ShaclValidator
+    Writes the credential to a temp file and runs the full validation
     pipeline (context inlining, schema discovery, RDFS inference, SHACL
-    validation) — identical to production ``make validate``.
+    validation) — identical to production ``just validate-shacl``.
+
+    Args:
+        credential: The credential JSON to validate.
+        validator: The ``validate(files)`` callable from the
+            ``shacl_validator`` fixture.
 
     Returns:
         (conforms, violations, results_text)
@@ -189,7 +198,7 @@ def _validate(
         temp_path = Path(f.name)
 
     try:
-        result = validator.validate([temp_path])
+        result = validator([temp_path])
         violations = (
             _extract_violations(result.report_graph)
             if result.report_graph is not None
@@ -287,7 +296,7 @@ class TestPositiveBaseline:
 # ---------------------------------------------------------------------------
 
 # Each tuple: (example_file, field_path, expected_shacl_path, test_id)
-# field_path is the key chain to remove, e.g. ("issuer",) or ("credentialSubject", "givenName")
+# field_path is the key chain to remove, e.g. ("issuer",) or ("credentialSubject", "memberOf")
 _MISSING_FIELD_CASES = [
     # --- LegalPersonCredential envelope ---
     (
@@ -377,9 +386,22 @@ _MISSING_FIELD_CASES = [
         str(CRED.evidence),
         "NaturalPersonCredential-missing-evidence",
     ),
-    # Note: NaturalPerson subject has NO minCount constraints on givenName/familyName
-    # (they are optional per SHACL). The shape IS sh:closed, so wrong property names
-    # are caught by ClosedConstraintComponent tests instead.
+    # --- NaturalPerson subject (compliance attestation) ---
+    # Mirrors the LegalPerson subject cases: entity data lives in the referenced
+    # gx:NaturalPerson VC, so the attestation's required slots are the reference
+    # itself and the employment link Gaia-X does not model.
+    (
+        "natural-person-credential.json",
+        ("credentialSubject", "harbour.gx:compliantNaturalPersonVC"),
+        str(HARBOUR_GX.compliantNaturalPersonVC),
+        "NaturalPerson-missing-compliantNaturalPersonVC",
+    ),
+    (
+        "natural-person-credential.json",
+        ("credentialSubject", "memberOf"),
+        str(SDO.memberOf),
+        "NaturalPerson-missing-memberOf",
+    ),
 ]
 
 

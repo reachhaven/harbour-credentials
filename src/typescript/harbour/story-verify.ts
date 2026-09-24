@@ -270,7 +270,7 @@ async function main(): Promise<void> {
   const signedDirs = discoverSignedDirs();
   if (signedDirs.length === 0) {
     throw new Error(
-      "No signed example directories found. Run `make story sign` or `make story ts` first.",
+      "No signed example directories found. Run `just story-sign` or `just story-ts` first.",
     );
   }
 

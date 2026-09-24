@@ -60,7 +60,7 @@ classDiagram
         credentialStatus : CRSetEntry[] ⟨required⟩
     }
 
-    class ComplianceCredential {
+    class HarbourComplianceCredential {
         <<abstract>>
         evidence : Evidence[] ⟨required⟩
     }
@@ -80,8 +80,8 @@ classDiagram
     }
 
     W3C_VC_Envelope <|-- HarbourCredential : imports + strengthens
-    HarbourCredential <|-- ComplianceCredential
-    ComplianceCredential <|-- LegalPersonCredential
+    HarbourCredential <|-- HarbourComplianceCredential
+    HarbourComplianceCredential <|-- LegalPersonCredential
     HarbourCredential <|-- NaturalPersonCredential
 ```
 
@@ -90,7 +90,7 @@ classDiagram
 The W3C VC Data Model v2.0 defines most envelope fields as optional.
 `HarbourCredential` tightens these for the harbour profile:
 
-| Field | W3C VC v2.0 | HarbourCredential | ComplianceCredential / NPC |
+| Field | W3C VC v2.0 | HarbourCredential | HarbourComplianceCredential / NPC |
 |-------|-------------|-------------------|---------------------------|
 | `issuer` | optional | **required** | **required** |
 | `validFrom` | optional | **required** | **required** |
@@ -102,7 +102,7 @@ The W3C VC Data Model v2.0 defines most envelope fields as optional.
     Evidence is optional at the base `HarbourCredential` level (e.g. the
     Trust Anchor's self-signed `LinkedCredentialService` credential has no
     evidence — it is the root of trust). Domain-specific types
-    (`ComplianceCredential`, `NaturalPersonCredential`) make evidence
+    (`HarbourComplianceCredential`, `NaturalPersonCredential`) make evidence
     **required** via `slot_usage` overrides.
 
 !!! note "Downstream overrides"
@@ -156,17 +156,18 @@ Subject types define what a credential asserts about a person or
 organisation. These are **not** inherited from `HarbourCredential` — they
 are standalone classes used as the `credentialSubject` value.
 
-### harbour.gx:LegalPerson — Compliance Attestation
+### Compliance Attestation Subjects
 
-`harbour.gx:LegalPerson` is a **pure compliance type** — it does NOT contain
-entity data (name, addresses, registrationNumber). Entity data lives in the
-referenced plain `gx:LegalPerson` input VC. This type only carries compliance
-enforcement slots with SHACL `sh:minCount 1`:
+Both subject types are **pure compliance types** — neither contains entity
+data. Entity data lives in the referenced plain `gx:` input VC, because
+`gx:LegalPersonShape` and `gx:NaturalPersonShape` are both `sh:closed true`:
+a harbour subclass adding its own slots would violate the closed shape. The
+attestation carries only the enforcement slots, with SHACL `sh:minCount 1`:
 
 ```mermaid
 classDiagram
     class HarbourLegalPerson {
-        class_uri = harbour.gx:LegalPerson
+        class_uri = harbour.gx:HarbourLegalPerson
         compliantLegalPersonVC : CompliantCredentialReference ⟨required⟩
         compliantRegistrationVC : CompliantCredentialReference ⟨required⟩
         compliantTermsVC : CompliantCredentialReference ⟨required⟩
@@ -184,23 +185,21 @@ classDiagram
     }
 
     class HarbourNaturalPerson {
-        class_uri = harbour.gx:NaturalPerson
-        givenName : string
-        familyName : string
-        email : string
-        memberOf : uri
-        address : gx:Address
+        class_uri = harbour.gx:HarbourNaturalPerson
+        compliantNaturalPersonVC : CompliantCredentialReference ⟨required⟩
+        memberOf : uri ⟨required⟩
     }
 
     HarbourLegalPerson --> CompliantCredentialReference : 3 required refs
+    HarbourNaturalPerson --> CompliantCredentialReference : 1 required ref
 ```
 
 ### Credential ↔ Subject Pairing
 
 | Credential Type | Subject Type | Use Case |
 |----------------|-------------|----------|
-| `harbour.gx:LegalPersonCredential` | `harbour.gx:LegalPerson` | Organisation compliance attestation |
-| `harbour.gx:NaturalPersonCredential` | `harbour.gx:NaturalPerson` | Individual identity |
+| `harbour.gx:LegalPersonCredential` | `harbour.gx:HarbourLegalPerson` | Organisation compliance attestation |
+| `harbour.gx:NaturalPersonCredential` | `harbour.gx:HarbourNaturalPerson` | Individual compliance attestation |
 
 ---
 
@@ -220,7 +219,7 @@ a valid one means Haven has verified all three underlying Gaia-X VCs.
 
 The input VCs are **plain Gaia-X** (type: `VerifiableCredential` only, no
 harbour envelope). Haven verifies them and issues a `LegalPersonCredential`
-whose `credentialSubject` (type: `harbour.gx:LegalPerson`) contains:
+whose `credentialSubject` (type: `harbour.gx:HarbourLegalPerson`) contains:
 
 - Three `CompliantCredentialReference` slots with `digestSRI` integrity hashes
 - Compliance metadata (`labelLevel`, `engineVersion`, `rulesVersion`, `validatedCriteria`)
@@ -235,7 +234,7 @@ graph TD
 
     subgraph "Output: Harbour Compliance Credential"
         D["harbour.gx:LegalPersonCredential<br/>(issued by Haven)"]
-        E["credentialSubject:<br/>harbour.gx:LegalPerson"]
+        E["credentialSubject:<br/>harbour.gx:HarbourLegalPerson"]
         F["compliantLegalPersonVC<br/>+ digestSRI"]
         G["compliantRegistrationVC<br/>+ digestSRI"]
         H["compliantTermsVC<br/>+ digestSRI"]
@@ -374,7 +373,7 @@ flowchart LR
 | **SHACL** (`.shacl.ttl`) | Validation constraints (required, ranges, cardinality) | `HarbourShaclGenerator` |
 | **JSON-LD Context** (`.context.jsonld`) | Term-to-IRI mappings for JSON-LD serialisation | `DomainContextGenerator` |
 
-Run `make generate` to regenerate all artifacts from schemas.
+Run `just generate` to regenerate all artifacts from schemas.
 
 ---
 
@@ -394,9 +393,9 @@ For quick reference, every class defined across all three schema files:
 | `TrustAnchorService` | core | — | *(Service union)* | Core |
 | `LinkedCredentialService` | core | — | *(Service union)* | Core |
 | `CRSetRevocationRegistryService` | core | — | *(Service union)* | Core |
-| `ComplianceCredential` | gx | ✅ | `HarbourCredential` | Gaia-X |
-| `LegalPersonCredential` | gx | — | `ComplianceCredential` | Gaia-X |
+| `HarbourComplianceCredential` | gx | ✅ | `HarbourCredential` | Gaia-X |
+| `LegalPersonCredential` | gx | — | `HarbourComplianceCredential` | Gaia-X |
 | `NaturalPersonCredential` | gx | — | `HarbourCredential` | Gaia-X |
 | `HarbourLegalPerson` | gx | — | — | Gaia-X |
 | `CompliantCredentialReference` | gx | — | — | Gaia-X |
-| `HarbourNaturalPerson` | gx | — | `gx:Participant` | Gaia-X |
+| `HarbourNaturalPerson` | gx | — | — | Gaia-X |
