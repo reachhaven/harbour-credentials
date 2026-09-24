@@ -193,8 +193,9 @@ Validate harbour credentials against SHACL shapes using the ontology-management-
 just generate
 
 # Validate examples against SHACL shapes (harbour + gx).
-# Credentials and DID documents are validated in separate passes, because a
-# did:ethr:... IRI is both a closed credentialSubject and a DID document root.
+# Every credential and DID document is validated in its own graph (per-resource),
+# because the examples reuse IRIs across files (a did:ethr:... IRI is both a
+# closed credentialSubject and a DID document root).
 just validate-shacl
 
 # Validate a single file or folder

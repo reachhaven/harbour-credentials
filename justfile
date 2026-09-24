@@ -153,40 +153,25 @@ validate-shacl path="":
     #      HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES overrides the required-ontology
     #      gate (default 1 for the full example set, 0 when a path is given).
     #
-    # Credentials and DID documents are validated in SEPARATE runs. omb merges every
-    # requested document into one graph, and a subject like
-    # did:ethr:0x14a34:0xa682... is both the credentialSubject of a closed
-    # harbour.gx:HarbourLegalPerson shape and the root of a DID document carrying
-    # sec:verificationMethod / didcore:service. Merged, the DID document's properties
-    # land on the credential's closed node and every one of them is a
-    # ClosedConstraintComponent violation. Validating each set in its own run keeps the
-    # IRIs apart. (omb < 0.5.0 never surfaced this: it silently dropped DID documents
-    # from the validated set and only registered them for reference resolution.)
-    echo "Running SHACL data conformance check on examples..."
+    # Every document is validated PER RESOURCE (`--per-resource`): each file in its
+    # own data graph against the shared, closed shapes, never merged with the others.
+    # That is the grain VC and DID data is issued and verified at, and the examples
+    # reuse the same IRIs across files on purpose: did:ethr:0x14a34:0xa682... is the
+    # credentialSubject of a closed harbour.gx:HarbourLegalPerson shape in
+    # legal-person-credential.json and the root of a DID document carrying
+    # sec:verificationMethod / didcore:service in examples/did-ethr/. Merged into one
+    # graph, each document's properties land on the others' closed nodes as
+    # ClosedConstraintComponent violations; worse, a merged graph lets an incomplete
+    # document borrow a required property from a different file and pass.
+    echo "Running SHACL data conformance check on examples (per-resource)..."
     allow_online="${HARBOUR_VALIDATE_ALLOW_ONLINE:-1}"
     enforce="${HARBOUR_VALIDATE_ENFORCE_REQUIRED_ONTOLOGIES:-}"
     target_path="{{path}}"
     allow_online_flag=""
     if [ "$allow_online" = "0" ]; then allow_online_flag="--offline"; fi
 
-    # Run one conformance pass; echoes the suite output and leaves it in $run_output.
-    run_output=""
-    run_conformance() {
-        local tmp_output
-        tmp_output=$(mktemp)
-        local status=0
-        {{run}} python -m omb.validators.validation_suite \
-            --run check-data-conformance \
-            $allow_online_flag \
-            --data-paths "$@" \
-            --artifacts artifacts > "$tmp_output" 2>&1 || status=$?
-        cat "$tmp_output"
-        run_output="$tmp_output"
-        return "$status"
-    }
-
+    targets=()
     if [ -n "$target_path" ]; then
-        targets=()
         if [ -d "$target_path" ]; then
             while IFS= read -r data_file; do
                 targets+=("$data_file")
@@ -206,19 +191,25 @@ validate-shacl path="":
             exit 1
         fi
         : "${enforce:=0}"
-        status=0
-        run_conformance "${targets[@]}" || status=$?
-        if [ "$status" -ne 0 ]; then rm -f "$run_output"; exit "$status"; fi
     else
+        targets=(examples/*.json examples/gaiax/*.json examples/did-ethr/*.json)
         : "${enforce:=1}"
-        status=0
-        run_conformance examples/*.json examples/gaiax/*.json || status=$?
-        if [ "$status" -ne 0 ]; then rm -f "$run_output"; exit "$status"; fi
     fi
 
-    # The required-ontology gate reads the credential pass: it is the run that has to
-    # pull in the gx layer and the cs/cred imports. A stale or half-resolved catalog
-    # otherwise "passes" by validating against nothing.
+    run_output=$(mktemp)
+    trap 'rm -f "$run_output"' EXIT
+    status=0
+    {{run}} python -m omb.validators.validation_suite \
+        --run check-data-conformance \
+        --per-resource \
+        $allow_online_flag \
+        --data-paths "${targets[@]}" \
+        --artifacts artifacts > "$run_output" 2>&1 || status=$?
+    cat "$run_output"
+    if [ "$status" -ne 0 ]; then exit "$status"; fi
+
+    # A stale or half-resolved catalog otherwise "passes" by validating against
+    # nothing: the full example set has to pull in the gx layer and the cs/cred imports.
     if [ "$enforce" = "1" ]; then
         for required in \
             "imports/cs/cs.owl.ttl" \
@@ -227,20 +218,9 @@ validate-shacl path="":
             "artifacts/gx/gx.owl.ttl" ; do
             if ! grep -q "$required" "$run_output" ; then
                 echo "ERROR: Required ontology not loaded by validation suite: $required" >&2
-                rm -f "$run_output"
                 exit 1
             fi
         done
-    fi
-    rm -f "$run_output"
-
-    # Second pass: the did:ethr documents, in a graph of their own (see above).
-    if [ -z "$target_path" ]; then
-        echo "Running SHACL data conformance check on DID documents..."
-        status=0
-        run_conformance examples/did-ethr/*.json || status=$?
-        rm -f "$run_output"
-        if [ "$status" -ne 0 ]; then exit "$status"; fi
     fi
     echo "OK: SHACL validation complete"
 

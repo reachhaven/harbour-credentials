@@ -257,7 +257,8 @@ When asked to prepare a commit or PR, default to writing these gitignored files 
 - Breaking feature parity between Python and TypeScript (add the mirror change + an interop test)
 - Trying to export the credential/story pipeline (`credentials/*`, `story-*.ts`) as library functions — they are CLI-only
 - Confusing `just validate` (structural pytest) with `just validate-shacl` (SHACL conformance)
-- Feeding credentials and `examples/did-ethr/` to `omb` in one validation run — `just validate-shacl` validates them in **separate passes** on purpose (a `did:ethr:…` IRI is both a credentialSubject of a closed shape and a DID document root; merged, every DID property becomes a `ClosedConstraintComponent` violation)
+- Validating examples in one merged graph — `just validate-shacl` passes `--per-resource` on purpose, so every credential and DID document is validated in its own graph (a `did:ethr:…` IRI is both a credentialSubject of a closed shape and a DID document root; merged, every DID property becomes a `ClosedConstraintComponent` violation, and an incomplete document can borrow a required property from another file)
+- Embedding a stripped-down credential in an evidence VP — embedded VCs must be complete (their own `evidence` + `credentialStatus`), since per-resource validation checks them without the rest of the example set
 - Repinning `submodules/service-characteristics` independently of the `omb` version (see Submodules — it is a three-pin move, guarded by `just check-gx-pin`)
 - Committing generated/gitignored outputs (`examples/**/signed/`, `artifacts/*`, `htmlcov/`, `.coverage`)
 - Using `range: Any` in LinkML schemas, or changing a schema without checking `docs/specs/references/`
