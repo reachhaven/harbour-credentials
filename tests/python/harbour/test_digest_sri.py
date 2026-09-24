@@ -27,7 +27,7 @@ GAIAX = REPO_ROOT / "examples" / "gaiax"
 
 # Cross-runtime known-answer vector (keep in sync with the TypeScript suite).
 # Standard base64 (RFC 4648 §4) per W3C SRI — NOT lowercase hex.
-LEGAL_PERSON_SRI = "sha256-dl7zg1RuG2HhA97FckTfjuXIUxhc0Cagbp2MD4B6JTw="
+LEGAL_PERSON_SRI = "sha256-96CWnj0WFnepzcQhvBmXHu0U1nq3W6/Os+0VUKfvByw="
 
 
 def _load(name: str) -> dict:
@@ -131,11 +131,13 @@ class TestExamplesConsistency:
             check_file,
             collect_target_files,
             load_input_vcs,
+            load_self_signed_sources,
         )
 
         inputs = load_input_vcs(GAIAX)
+        self_signed = load_self_signed_sources(GAIAX)
         all_errors: list[str] = []
         for path in collect_target_files(GAIAX):
-            errors, _ = check_file(path, inputs)
+            errors, _ = check_file(path, inputs, self_signed)
             all_errors.extend(errors)
         assert all_errors == [], "\n".join(all_errors)
