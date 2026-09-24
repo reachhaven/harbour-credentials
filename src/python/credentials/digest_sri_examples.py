@@ -13,7 +13,13 @@ is the Subresource Integrity hash of the referenced credential
 (:mod:`harbour.digest_sri`).
 
 Every ``harbour.gx:digestSRI`` is taken over the source-of-truth **input VC**
-for its ``credentialType`` -- in every file, including presentations. This keeps
+for its ``credentialType`` -- in every file, including presentations -- except
+for a **self-signed** organization (the Trust Anchor: a
+``harbour.gx:LegalPersonCredential`` with ``issuer == credentialSubject.id``).
+It has no input files of its own; its references resolve only against the gx
+VCs bundled in the evidence VP of its own credential, whose canonical copy is
+the file that has that credential at its root (``trust-anchor-credential.json``).
+Every embedded copy must be identical to that file. This keeps
 the value identical wherever a reference ``@id`` (e.g. ``#compliantLegalPersonVC``)
 is reused across examples, so the validator's merged graph never sees one node
 with two conflicting ``maxCount 1`` values. Plain gx VCs bundled inside a
@@ -25,7 +31,9 @@ Modes:
   * ``--write`` recomputes each ``harbour.gx:digestSRI`` from the input VC and
     rewrites any inline ``harbour.gx:embeddedCredential`` to that canonical input
     VC, so the standalone referenced and embedded compliance credentials are
-    provably the same credential.
+    provably the same credential. It resolves every reference before writing
+    anything, so a reference with no source VC aborts the run with no file
+    changed.
   * ``--check`` (default) recomputes and verifies every digestSRI without
     modifying any file, failing if a value is stale or tampered. This is the
     integrity step run by ``just story``.
@@ -107,76 +115,154 @@ def _has_type(node: dict, type_value: str) -> bool:
     return isinstance(types, list) and type_value in types
 
 
+def _self_signed_org(cred: dict) -> str | None:
+    """The org DID if *cred* is a self-signed LegalPersonCredential, else ``None``."""
+    if not _has_type(cred, "harbour.gx:LegalPersonCredential"):
+        return None
+    subject = cred.get("credentialSubject")
+    if not isinstance(subject, dict):
+        return None
+    org_did = subject.get("id")
+    if not org_did or cred.get("issuer") != org_did:
+        return None
+    return org_did
+
+
 def load_self_signed_sources(gaiax_dir: Path) -> dict[str, dict[str, dict]]:
     """Map a self-signed org DID -> {credentialType: its own gx VC}.
 
     The Trust Anchor self-signs its LegalPersonCredential (issuer ==
-    credentialSubject.id) and bundles its own three gx VCs in its evidence VP.
-    Those gx VCs are that org's source of truth (it has no Example-Corp input
-    file), and are registered globally so compact copies of the self-signed
-    credential embedded elsewhere resolve to the same digests.
+    credentialSubject.id) and bundles its own gx VCs in its evidence VP. Those
+    gx VCs are that org's source of truth (it has no Example-Corp input file).
+
+    The credential occurs in several files: at the root of its own file
+    (``trust-anchor-credential.json``), which is the canonical copy, and inside
+    the evidence VP of every credential it authorizes. Every embedded copy must
+    equal the canonical one, and the bundle may hold one VC per credentialType.
+    Otherwise the digests would depend on whichever copy is read first, and an
+    edit to any other copy would go unnoticed.
+
+    Raises:
+        ValueError: a self-signed credential has no ``id``, is not the root of
+            exactly one file, has an embedded copy that differs from that file,
+            or bundles two VCs of the same credentialType.
     """
-    sources: dict[str, dict[str, dict]] = {}
+    # credential id -> [(path, is_root, credential)]
+    copies: dict[str, list[tuple[Path, bool, dict]]] = {}
     for path in collect_target_files(gaiax_dir):
         obj = json.loads(path.read_text(encoding="utf-8"))
         for cred in _iter_dicts(obj):
-            if not _has_type(cred, "harbour.gx:LegalPersonCredential"):
+            org_did = _self_signed_org(cred)
+            if org_did is None:
                 continue
-            subject = cred.get("credentialSubject")
-            if not isinstance(subject, dict):
+            cred_id = cred.get("id")
+            if not cred_id:
+                raise ValueError(
+                    f"{path.name}: self-signed credential of {org_did} has no id"
+                )
+            copies.setdefault(cred_id, []).append((path, cred is obj, cred))
+
+    sources: dict[str, dict[str, dict]] = {}
+    for cred_id, found in copies.items():
+        roots = [(path, cred) for path, is_root, cred in found if is_root]
+        if len(roots) != 1:
+            where = ", ".join(sorted(path.name for path, _ in roots)) or "no file"
+            raise ValueError(
+                f"self-signed credential {cred_id} must be the root of exactly "
+                f"one file (its canonical copy); found: {where}"
+            )
+        canonical_path, canonical = roots[0]
+        drifted = sorted(
+            {
+                path.name
+                for path, is_root, cred in found
+                if not is_root and canonical_json(cred) != canonical_json(canonical)
+            }
+        )
+        if drifted:
+            raise ValueError(
+                f"self-signed credential {cred_id}: the copy embedded in "
+                f"{', '.join(drifted)} differs from {canonical_path.name}"
+            )
+
+        org_did = _self_signed_org(canonical)
+        bundle = sources.setdefault(org_did, {})
+        for inner in _iter_dicts(canonical.get("evidence", [])):
+            cs = inner.get("credentialSubject")
+            if not isinstance(cs, dict):
                 continue
-            org_did = subject.get("id")
-            if not org_did or cred.get("issuer") != org_did:
-                continue  # not self-signed
-            # collect plain gx VCs bundled in this credential's evidence VP(s)
-            for inner in _iter_dicts(cred.get("evidence", [])):
-                cs = inner.get("credentialSubject")
-                if isinstance(cs, dict) and cs.get("type") in INPUT_FILES:
-                    sources.setdefault(org_did, {}).setdefault(cs["type"], inner)
+            credential_type = cs.get("type")
+            if (
+                not isinstance(credential_type, str)
+                or credential_type not in INPUT_FILES
+            ):
+                continue
+            if credential_type in bundle:
+                raise ValueError(
+                    f"self-signed organization {org_did} bundles more than one "
+                    f"{credential_type} VC ({canonical_path.name})"
+                )
+            bundle[credential_type] = inner
     return sources
 
 
 def _resolve_referent(
     ref: dict, inputs: dict[str, dict], self_signed: dict[str, dict[str, dict]]
-) -> dict | None:
+) -> dict:
     """The gx VC a reference's digestSRI is taken over.
 
-    A reference whose ``@id`` org DID is a self-signed org resolves to that
-    org's own gx VC; otherwise it resolves to the Example-Corp input VC.
+    A reference whose ``@id`` names a self-signed org resolves ONLY against that
+    org's own bundle. It never falls back to the Example-Corp input VC, which
+    describes a different organization. Any other reference resolves to the
+    input VC for its credentialType.
+
+    Raises:
+        ValueError: there is no source VC for the reference.
     """
-    ct = ref.get(_CREDENTIAL_TYPE_KEY)
+    credential_type = ref.get(_CREDENTIAL_TYPE_KEY)
     org_did = str(ref.get("@id", "")).split("#", 1)[0]
-    if org_did in self_signed and ct in self_signed[org_did]:
-        return self_signed[org_did][ct]
-    return inputs.get(ct)
+    if org_did in self_signed:
+        bundle = self_signed[org_did]
+        if credential_type not in bundle:
+            raise ValueError(
+                f"self-signed organization {org_did} bundles no "
+                f"{credential_type!r} VC in its evidence "
+                f"(bundled: {', '.join(sorted(bundle)) or 'none'})"
+            )
+        return bundle[credential_type]
+    if credential_type not in inputs:
+        raise ValueError(
+            f"no source-of-truth input VC for credentialType {credential_type!r} "
+            f"(@id {ref.get('@id')!r})"
+        )
+    return inputs[credential_type]
 
 
-def fill_file(
+def render_filled(
     path: Path, inputs: dict[str, dict], self_signed: dict[str, dict[str, dict]]
-) -> bool:
-    """Rewrite *path* with real digestSRI values (and canonical embedded VCs).
+) -> tuple[str, str]:
+    """Return ``(original, updated)`` text of *path* with real digestSRI values.
 
-    Returns ``True`` if the file content changed.
+    Also rewrites each inline embedded VC to its canonical source. Nothing is
+    written; ``--write`` renders every file first and only then writes, so an
+    unresolvable reference leaves the tree untouched.
+
+    Raises:
+        ValueError: a reference has no source VC (see ``_resolve_referent``).
     """
     original = path.read_text(encoding="utf-8")
     obj = json.loads(original)
 
     for ref in iter_reference_nodes(obj):
-        referent = _resolve_referent(ref, inputs, self_signed)
-        if referent is None:
-            raise ValueError(
-                f"{path.name}: cannot resolve referent for credentialType "
-                f"{ref.get(_CREDENTIAL_TYPE_KEY)!r} / @id {ref.get('@id')!r}"
-            )
+        try:
+            referent = _resolve_referent(ref, inputs, self_signed)
+        except ValueError as exc:
+            raise ValueError(f"{path.name}: {exc}") from None
         ref[_DIGEST_KEY] = compute_digest_sri(referent)
         if _EMBEDDED_KEY in ref:
             ref[_EMBEDDED_KEY] = canonical_json(referent)
 
-    updated = json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
-    if updated != original:
-        path.write_text(updated, encoding="utf-8")
-        return True
-    return False
+    return original, json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
 
 def check_file(
@@ -194,12 +280,10 @@ def check_file(
     for ref in refs:
         credential_type = ref.get(_CREDENTIAL_TYPE_KEY)
         stored = ref.get(_DIGEST_KEY)
-        referent = _resolve_referent(ref, inputs, self_signed)
-        if referent is None:
-            errors.append(
-                f"{path.name}: cannot resolve referent for credentialType "
-                f"{credential_type!r} / @id {ref.get('@id')!r}"
-            )
+        try:
+            referent = _resolve_referent(ref, inputs, self_signed)
+        except ValueError as exc:
+            errors.append(f"{path.name}: {exc}")
             continue
 
         if not verify_digest_sri(referent, stored):
@@ -283,7 +367,11 @@ Examples:
         sys.exit(1)
 
     inputs = load_input_vcs(gaiax_dir)
-    self_signed = load_self_signed_sources(gaiax_dir)
+    try:
+        self_signed = load_self_signed_sources(gaiax_dir)
+    except ValueError as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        sys.exit(1)
     targets = collect_target_files(gaiax_dir)
 
     if args.write:
@@ -295,9 +383,17 @@ Examples:
                 print(
                     f"  [self-signed {org_did[-8:]}] {credential_type}: {compute_digest_sri(vc)}"
                 )
+        try:
+            rendered = [
+                (path, *render_filled(path, inputs, self_signed)) for path in targets
+            ]
+        except ValueError as exc:
+            print(f"FAIL: {exc}\nNo files were written.", file=sys.stderr)
+            sys.exit(1)
         changed = 0
-        for path in targets:
-            if fill_file(path, inputs, self_signed):
+        for path, original, updated in rendered:
+            if updated != original:
+                path.write_text(updated, encoding="utf-8")
                 changed += 1
                 print(f"  updated {path.name}")
         print(f"Done. {changed} file(s) updated.")

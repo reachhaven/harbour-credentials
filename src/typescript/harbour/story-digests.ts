@@ -14,7 +14,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { verifyDigestSri, computeDigestSri } from "./index.js";
+import { verifyDigestSri, computeDigestSri, canonicalJson } from "./index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -100,60 +100,130 @@ function hasType(node: Json, typeValue: string): boolean {
   return types.includes(typeValue);
 }
 
+/** The org DID if `cred` is a self-signed LegalPersonCredential, else undefined. */
+function selfSignedOrg(cred: Json): string | undefined {
+  if (!hasType(cred, "harbour.gx:LegalPersonCredential")) return undefined;
+  const subject = cred["credentialSubject"];
+  if (subject === null || typeof subject !== "object") return undefined;
+  const orgDid = (subject as Json)["id"];
+  if (typeof orgDid !== "string" || !orgDid || cred["issuer"] !== orgDid) return undefined;
+  return orgDid;
+}
+
 /**
  * Map a self-signed org DID -> { credentialType: its own bundled gx VC }.
  *
  * Mirrors `credentials.digest_sri_examples.load_self_signed_sources`: a
  * self-signed `harbour.gx:LegalPersonCredential` (issuer == credentialSubject.id,
- * e.g. the Trust Anchor) bundles its own three gx VCs in its evidence VP. Those
- * are that org's source of truth (it has no Example-Corp input file), so digestSRI
- * references whose `@id` org DID is self-signed resolve against them.
+ * e.g. the Trust Anchor) bundles its own gx VCs in its evidence VP, and those are
+ * that org's source of truth (it has no Example-Corp input file).
+ *
+ * The credential's canonical copy is the file that has it at its root
+ * (`trust-anchor-credential.json`). Every copy embedded in another credential's
+ * evidence VP must equal it, and the bundle may hold one VC per credentialType;
+ * otherwise the digests would depend on whichever copy is read first.
+ *
+ * Throws when a self-signed credential has no `id`, is not the root of exactly
+ * one file, has a drifted embedded copy, or bundles two VCs of one type.
  */
 function loadSelfSignedSources(files: string[]): Record<string, Record<string, Json>> {
-  const sources: Record<string, Record<string, Json>> = {};
+  const copies = new Map<string, { path: string; isRoot: boolean; cred: Json }[]>();
   for (const path of files) {
-    const obj = JSON.parse(readFileSync(path, "utf-8"));
+    const obj = JSON.parse(readFileSync(path, "utf-8")) as Json;
     const dicts: Json[] = [];
     iterDicts(obj, dicts);
     for (const cred of dicts) {
-      if (!hasType(cred, "harbour.gx:LegalPersonCredential")) continue;
-      const subject = cred["credentialSubject"];
-      if (subject === null || typeof subject !== "object") continue;
-      const orgDid = (subject as Json)["id"];
-      if (typeof orgDid !== "string" || cred["issuer"] !== orgDid) continue; // not self-signed
-      const inners: Json[] = [];
-      iterDicts(cred["evidence"] ?? [], inners);
-      for (const inner of inners) {
-        const cs = inner["credentialSubject"];
-        if (cs !== null && typeof cs === "object") {
-          const cst = (cs as Json)["type"];
-          if (typeof cst === "string" && cst in INPUT_FILES) {
-            (sources[orgDid] ??= {})[cst] ??= inner;
-          }
-        }
+      const orgDid = selfSignedOrg(cred);
+      if (orgDid === undefined) continue;
+      const credId = cred["id"];
+      if (typeof credId !== "string" || !credId) {
+        throw new Error(`${basename(path)}: self-signed credential of ${orgDid} has no id`);
       }
+      if (!copies.has(credId)) copies.set(credId, []);
+      copies.get(credId)!.push({ path, isRoot: cred === obj, cred });
+    }
+  }
+
+  const sources: Record<string, Record<string, Json>> = {};
+  for (const [credId, found] of copies) {
+    const roots = found.filter((c) => c.isRoot);
+    if (roots.length !== 1) {
+      const where = roots.map((c) => basename(c.path)).sort().join(", ") || "no file";
+      throw new Error(
+        `self-signed credential ${credId} must be the root of exactly one file ` +
+          `(its canonical copy); found: ${where}`,
+      );
+    }
+    const canonical = roots[0];
+    const canonicalText = canonicalJson(canonical.cred);
+    const drifted = [
+      ...new Set(
+        found
+          .filter((c) => !c.isRoot && canonicalJson(c.cred) !== canonicalText)
+          .map((c) => basename(c.path)),
+      ),
+    ].sort();
+    if (drifted.length > 0) {
+      throw new Error(
+        `self-signed credential ${credId}: the copy embedded in ` +
+          `${drifted.join(", ")} differs from ${basename(canonical.path)}`,
+      );
+    }
+
+    const orgDid = selfSignedOrg(canonical.cred) as string;
+    const bundle = (sources[orgDid] ??= {});
+    const inners: Json[] = [];
+    iterDicts(canonical.cred["evidence"] ?? [], inners);
+    for (const inner of inners) {
+      const cs = inner["credentialSubject"];
+      if (cs === null || typeof cs !== "object") continue;
+      const credentialType = (cs as Json)["type"];
+      if (typeof credentialType !== "string" || !(credentialType in INPUT_FILES)) continue;
+      if (credentialType in bundle) {
+        throw new Error(
+          `self-signed organization ${orgDid} bundles more than one ` +
+            `${credentialType} VC (${basename(canonical.path)})`,
+        );
+      }
+      bundle[credentialType] = inner;
     }
   }
   return sources;
 }
 
 /**
- * The gx VC a reference's digestSRI is taken over: a reference whose `@id` org
- * DID is a self-signed org resolves to that org's own bundled gx VC; otherwise
- * to the shared Example-Corp input VC.
+ * The gx VC a reference's digestSRI is taken over. A reference whose `@id` names
+ * a self-signed org resolves ONLY against that org's own bundle; it never falls
+ * back to the Example-Corp input VC, which describes a different organization.
+ * Any other reference resolves to the input VC for its credentialType.
+ *
+ * Throws when there is no source VC for the reference.
  */
 function resolveReferent(
   ref: Json,
   inputs: Record<string, Json>,
   selfSigned: Record<string, Record<string, Json>>,
-): Json | undefined {
-  const ct = ref[CREDENTIAL_TYPE_KEY] as string;
+): Json {
+  const credentialType = ref[CREDENTIAL_TYPE_KEY] as string;
   const id = typeof ref["@id"] === "string" ? (ref["@id"] as string) : "";
   const orgDid = id.split("#", 1)[0];
-  if (orgDid in selfSigned && ct in selfSigned[orgDid]) {
-    return selfSigned[orgDid][ct];
+  if (orgDid in selfSigned) {
+    const bundle = selfSigned[orgDid];
+    if (!(credentialType in bundle)) {
+      const bundled = Object.keys(bundle).sort().join(", ") || "none";
+      throw new Error(
+        `self-signed organization ${orgDid} bundles no '${credentialType}' VC in ` +
+          `its evidence (bundled: ${bundled})`,
+      );
+    }
+    return bundle[credentialType];
   }
-  return inputs[ct];
+  if (!(credentialType in inputs)) {
+    throw new Error(
+      `no source-of-truth input VC for credentialType '${credentialType}' (@id ${ref["@id"]})`,
+    );
+  }
+  return inputs[credentialType];
 }
 
 async function main(): Promise<void> {
@@ -161,7 +231,13 @@ async function main(): Promise<void> {
     throw new Error(`gaiax examples directory not found: ${GAIAX_DIR}`);
   }
   const inputs = loadInputVcs();
-  const selfSigned = loadSelfSignedSources(targetFiles());
+  let selfSigned: Record<string, Record<string, Json>> = {};
+  try {
+    selfSigned = loadSelfSignedSources(targetFiles());
+  } catch (e) {
+    console.error(`\nFAIL: ${(e as Error).message}`);
+    process.exit(1);
+  }
   const errors: string[] = [];
   let totalRefs = 0;
 
@@ -178,11 +254,11 @@ async function main(): Promise<void> {
     for (const ref of refs) {
       const credentialType = ref[CREDENTIAL_TYPE_KEY] as string;
       const stored = ref[DIGEST_KEY] as string;
-      const sourceVc = resolveReferent(ref, inputs, selfSigned);
-      if (!sourceVc) {
-        fileErrors.push(
-          `cannot resolve referent for credentialType '${credentialType}' / @id ${ref["@id"]}`,
-        );
+      let sourceVc: Json;
+      try {
+        sourceVc = resolveReferent(ref, inputs, selfSigned);
+      } catch (e) {
+        fileErrors.push((e as Error).message);
         continue;
       }
       // The digest must match its source-of-truth VC (Example-Corp input VC,
