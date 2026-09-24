@@ -154,6 +154,12 @@ def shacl_validator():
     vendored in the installed ``omb`` package), RDFS inference, non-strict IRI
     resolution, and online DID/context resolution allowed. Returns an ``omb``
     ``ValidationResult`` (``.conforms``, ``.report_graph``, ``.report_text``).
+
+    Every call validates exactly one document, so this is already the
+    per-resource grain of ``just validate-shacl``. ``per_resource=True`` is
+    deliberately not passed: it adds nothing for a single file, and omb 0.5.0's
+    per-resource aggregate drops ``report_graph``, which the violation
+    assertions below parse.
     """
     from omb.api import validate_data
 
