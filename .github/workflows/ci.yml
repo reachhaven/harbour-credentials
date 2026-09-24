@@ -123,6 +123,11 @@ jobs:
         with:
           tool: just
 
+      # Without artifacts/ every artifact-dependent test (test_shacl_failures.py,
+      # the artifact checks in test_validation.py) skips instead of running.
+      - name: Generate artifacts
+        run: just generate
+
       - name: Run tests
         run: just test
 
