@@ -19,7 +19,7 @@ Proves that an authorizing party approved the credential issuance via OID4VP. Th
 
 The Harbour Signing Service is the **sole issuer** of all credentials. Evidence VPs establish the chain of authorization:
 
-**Use case 1 — Trust Anchor authorizes org (LegalPersonCredential)**: The Trust Anchor presents a VP containing its **self-signed LinkedCredentialService credential** (service endpoint proof, root of trust — analogous to a root CA certificate). The Signing Service verifies this VP and issues the org's credential with it as evidence.
+**Use case 1 — Trust Anchor authorizes org (LegalPersonCredential)**: The Trust Anchor presents a VP containing its **self-signed LegalPersonCredential** (`issuer == credentialSubject.id`; root of trust — analogous to a root CA certificate — and publicly resolvable via the `LinkedCredentialService` endpoint in its DID document). The Signing Service verifies this VP and issues the org's credential with it as evidence.
 
 **Use case 2 — Org authorizes employee (NaturalPersonCredential)**: The organization presents a VP containing its **LegalPersonCredential** (SD-JWT with sensitive fields redacted — registration number and addresses hidden, compliance status disclosed). The Signing Service verifies this VP and issues the employee's credential with it as evidence.
 
@@ -32,22 +32,36 @@ The Harbour Signing Service is the **sole issuer** of all credentials. Evidence 
     "holder": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
     "verifiableCredential": [
       {
-        "@context": ["https://www.w3.org/ns/credentials/v2", "https://w3id.org/reachhaven/harbour/core/v1/"],
-        "type": ["VerifiableCredential"],
+        "@context": [
+          "https://www.w3.org/ns/credentials/v2",
+          "https://w3id.org/gaia-x/development#",
+          "https://w3id.org/reachhaven/harbour/core/v1/",
+          "https://w3id.org/reachhaven/harbour/gx/v1/"
+        ],
+        "type": ["VerifiableCredential", "harbour.gx:LegalPersonCredential"],
+        "id": "urn:uuid:b6cde737-7076-4c5f-8d6e-ceb29758d883",
         "issuer": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
-        "validFrom": "2024-01-01T00:00:00Z",
+        "validFrom": "2026-01-05T00:00:00Z",
+        "validUntil": "2027-01-05T00:00:00Z",
         "credentialSubject": {
           "id": "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774",
-          "type": "harbour:LinkedCredentialService",
-          "didcore:serviceEndpoint": {"id": "https://resolver.harbour.id/credentials/did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"}
-        }
+          "type": "harbour.gx:HarbourLegalPerson",
+          "harbour.gx:compliantLegalPersonVC": { "...": "digestSRI reference to its own gx:LegalPerson VC" },
+          "harbour.gx:compliantRegistrationVC": { "...": "digestSRI reference to its own gx:VatID VC" },
+          "harbour.gx:compliantTermsVC": { "...": "digestSRI reference to its own gx:Issuer VC" },
+          "harbour.gx:labelLevel": "SC"
+        },
+        "credentialStatus": [{ "type": "harbour:CRSetEntry", "...": "..." }],
+        "evidence": [{ "type": ["harbour:CredentialEvidence"], "verifiablePresentation": { "...": "its own three gx VCs" } }]
       }
     ]
   }
 }
 ```
 
-**What it proves**: The authorizing party (Trust Anchor or org) approved the Signing Service to issue a credential for the target subject. The chain of trust flows: Trust Anchor (LinkedCredentialService) → org (LegalPersonCredential) → employee (NaturalPersonCredential).
+**What it proves**: The authorizing party (Trust Anchor or org) approved the Signing Service to issue a credential for the target subject. The chain of trust flows: Trust Anchor (self-signed LegalPersonCredential) → org (LegalPersonCredential) → employee (NaturalPersonCredential).
+
+Credentials embedded in an evidence VP are **complete** verifiable credentials — they carry their own `evidence` and `credentialStatus`, recursively — so each one can be verified on its own. The full, unabridged chain is in [`examples/gaiax/trust-anchor-credential.json`](https://github.com/reachhaven/harbour-credentials/blob/main/examples/gaiax/trust-anchor-credential.json) and the credentials that embed it.
 
 ### DelegatedSignatureEvidence
 

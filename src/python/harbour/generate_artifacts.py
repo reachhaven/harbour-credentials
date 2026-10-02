@@ -90,6 +90,7 @@ def main() -> None:
                 schema,
                 deterministic=True,
                 normalize_prefixes=True,
+                closed=True,
                 importmap=importmap,
                 base_dir=base_dir,
             )

@@ -47,7 +47,7 @@ and properties, while core envelope types use `harbour:`.
 
 | File | Step | Description |
 |------|------|-------------|
-| `trust-anchor-credential.json` | — | Trust Anchor self-signed credential (root of trust) |
+| `trust-anchor-credential.json` | — | Trust Anchor (vDL Digital Ventures GmbH) self-signed `LegalPersonCredential` — root of trust; its evidence VP bundles its own three gx VCs |
 | `participant-vp.json` | — | VP bundling all 4 VCs (3 plain gx + 1 compliance) |
 | `natural-person-credential.json` | 5 | Employee credential with identity and `memberOf` link |
 | `delegated-signing-receipt.json` | 6+7 | Transaction receipt with embedded consent VP as evidence |

@@ -99,11 +99,12 @@ The W3C VC Data Model v2.0 defines most envelope fields as optional.
 | `credentialStatus` | optional | **required** (range: `CRSetEntry`) | **required** |
 
 !!! note "Evidence requirement"
-    Evidence is optional at the base `HarbourCredential` level (e.g. the
-    Trust Anchor's self-signed `LinkedCredentialService` credential has no
-    evidence — it is the root of trust). Domain-specific types
-    (`HarbourComplianceCredential`, `NaturalPersonCredential`) make evidence
-    **required** via `slot_usage` overrides.
+    Evidence is optional at the base `HarbourCredential` level. Domain-specific
+    types (`HarbourComplianceCredential`, `NaturalPersonCredential`) make
+    evidence **required** via `slot_usage` overrides. That includes the root of
+    trust: the Trust Anchor's self-signed `LegalPersonCredential`
+    (`issuer == credentialSubject.id`) satisfies it with a VP of its own three
+    Gaia-X input VCs, which its `digestSRI` references point at.
 
 !!! note "Downstream overrides"
     Consumers like SimpulseID may loosen these constraints via `slot_usage`.
@@ -141,8 +142,8 @@ classDiagram
 
 **`CredentialEvidence`** — attests that an authorizing party approved the
 credential issuance via OID4VP. The embedded VP contains the authorizer's
-credential (Trust Anchor's LinkedCredentialService for org issuance, or
-org's LegalPersonCredential for employee issuance).
+credential (Trust Anchor's self-signed LegalPersonCredential for org
+issuance, or org's LegalPersonCredential for employee issuance).
 
 **`DelegatedSignatureEvidence`** — attests that the subject authorized a
 signing service to act on their behalf via an OID4VP challenge-response

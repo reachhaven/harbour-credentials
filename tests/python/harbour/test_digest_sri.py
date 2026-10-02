@@ -27,7 +27,7 @@ GAIAX = REPO_ROOT / "examples" / "gaiax"
 
 # Cross-runtime known-answer vector (keep in sync with the TypeScript suite).
 # Standard base64 (RFC 4648 §4) per W3C SRI — NOT lowercase hex.
-LEGAL_PERSON_SRI = "sha256-dl7zg1RuG2HhA97FckTfjuXIUxhc0Cagbp2MD4B6JTw="
+LEGAL_PERSON_SRI = "sha256-96CWnj0WFnepzcQhvBmXHu0U1nq3W6/Os+0VUKfvByw="
 
 
 def _load(name: str) -> dict:
@@ -131,11 +131,128 @@ class TestExamplesConsistency:
             check_file,
             collect_target_files,
             load_input_vcs,
+            load_self_signed_sources,
         )
 
         inputs = load_input_vcs(GAIAX)
+        self_signed = load_self_signed_sources(GAIAX)
         all_errors: list[str] = []
         for path in collect_target_files(GAIAX):
-            errors, _ = check_file(path, inputs)
+            errors, _ = check_file(path, inputs, self_signed)
             all_errors.extend(errors)
         assert all_errors == [], "\n".join(all_errors)
+
+
+_TRUST_ANCHOR = "did:ethr:0x14a34:0x4d6246a7d1e60caa44b75e3af9b37ac8d6442774"
+_TA_TERMS_VC = "urn:uuid:1d10aed1-3f1b-4d8d-8d37-0453149a8d62#cs"
+
+
+def _copy_gaiax(tmp_path: Path) -> Path:
+    import shutil
+
+    target = tmp_path / "gaiax"
+    shutil.copytree(GAIAX, target, ignore=shutil.ignore_patterns("signed"))
+    return target
+
+
+def _edit_subjects(path: Path, match, edit) -> int:
+    """Apply *edit* to every credentialSubject in *path* that *match* accepts."""
+    obj = json.loads(path.read_text(encoding="utf-8"))
+    hits = 0
+
+    def walk(node):
+        nonlocal hits
+        if isinstance(node, dict):
+            cs = node.get("credentialSubject")
+            if isinstance(cs, dict) and match(cs):
+                edit(cs)
+                hits += 1
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(obj)
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    return hits
+
+
+def _retype_trust_anchor_terms_vc(gaiax: Path) -> None:
+    """Typo the trust anchor's bundled gx:Issuer VC type in every copy."""
+    hits = sum(
+        _edit_subjects(
+            path,
+            lambda cs: cs.get("id") == _TA_TERMS_VC,
+            lambda cs: cs.update(type="gx:Isser"),
+        )
+        for path in gaiax.glob("*.json")
+    )
+    assert hits == 5  # the trust anchor file + four embedded copies
+
+
+class TestSelfSignedSources:
+    """The trust anchor's bundle has one canonical source and no fallback."""
+
+    def test_canonical_copy_is_the_trust_anchor_file(self, tmp_path):
+        from credentials.digest_sri_examples import load_self_signed_sources
+
+        gaiax = _copy_gaiax(tmp_path)
+        # Edit only the canonical file: every embedded copy is now stale.
+        assert _edit_subjects(
+            gaiax / "trust-anchor-credential.json",
+            lambda cs: cs.get("gx:vatID") == "DE298765432",
+            lambda cs: cs.update({"gx:vatID": "DE000000000"}),
+        )
+        with pytest.raises(ValueError, match="differs from trust-anchor-credential"):
+            load_self_signed_sources(gaiax)
+
+    def test_drifted_embedded_copy_is_detected(self, tmp_path):
+        from credentials.digest_sri_examples import load_self_signed_sources
+
+        gaiax = _copy_gaiax(tmp_path)
+        assert _edit_subjects(
+            gaiax / "legal-person-credential.json",
+            lambda cs: cs.get("gx:vatID") == "DE298765432",
+            lambda cs: cs.update({"gx:vatID": "DE000000000"}),
+        )
+        with pytest.raises(ValueError, match="embedded in legal-person-credential"):
+            load_self_signed_sources(gaiax)
+
+    def test_missing_bundled_type_does_not_fall_back(self, tmp_path):
+        from credentials.digest_sri_examples import (
+            check_file,
+            load_input_vcs,
+            load_self_signed_sources,
+            render_filled,
+        )
+
+        gaiax = _copy_gaiax(tmp_path)
+        _retype_trust_anchor_terms_vc(gaiax)
+        inputs = load_input_vcs(gaiax)
+        self_signed = load_self_signed_sources(gaiax)
+        assert "gx:Issuer" not in self_signed[_TRUST_ANCHOR]
+
+        errors, _ = check_file(
+            gaiax / "trust-anchor-credential.json", inputs, self_signed
+        )
+        assert any("bundles no 'gx:Issuer'" in e for e in errors), errors
+        with pytest.raises(ValueError, match="bundles no 'gx:Issuer'"):
+            render_filled(gaiax / "trust-anchor-credential.json", inputs, self_signed)
+
+    def test_write_aborts_without_touching_files(self, tmp_path, monkeypatch):
+        import sys
+
+        from credentials import digest_sri_examples
+
+        gaiax = _copy_gaiax(tmp_path)
+        _retype_trust_anchor_terms_vc(gaiax)
+        before = {p.name: p.read_bytes() for p in gaiax.glob("*.json")}
+
+        monkeypatch.setattr(
+            sys, "argv", ["digest_sri_examples", "--write", "--gaiax-dir", str(gaiax)]
+        )
+        with pytest.raises(SystemExit) as exc:
+            digest_sri_examples.main()
+        assert exc.value.code == 1
+        assert {p.name: p.read_bytes() for p in gaiax.glob("*.json")} == before

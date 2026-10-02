@@ -38,7 +38,7 @@ sequenceDiagram
     H->>H: ⚙️ Build gx:VatID VC (notary-signed)
 
     Note over C,BC: Phase 3 — Compliance Credential
-    TA->>H: ⚙️ Present LinkedCredentialService VP (authorization)
+    TA->>H: ⚙️ Present VP with self-signed LegalPersonCredential (authorization)
     H->>H: ⚙️ Verify TA VP + 3 GX VCs + compute SRI hashes
     H->>H: ⚙️ Build LegalPersonCredential (references + evidence)
     H->>H: ⚙️ Sign credential as JWT (Haven key)
