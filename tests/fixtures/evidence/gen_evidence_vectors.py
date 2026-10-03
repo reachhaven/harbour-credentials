@@ -30,6 +30,7 @@ from typing import Any
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from joserfc import jws
 
@@ -434,21 +435,82 @@ def generate() -> dict[str, Any]:
             member_of=[acme, f"did:web:{HOST}:programs:example-programme"],
         ).sd_jwt,
     )
-    _, endorsed = tenant.issue(
-        tenant.prepare_member(
-            acme,
-            "member",
-            [member.passkey, SoftAuthenticator()],
-            sub=member.payload["sub"],
-        ),
-        *by(member),
-        kind="endorsement",
+    updated = {k: v for k, v in member.payload.items() if k != "evidence"}
+    updated.update(
+        authenticators=[
+            member.passkey.authenticator,
+            SoftAuthenticator().authenticator,
+        ],
+        iat=NOW - DAY,
+        jti=f"urn:uuid:{uuid.uuid4()}",
     )
+    _, endorsed = tenant.issue((updated, []), *by(member), kind="endorsement")
     credential_case(
         "endorsement",
-        "Reissue that only adds a passkey, endorsed by the person's existing passkey.",
+        "Reissue preserving all claims except authenticators, iat, jti and evidence.",
         endorsed,
     )
+    assert cases[-1]["expected"]["ok"]
+
+    changes = {
+        "vct": {**updated, "vct": ASCS_USER_VCT},
+        "expiry": {**updated, "exp": updated["exp"] + DAY},
+        "membership": {**updated, "memberOf": [acme, other]},
+        "cnf": {**updated, "cnf": {"jwk": SoftAuthenticator().jwk}},
+        "status": {**updated, "credentialStatus": []},
+        "disclosures": {**updated, "_sd": []},
+        "added-claim": {**updated, "privilege": "admin"},
+        "proof": {**updated, "proof": {"type": "DataIntegrityProof"}},
+        "removed-claim": {k: v for k, v in updated.items() if k != "credentialStatus"},
+    }
+    for name, payload in changes.items():
+        _, token = tenant.issue((payload, []), *by(member), kind="endorsement")
+        credential_case(
+            f"endorsement-changed-{name}",
+            "A self-endorsement cannot change protected claims.",
+            token,
+        )
+        assert cases[-1]["expected"] == {
+            "ok": False,
+            "reason": "endorsement-payload-mismatch",
+            "depth": 0,
+        }
+
+    # Sign directly so the signer does not reject deliberately invalid headers.
+    for name, extension, accepted in [
+        ("unknown-critical", {"crit": ["custom"], "custom": True}, False),
+        ("empty-critical", {"crit": []}, False),
+        ("malformed-critical", {"crit": "custom", "custom": True}, False),
+        ("missing-critical", {"crit": ["custom"]}, False),
+        ("noncritical", {"custom": True}, True),
+    ]:
+        header = {
+            "alg": "ES256",
+            "typ": "dc+sd-jwt",
+            "kid": tenant.kid(acme),
+            **extension,
+        }
+        signing_input = (
+            b64url_encode(json.dumps(header).encode())
+            + "."
+            + b64url_encode(json.dumps(member.payload).encode())
+        ).encode()
+        signature = tenant._signing_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
+        r, sig_s = decode_dss_signature(signature)
+        token = (
+            signing_input.decode()
+            + "."
+            + b64url_encode(r.to_bytes(32, "big") + sig_s.to_bytes(32, "big"))
+            + "~"
+        )
+        credential_case(
+            f"jws-{name}",
+            "Critical extensions must be understood; non-critical extensions may be ignored.",
+            token,
+        )
+        assert cases[-1]["expected"]["ok"] is accepted, (name, cases[-1]["expected"])
+        if not accepted:
+            assert cases[-1]["expected"]["reason"] == "bad-issuer-signature"
 
     # --- negative single approvals ------------------------------------------
 
