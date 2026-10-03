@@ -122,6 +122,18 @@ const sdJwt = await issueSdJwtVc(credential, privateKey, {
 const result = await verifySdJwtVc(sdJwt, publicKey);
 ```
 
+Credentials are issued with the JOSE header `typ: dc+sd-jwt`; verifiers also
+accept the pre-rename `vc+sd-jwt`. Every `disclosable` path must exist in the
+claims, and registered claims such as `iss`, `exp`, `cnf`, `vct` and `status`
+cannot be made disclosable. Nested claims use dot paths
+(`"credentialSubject.email"`); a key that itself contains a dot needs a segment
+list (`["credentialSubject", "harbour.gx:labelLevel"]`).
+
+To hash or approve the exact payload before it is signed, split issuance in two:
+`build_sd_jwt_payload` / `buildSdJwtPayload` fixes the disclosure salts and
+returns the payload, and `sign_sd_jwt` / `signSdJwt` signs it (optionally with a
+`kid`).
+
 ## Next Steps
 
 - [CLI Reference](../cli/index.md) — Command-line tools
