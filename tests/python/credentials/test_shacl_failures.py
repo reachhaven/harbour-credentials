@@ -197,13 +197,14 @@ def _validate(
     Returns:
         (conforms, violations, results_text)
     """
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, encoding="utf-8"
-    ) as f:
-        json.dump(credential, f, ensure_ascii=False)
-        temp_path = Path(f.name)
-
-    try:
+    # A private directory, not the shared system temp dir: omb scans the parent
+    # directory of every input file for JSON-LD fixtures, so a busy /tmp would
+    # feed unrelated files into the validation.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        temp_path = Path(tmp_dir) / "credential.json"
+        temp_path.write_text(
+            json.dumps(credential, ensure_ascii=False), encoding="utf-8"
+        )
         result = validator([temp_path])
         violations = (
             _extract_violations(result.report_graph)
@@ -211,8 +212,6 @@ def _validate(
             else []
         )
         return result.conforms, violations, result.report_text
-    finally:
-        temp_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
