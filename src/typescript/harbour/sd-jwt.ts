@@ -82,6 +82,46 @@ function createDisclosure(name: string, value: unknown): [string, string] {
   return [discB64, base64urlEncode(digest)];
 }
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * Normalize and validate disclosable paths before anything is concealed.
+ *
+ * Rejects (rather than silently issuing an unverifiable credential):
+ * - paths under a reserved top-level claim — the whole claim, including its
+ *   members (e.g. `status.status_list`, `cnf.jwk`), must stay in plaintext
+ *   ([SD-JWT-VC] §3.2.2.2);
+ * - overlapping paths (one a prefix of, or equal to, another): the child's
+ *   digest would be concealed inside the parent's disclosure, which the
+ *   verifier does not resolve recursively.
+ */
+function normalizeDisclosablePaths(disclosable: (string | string[])[]): string[][] {
+  const paths = disclosable.map((p) => (typeof p === "string" ? p.split(".") : [...p]));
+  for (const parts of paths) {
+    if (parts.length === 0) throw new Error("empty disclosable path");
+    if (NON_DISCLOSABLE_CLAIMS.has(parts[0])) {
+      throw new Error(
+        parts.length === 1
+          ? `claim '${parts[0]}' must not be selectively disclosable ([SD-JWT-VC] registered claims)`
+          : `claim '${parts[0]}' must not be selectively disclosable, nor any of its members: ${JSON.stringify(parts)} ([SD-JWT-VC] registered claims)`,
+      );
+    }
+  }
+  for (let i = 0; i < paths.length; i++) {
+    for (let j = i + 1; j < paths.length; j++) {
+      const [a, b] = paths[i].length <= paths[j].length ? [paths[i], paths[j]] : [paths[j], paths[i]];
+      if (a.every((seg, k) => seg === b[k])) {
+        throw new Error(
+          `overlapping disclosable paths: ${JSON.stringify(a)} and ${JSON.stringify(b)}`,
+        );
+      }
+    }
+  }
+  return paths;
+}
+
 /**
  * Apply structured selective disclosure to a (possibly nested) payload.
  * Each entry is either an array of exact key segments (safe for keys that
@@ -90,9 +130,11 @@ function createDisclosure(name: string, value: unknown): [string, string] {
  * top-level claim). `_sd` digests are placed at the right nesting level per
  * RFC 9901 §6.2. Mirrors the Python `_apply_structured_disclosures`.
  *
- * Throws if a declared path does not resolve — a declared-but-missing
- * disclosure is a caller bug, and skipping it would silently issue the claim
- * in plaintext.
+ * Throws if a declared path does not resolve to an own property of nested
+ * objects — a declared-but-missing disclosure is a caller bug, and skipping
+ * it would silently issue the claim in plaintext. Array elements (and paths
+ * through arrays) are not supported: the verifier does not resolve array
+ * digests (RFC 9901 §4.2.4.2), so such credentials would not verify.
  */
 function applyStructuredDisclosures(
   payload: Record<string, unknown>,
@@ -101,35 +143,25 @@ function applyStructuredDisclosures(
   const result = structuredClone(payload);
   const disclosures: string[] = [];
 
-  for (const path of disclosable) {
-    const parts = typeof path === "string" ? path.split(".") : [...path];
-    if (parts.length === 0) throw new Error("empty disclosable path");
-    if (parts.length === 1 && NON_DISCLOSABLE_CLAIMS.has(parts[0])) {
-      throw new Error(
-        `claim '${parts[0]}' must not be selectively disclosable ([SD-JWT-VC] registered claims)`,
-      );
-    }
-    const leafKey = parts[parts.length - 1];
+  for (const parts of normalizeDisclosablePaths(disclosable)) {
+    // Own-property checks only: `in` would follow inherited properties
+    // (e.g. "__proto__") out of the cloned claims into shared prototypes.
     let parent: unknown = result;
-    for (const part of parts.slice(0, -1)) {
-      if (parent && typeof parent === "object" && part in (parent as object)) {
-        parent = (parent as Record<string, unknown>)[part];
-      } else {
+    for (let i = 0; i < parts.length; i++) {
+      if (Array.isArray(parent)) {
+        throw new Error(
+          `disclosable path traverses an array (array-element disclosure is not supported): ${JSON.stringify(parts)}`,
+        );
+      }
+      if (!isPlainObject(parent) || !Object.hasOwn(parent, parts[i])) {
         throw new Error(
           `disclosable path not found in claims: ${JSON.stringify(parts)}`,
         );
       }
-    }
-    if (
-      !parent ||
-      typeof parent !== "object" ||
-      !(leafKey in (parent as object))
-    ) {
-      throw new Error(
-        `disclosable path not found in claims: ${JSON.stringify(parts)}`,
-      );
+      if (i < parts.length - 1) parent = parent[parts[i]];
     }
     const obj = parent as Record<string, unknown>;
+    const leafKey = parts[parts.length - 1];
     const value = obj[leafKey];
     delete obj[leafKey];
     const [discB64, digest] = createDisclosure(leafKey, value);

@@ -437,6 +437,15 @@ class TestReservedClaims:
             "status": "verified"
         }
 
+    @pytest.mark.parametrize("path", ["status.status_list", "cnf.jwk"])
+    def test_reserved_claim_members_rejected(self, path):
+        claims = {
+            "status": {"status_list": {"idx": 0, "uri": "https://example.com/sl"}},
+            "cnf": {"jwk": {"kty": "EC"}},
+        }
+        with pytest.raises(ValueError, match="nor any of its members"):
+            build_sd_jwt_payload(claims, vct=VCT, disclosable=[path])
+
     def test_iat_and_sub_may_be_disclosable(self, p256_private_key, p256_public_key):
         claims = {**SAMPLE_CLAIMS, "sub": "urn:uuid:1"}
         sd_jwt = issue_sd_jwt_vc(
@@ -484,3 +493,36 @@ class TestBuildAndSign:
         assert "kid" not in _jose_header(
             issue_sd_jwt_vc(SAMPLE_CLAIMS, p256_private_key, vct=VCT)
         )
+
+
+class TestDisclosablePathValidation:
+    """Paths the verifier could not resolve are rejected at issuance."""
+
+    @pytest.mark.parametrize("path", ["roles.0", "addresses.0.city"])
+    def test_array_paths_rejected(self, path):
+        claims = {"roles": ["admin"], "addresses": [{"city": "Munich"}]}
+        with pytest.raises(ValueError, match="traverses an array"):
+            build_sd_jwt_payload(claims, vct=VCT, disclosable=[path])
+
+    @pytest.mark.parametrize(
+        "disclosable",
+        [
+            ["address.city", "address"],
+            ["address", "address.city"],
+            ["address.city", "address.city"],
+        ],
+    )
+    def test_overlapping_paths_rejected(self, disclosable):
+        claims = {"address": {"city": "Munich"}}
+        with pytest.raises(ValueError, match="overlapping disclosable paths"):
+            build_sd_jwt_payload(claims, vct=VCT, disclosable=disclosable)
+
+    def test_sibling_paths_allowed(self, p256_private_key, p256_public_key):
+        claims = {"address": {"city": "Munich", "zip": "80331"}}
+        sd_jwt = issue_sd_jwt_vc(
+            claims,
+            p256_private_key,
+            vct=VCT,
+            disclosable=["address.city", "address.zip"],
+        )
+        assert verify_sd_jwt_vc(sd_jwt, p256_public_key)["address"] == claims["address"]

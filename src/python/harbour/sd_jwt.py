@@ -77,6 +77,44 @@ def _create_disclosure(claim_name: str, claim_value: Any) -> tuple[str, str]:
     return disclosure_b64, digest
 
 
+def _normalize_disclosable_paths(
+    disclosable: list[str | list[str]],
+) -> list[list[str]]:
+    """Normalize and validate disclosable paths before anything is concealed.
+
+    Rejects (rather than silently issuing an unverifiable credential):
+
+    - paths under a reserved top-level claim — the whole claim, including its
+      members (e.g. ``status.status_list``, ``cnf.jwk``), must stay in
+      plaintext ([SD-JWT-VC] §3.2.2.2);
+    - overlapping paths (one a prefix of, or equal to, another): the child's
+      digest would be concealed inside the parent's disclosure, which the
+      verifier does not resolve recursively.
+    """
+    paths = [p.split(".") if isinstance(p, str) else list(p) for p in disclosable]
+    for parts in paths:
+        if not parts:
+            raise ValueError("empty disclosable path")
+        if parts[0] in NON_DISCLOSABLE_CLAIMS:
+            if len(parts) == 1:
+                raise ValueError(
+                    f"claim {parts[0]!r} must not be selectively disclosable "
+                    "([SD-JWT-VC] registered claims)"
+                )
+            raise ValueError(
+                f"claim {parts[0]!r} must not be selectively disclosable, nor any "
+                f"of its members: {parts!r} ([SD-JWT-VC] registered claims)"
+            )
+    for i, a in enumerate(paths):
+        for b in paths[i + 1 :]:
+            short, long_ = (a, b) if len(a) <= len(b) else (b, a)
+            if long_[: len(short)] == short:
+                raise ValueError(
+                    f"overlapping disclosable paths: {short!r} and {long_!r}"
+                )
+    return paths
+
+
 def _apply_structured_disclosures(
     payload: dict, disclosable: list[str | list[str]]
 ) -> tuple[dict, list[str]]:
@@ -99,32 +137,28 @@ def _apply_structured_disclosures(
     Raises:
         ValueError: if a declared path does not resolve to an existing claim —
             a declared-but-missing disclosure is a caller bug, and skipping it
-            would silently issue the claim in plaintext.
+            would silently issue the claim in plaintext; if it traverses an
+            array (array-element disclosure is not supported: the verifier
+            does not resolve array digests, RFC 9901 §4.2.4.2); or if it is
+            rejected by :func:`_normalize_disclosable_paths`.
     """
     result = copy.deepcopy(payload)
     disclosures: list[str] = []
 
-    for path in disclosable:
-        parts = path.split(".") if isinstance(path, str) else list(path)
-        if not parts:
-            raise ValueError("empty disclosable path")
-        if len(parts) == 1 and parts[0] in NON_DISCLOSABLE_CLAIMS:
-            raise ValueError(
-                f"claim {parts[0]!r} must not be selectively disclosable "
-                "([SD-JWT-VC] registered claims)"
-            )
-        leaf_key = parts[-1]
-
-        # Navigate to the parent object
+    for parts in _normalize_disclosable_paths(disclosable):
         parent = result
-        for part in parts[:-1]:
-            if isinstance(parent, dict) and part in parent:
-                parent = parent[part]
-            else:
+        for i, part in enumerate(parts):
+            if isinstance(parent, list):
+                raise ValueError(
+                    "disclosable path traverses an array (array-element "
+                    f"disclosure is not supported): {parts!r}"
+                )
+            if not isinstance(parent, dict) or part not in parent:
                 raise ValueError(f"disclosable path not found in claims: {parts!r}")
-        if not isinstance(parent, dict) or leaf_key not in parent:
-            raise ValueError(f"disclosable path not found in claims: {parts!r}")
+            if i < len(parts) - 1:
+                parent = parent[part]
 
+        leaf_key = parts[-1]
         value = parent.pop(leaf_key)
         disc_b64, digest = _create_disclosure(leaf_key, value)
         disclosures.append(disc_b64)
@@ -155,8 +189,9 @@ def build_sd_jwt_payload(
         disclosable: Claim names/paths to make selectively disclosable
             (segment lists for exact keys — required when a key contains a
             dot — or dot-separated strings; RFC 9901 §6). Every path MUST
-            resolve, and top-level claims reserved by [SD-JWT-VC] (see
-            :data:`NON_DISCLOSABLE_CLAIMS`) MUST NOT be listed (ValueError
+            resolve, top-level claims reserved by [SD-JWT-VC] (see
+            :data:`NON_DISCLOSABLE_CLAIMS`) and their members MUST NOT be
+            listed, paths MUST NOT overlap or pass through arrays (ValueError
             otherwise).
         cnf: Confirmation key (holder's public key JWK for key binding).
 

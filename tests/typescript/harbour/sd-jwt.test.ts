@@ -241,6 +241,61 @@ describe("SD-JWT-VC reserved claims", () => {
   });
 });
 
+describe("SD-JWT-VC disclosable path validation", () => {
+  for (const path of ["status.status_list", "cnf.jwk"]) {
+    it(`rejects disclosing '${path}' under a reserved claim`, () => {
+      const claims = {
+        status: { status_list: { idx: 0, uri: "https://example.com/sl" } },
+        cnf: { jwk: { kty: "EC" } },
+      };
+      expect(() => buildSdJwtPayload(claims, { vct: VCT, disclosable: [path] })).toThrow(
+        /must not be selectively disclosable, nor any of its members/,
+      );
+    });
+  }
+
+  for (const path of ["__proto__.isPrototypeOf", "constructor.prototype.isPrototypeOf", "toString"]) {
+    it(`does not follow inherited properties ('${path}')`, () => {
+      expect(() =>
+        buildSdJwtPayload({ a: 1 }, { vct: VCT, disclosable: [path] }),
+      ).toThrow(/disclosable path not found/);
+      expect(Object.hasOwn(Object.prototype, "_sd")).toBe(false);
+      expect(Object.hasOwn(Object.prototype, "isPrototypeOf")).toBe(true);
+    });
+  }
+
+  for (const path of ["roles.0", "addresses.0.city"]) {
+    it(`rejects array paths ('${path}')`, () => {
+      const claims = { roles: ["admin"], addresses: [{ city: "Munich" }] };
+      expect(() => buildSdJwtPayload(claims, { vct: VCT, disclosable: [path] })).toThrow(
+        /traverses an array/,
+      );
+    });
+  }
+
+  for (const disclosable of [
+    ["address.city", "address"],
+    ["address", "address.city"],
+    ["address.city", "address.city"],
+  ]) {
+    it(`rejects overlapping paths ${JSON.stringify(disclosable)}`, () => {
+      expect(() =>
+        buildSdJwtPayload({ address: { city: "Munich" } }, { vct: VCT, disclosable }),
+      ).toThrow(/overlapping disclosable paths/);
+    });
+  }
+
+  it("allows sibling paths sharing a parent", async () => {
+    const sdJwt = await issueSdJwtVc(
+      { address: { city: "Munich", zip: "80331" } },
+      privateKey,
+      { vct: VCT, disclosable: ["address.city", "address.zip"] },
+    );
+    const result = await verifySdJwtVc(sdJwt, publicKey);
+    expect(result.address).toEqual({ city: "Munich", zip: "80331" });
+  });
+});
+
 describe("SD-JWT-VC build and sign", () => {
   it("signs exactly the built payload", async () => {
     const { payload, disclosures } = buildSdJwtPayload(SAMPLE_CLAIMS, {

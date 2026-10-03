@@ -125,7 +125,9 @@ const result = await verifySdJwtVc(sdJwt, publicKey);
 Credentials are issued with the JOSE header `typ: dc+sd-jwt`; verifiers also
 accept the pre-rename `vc+sd-jwt`. Every `disclosable` path must exist in the
 claims, and registered claims such as `iss`, `exp`, `cnf`, `vct` and `status`
-cannot be made disclosable. Nested claims use dot paths
+cannot be made disclosable — neither can their members (`cnf.jwk`). Paths must
+not overlap (`address` together with `address.city`) or pass through arrays.
+Nested claims use dot paths
 (`"credentialSubject.email"`); a key that itself contains a dot needs a segment
 list (`["credentialSubject", "harbour.gx:labelLevel"]`).
 
