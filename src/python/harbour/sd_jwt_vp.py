@@ -46,6 +46,7 @@ from harbour.delegation import (
     validate_transaction_data,
 )
 from harbour.keys import PrivateKey, PublicKeyType
+from harbour.sd_jwt import ACCEPTED_SD_JWT_VC_TYPS, SD_JWT_VC_TYP
 from harbour.verifier import VerificationError
 
 logger = logging.getLogger(__name__)
@@ -412,9 +413,10 @@ def verify_sd_jwt_vp(
         raise VerificationError(f"VC JWT verification failed: {e}") from e
 
     vc_header = vc_result.headers()
-    if vc_header.get("typ") != "vc+sd-jwt":
+    if vc_header.get("typ") not in ACCEPTED_SD_JWT_VC_TYPS:
         raise VerificationError(
-            f"Unexpected VC typ: expected 'vc+sd-jwt', got {vc_header.get('typ')!r}"
+            f"Unexpected VC typ: expected {SD_JWT_VC_TYP!r}, "
+            f"got {vc_header.get('typ')!r}"
         )
 
     vc_payload = json.loads(vc_result.payload)
@@ -673,7 +675,7 @@ Examples:
 
     if args.command == "issue":
         # Load SD-JWT-VC
-        sd_jwt_vc = Path(args.sd_jwt_vc).read_text().strip()
+        sd_jwt_vc = Path(args.sd_jwt_vc).read_text(encoding="utf-8").strip()
 
         # Load holder private key
         private_key, _ = _load_private_key(args.key)
@@ -681,7 +683,7 @@ Examples:
         # Load evidence if provided
         evidence = None
         if args.evidence:
-            evidence = json.loads(Path(args.evidence).read_text())
+            evidence = json.loads(Path(args.evidence).read_text(encoding="utf-8"))
             if not isinstance(evidence, list):
                 evidence = [evidence]
 
@@ -701,14 +703,14 @@ Examples:
 
         # Output
         if args.output:
-            Path(args.output).write_text(vp + "\n")
+            Path(args.output).write_text(vp + "\n", encoding="utf-8")
             print(f"SD-JWT VP written to {args.output}", file=sys.stderr)
         else:
             print(vp)
 
     elif args.command == "verify":
         # Load SD-JWT VP
-        sd_jwt_vp = Path(args.sd_jwt_vp).read_text().strip()
+        sd_jwt_vp = Path(args.sd_jwt_vp).read_text(encoding="utf-8").strip()
 
         # Load keys
         issuer_public_key = _load_public_key(args.issuer_key)

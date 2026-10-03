@@ -28,7 +28,15 @@ export {
   type VpVerifyOptions,
 } from "./verifier.js";
 
-export { issueSdJwtVc, verifySdJwtVc } from "./sd-jwt.js";
+export {
+  issueSdJwtVc,
+  verifySdJwtVc,
+  buildSdJwtPayload,
+  signSdJwt,
+  SD_JWT_VC_TYP,
+  ACCEPTED_SD_JWT_VC_TYPS,
+  NON_DISCLOSABLE_CLAIMS,
+} from "./sd-jwt.js";
 
 export { derToX5c, x5cToDer, importPublicKeyFromX5c } from "./x509.js";
 

@@ -23,22 +23,37 @@ KEYS_DIR = FIXTURES_DIR / "keys"
 TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
 
-_YARN = shutil.which("yarn") or "yarn"
+def _yarn_command() -> list[str]:
+    """Resolve the yarn invocation, falling back to corepack.
+
+    The repo mandates `corepack yarn`; on corepack-only machines there is no
+    bare `yarn` on PATH, and probing only for it made this whole suite skip
+    silently.
+    """
+    if shutil.which("yarn"):
+        return ["yarn"]
+    if shutil.which("corepack"):
+        return ["corepack", "yarn"]
+    return ["yarn"]
 
 
-def _run_node(script: str) -> str:
+_YARN = _yarn_command()
+
+
+def _run_node(script: str, *, runner: str = "node", suffix: str = ".mjs") -> str:
     """Run a Node.js ESM script via a temp file (avoids cmd.exe arg mangling on Windows)."""
     with tempfile.NamedTemporaryFile(
         mode="w",
-        suffix=".mjs",
+        suffix=suffix,
         dir=str(TS_DIR),
         delete=False,
+        encoding="utf-8",
     ) as f:
         f.write(script)
         tmp = Path(f.name)
     try:
         result = subprocess.run(
-            [_YARN, "node", str(tmp)],
+            [*_YARN, runner, str(tmp)],
             capture_output=True,
             text=True,
             cwd=str(TS_DIR),
@@ -49,6 +64,11 @@ def _run_node(script: str) -> str:
         return result.stdout.strip()
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def _run_ts(script: str) -> str:
+    """Run a TypeScript script through tsx so it can import the harbour TS library."""
+    return _run_node(script, runner="tsx", suffix=".ts")
 
 
 def _can_run_node_jose() -> bool:
@@ -200,7 +220,7 @@ import {{ compactVerify, importJWK }} from "jose";
 const key = await importJWK({json.dumps(pub_jwk)}, "ES256");
 const result = await compactVerify("{issuer_jwt}", key);
 const header = JSON.parse(Buffer.from("{issuer_jwt}".split(".")[0], "base64url").toString());
-if (header.typ !== "vc+sd-jwt") throw new Error("wrong typ: " + header.typ);
+if (header.typ !== "dc+sd-jwt") throw new Error("wrong typ: " + header.typ);
 const payload = JSON.parse(new TextDecoder().decode(result.payload));
 if (payload.vct !== "https://example.com/vc") throw new Error("wrong vct");
 console.log("OK");
@@ -211,8 +231,9 @@ console.log("OK");
 class TestNodeSDJWTPythonVerify:
     """Node.js issues SD-JWT-VC → Python verifies it."""
 
-    def test_sd_jwt_from_node(self, p256_public_key):
-        """Node-issued SD-JWT-VC can be verified by Python."""
+    @pytest.mark.parametrize("typ", ["dc+sd-jwt", "vc+sd-jwt"])
+    def test_sd_jwt_from_node(self, p256_public_key, typ):
+        """Node-issued SD-JWT-VC can be verified by Python (current and legacy typ)."""
         fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
 
         script = f"""
@@ -225,7 +246,7 @@ const payload = new TextEncoder().encode(JSON.stringify({{
   name: "NodeTest"
 }}));
 const signer = new CompactSign(payload);
-signer.setProtectedHeader({{ alg: "ES256", typ: "vc+sd-jwt" }});
+signer.setProtectedHeader({{ alg: "ES256", typ: "{typ}" }});
 const token = await signer.sign(key);
 // Output as SD-JWT (issuer-jwt with trailing ~)
 console.log(token + "~");
@@ -237,6 +258,78 @@ console.log(token + "~");
             == "did:ethr:0x14a34:0x927a94223e7cd1012bcf3851c1dcc0ff9f8eeda5"
         )
         assert result["vct"] == "https://example.com/vc"
+
+
+# Flat dc+sd-jwt claims with nested and dotted keys: exercises structured
+# disclosure (RFC 9901 §6.2) and exact-segment paths in both runtimes.
+_STRUCTURED_CLAIMS = {
+    "iss": "did:web:harbour.example:participants:acme",
+    "sub": "urn:uuid:5f1c2c6e-3d7a-4c39-9a52-1e0f6b1d2a11",
+    "memberOf": "did:web:harbour.example:participants:acme",
+    "givenName": "Alice",
+    "familyName": "Doe",
+    "harbour.gx:labelLevel": "L1",
+    "address": {
+        "@type": "gx:Address",
+        "gx:countryCode": "DE",
+        "gx:postalCode": "80331",
+    },
+}
+_STRUCTURED_DISCLOSABLE = [
+    "givenName",
+    "address.gx:postalCode",
+    ["harbour.gx:labelLevel"],
+]
+_STRUCTURED_VCT = "https://example.com/vct/member"
+_STRUCTURED_KID = "did:web:harbour.example:participants:acme#key-1"
+
+
+class TestStructuredSDJWTInterop:
+    """Library-to-library SD-JWT-VC round trips through tsx (not raw jose)."""
+
+    def test_python_issues_typescript_verifies(self, p256_private_key):
+        sd_jwt = issue_sd_jwt_vc(
+            _STRUCTURED_CLAIMS,
+            p256_private_key,
+            vct=_STRUCTURED_VCT,
+            disclosable=_STRUCTURED_DISCLOSABLE,
+            kid=_STRUCTURED_KID,
+        )
+        assert len(sd_jwt.split("~")) == 2 + len(_STRUCTURED_DISCLOSABLE)
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
+        pub_jwk = {k: fixture[k] for k in ("kty", "crv", "x", "y")}
+
+        script = f"""
+import {{ importJWK, decodeProtectedHeader }} from "jose";
+import {{ verifySdJwtVc }} from "./index.ts";
+const sdJwt = {json.dumps(sd_jwt)};
+const key = await importJWK({json.dumps(pub_jwk)}, "ES256");
+const claims = await verifySdJwtVc(sdJwt, key, {{ expectedVct: {json.dumps(_STRUCTURED_VCT)} }});
+const header = decodeProtectedHeader(sdJwt.split("~")[0]);
+console.log(JSON.stringify({{ header, claims }}));
+"""
+        out = json.loads(_run_ts(script))
+        assert out["header"]["typ"] == "dc+sd-jwt"
+        assert out["header"]["kid"] == _STRUCTURED_KID
+        assert out["claims"] == {**_STRUCTURED_CLAIMS, "vct": _STRUCTURED_VCT}
+
+    def test_typescript_issues_python_verifies(self, p256_public_key):
+        fixture = json.loads((KEYS_DIR / "test-keypair-p256.json").read_text())
+
+        script = f"""
+import {{ importJWK }} from "jose";
+import {{ issueSdJwtVc }} from "./index.ts";
+const key = await importJWK({json.dumps(fixture)}, "ES256");
+console.log(await issueSdJwtVc({json.dumps(_STRUCTURED_CLAIMS)}, key, {{
+  vct: {json.dumps(_STRUCTURED_VCT)},
+  disclosable: {json.dumps(_STRUCTURED_DISCLOSABLE)},
+  kid: {json.dumps(_STRUCTURED_KID)},
+}}));
+"""
+        sd_jwt = _run_ts(script)
+        assert len(sd_jwt.split("~")) == 2 + len(_STRUCTURED_DISCLOSABLE)
+        claims = verify_sd_jwt_vc(sd_jwt, p256_public_key, expected_vct=_STRUCTURED_VCT)
+        assert claims == {**_STRUCTURED_CLAIMS, "vct": _STRUCTURED_VCT}
 
 
 class TestCanonicalizationInterop:
