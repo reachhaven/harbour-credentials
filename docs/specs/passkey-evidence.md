@@ -198,7 +198,13 @@ credential as `P`.
      is `org`, or a trust anchor admin. When `org` is the trust anchor itself,
      only a trust anchor admin may approve.
    - Endorsement: the approver MUST come from step 5.2 with `AC.sub = P.sub`,
-     the same organisation as `P` and `AC.role = P.role`.
+     the same organisation as `P` and `AC.role = P.role`. Compare the complete
+     issuer-signed payloads of `AC` and `P`: only `authenticators`, `iat`, `jti`,
+     and `evidence` MAY differ. These permit passkey updates and reissue
+     metadata; every other claim MUST remain identical, including `exp`, `vct`,
+     `cnf`, `credentialStatus`, disclosure hashes, and all membership entries.
+     Added or removed claims outside this allowlist also fail with
+     `endorsement-payload-mismatch`. Preserve disclosure salts when reissuing.
 8. If step 5.2 was used, repeat from step 1 with `AC` as `P` at depth + 1. Fail
    when the depth would exceed 8. The chain succeeds when it ends in a trust
    anchor passkey (step 5.1).
@@ -231,7 +237,7 @@ results compare across runtimes:
 | 4 | `authenticator-data-invalid`, `rp-id-hash-mismatch`, `user-not-present`, `user-not-verified` |
 | 5 | `approver-credential-missing`, `approver-credential-not-member`, `approver-credential-out-of-window`, `approver-key-not-found`, `approver-mismatch` |
 | 6 | `bad-webauthn-signature`, `unsupported-alg` |
-| 7 | `approver-not-admin`, `approver-wrong-organisation`, `approver-not-trust-anchor`, `issuer-not-organisation`, `issuer-not-trust-anchor`, `endorsement-subject-mismatch` |
+| 7 | `approver-not-admin`, `approver-wrong-organisation`, `approver-not-trust-anchor`, `issuer-not-organisation`, `issuer-not-trust-anchor`, `endorsement-subject-mismatch`, `endorsement-payload-mismatch` |
 | 8 | `depth-exceeded` |
 
 `depth` is 0 for the credential itself and *n* for the *n*-th approver

@@ -37,12 +37,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+from joserfc import jwk as jose_jwk
+from joserfc import jws as jose_jws
 
+from harbour.digest_sri import canonical_json
 from harbour.merkle import (
     MerklePathError,
     b64url_decode,
@@ -418,20 +420,22 @@ def verify_did_signed_jwt(
     jwk = vm["publicKeyJwk"]
     if not _jws_alg_fits(alg, jwk):
         raise ValueError("unsupported-alg", alg)
-    signing_input = f"{parts[0]}.{parts[1]}".encode("ascii")
     try:
-        signature = b64url_decode(parts[2])
-        key = _public_key(jwk)
-        if alg == "ES256":
-            if len(signature) != 64:
-                raise InvalidSignature
-            der = encode_dss_signature(
-                int.from_bytes(signature[:32], "big"),
-                int.from_bytes(signature[32:], "big"),
-            )
-            key.verify(der, signing_input, ec.ECDSA(hashes.SHA256()))
-        else:
-            key.verify(signature, signing_input)
+        # joserfc permits an empty crit array; RFC 7515 §4.1.11 forbids it.
+        if "crit" in header and (
+            not isinstance(header["crit"], list)
+            or not header["crit"]
+            or any(not isinstance(name, str) or not name for name in header["crit"])
+        ):
+            raise ValueError("crit must be a non-empty array of header names")
+        # Keep non-critical extension headers interoperable with jose, while
+        # requiring every critical extension to be understood by the registry.
+        registry = jose_jws.JWSRegistry(algorithms=[alg], strict_check_header=False)
+        registry.max_header_length = max(8192, len(parts[0]))
+        registry.max_payload_length = max(65536, len(parts[1]))
+        jose_jws.deserialize_compact(
+            jws, jose_jwk.import_key(jwk), algorithms=[alg], registry=registry
+        )
     except Exception as e:
         raise ValueError("bad-issuer-signature", str(e) or None) from e
     return {**header, "kid": kid}, payload
@@ -766,6 +770,13 @@ def _verify_payload_chain(p: dict, ctx: _Ctx, depth: int) -> list[Approver]:
         e, _challenge(p, e, depth), p["iat"], ctx, depth
     )
     _check_authority(p, e, approver, ctx, depth)
+    if e["kind"] == "endorsement":
+        # §4 step 7: a self-endorsement only updates passkeys and reissue metadata.
+        mutable = {"authenticators", "iat", "jti", "evidence"}
+        old = {k: v for k, v in approver_credential.items() if k not in mutable}
+        new = {k: v for k, v in p.items() if k not in mutable}
+        if canonical_json(old) != canonical_json(new):
+            raise _Fail("endorsement-payload-mismatch", depth)
 
     approvers = [Approver(approver["sub"], approver["memberOf"], approver["via"])]
     if approver_credential is not None:

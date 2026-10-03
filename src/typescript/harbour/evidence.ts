@@ -12,6 +12,7 @@
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
+import canonicalize from "canonicalize";
 import { compactVerify, decodeProtectedHeader, importJWK } from "jose";
 import {
   b64urlDecode,
@@ -675,6 +676,15 @@ async function verifyPayloadChain(p: Payload, ctx: Ctx, depth: number): Promise<
     depth,
   );
   checkAuthority(p, e, approver, ctx, depth);
+  if (e.kind === "endorsement") {
+    // §4 step 7: a self-endorsement only updates passkeys and reissue metadata.
+    const mutable = new Set(["authenticators", "iat", "jti", "evidence"]);
+    const fixed = (payload: Payload) =>
+      Object.fromEntries(Object.entries(payload).filter(([key]) => !mutable.has(key)));
+    if (canonicalize(fixed(approverCredential!)) !== canonicalize(fixed(p))) {
+      throw new Fail("endorsement-payload-mismatch", depth);
+    }
+  }
 
   const approvers: EvidenceApprover[] = [
     { sub: approver.sub, memberOf: approver.memberOf, via: approver.via },
