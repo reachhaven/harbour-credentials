@@ -44,6 +44,15 @@ import {
   generateSelfSignedCert,
   certToX5c,
   x5cToCert,
+
+  // Passkey evidence (docs/specs/passkey-evidence.md)
+  payloadDigest,
+  buildBatch,
+  buildWebAuthnEvidence,
+  staticResolver,
+  verifyEvidenceChain,
+  verifyEvidenceForPayload,
+  verifyInstructionEvidence,
 } from '@reachhaven/harbour-credentials';
 ```
 

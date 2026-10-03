@@ -38,6 +38,47 @@ export {
   NON_DISCLOSABLE_CLAIMS,
 } from "./sd-jwt.js";
 
+export {
+  payloadDigestBytes,
+  hashNode,
+  merkleRoot,
+  inclusionPath,
+  foldPath,
+  verifyInclusion,
+  buildBatch,
+  MerklePathError,
+  MAX_PATH_LENGTH,
+  EXCLUDED_DIGEST_KEYS,
+  type MerklePathElement,
+} from "./merkle.js";
+
+export {
+  CREDENTIAL_JWT_TYP,
+  EVIDENCE_TYPE,
+  RELYING_PARTY_SERVICE_TYPE,
+  INSTRUCTION_CONTEXT,
+  MEMBER_VCTS,
+  ORGANISATION_VCTS,
+  DEFAULT_MAX_EVIDENCE_DEPTH,
+  payloadDigest,
+  evidenceChallenge,
+  passkeyVmId,
+  buildWebAuthnEvidence,
+  staticResolver,
+  derToRaw,
+  verifyDidSignedJwt,
+  verifyEvidenceChain,
+  verifyEvidenceForPayload,
+  verifyInstructionEvidence,
+  JwsVerificationError,
+  type DidDocument,
+  type ResolveDid,
+  type EvidenceApprover,
+  type EvidenceChainResult,
+  type EvidenceOptions,
+  type HavenWebAuthnEvidence,
+} from "./evidence.js";
+
 export { derToX5c, x5cToDer, importPublicKeyFromX5c } from "./x509.js";
 
 export {

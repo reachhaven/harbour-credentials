@@ -14,6 +14,8 @@ This section documents the Python API for Harbour Credentials.
 | `harbour.sd_jwt_vp` | SD-JWT Verifiable Presentations for privacy-preserving consent |
 | `harbour.delegation` | Delegation challenge encoding and transaction data |
 | `harbour.x509` | X.509 certificates |
+| `harbour.evidence` | Passkey evidence chains ([spec](../../specs/passkey-evidence.md)) |
+| `harbour.merkle` | Merkle batches: one passkey assertion approving many payloads |
 
 ## Quick Import Reference
 
@@ -76,4 +78,15 @@ from harbour.x509 import (
     cert_to_x5c,
     x5c_to_cert,
 )
+
+# Passkey evidence (docs/specs/passkey-evidence.md)
+from harbour.evidence import (
+    payload_digest,
+    build_webauthn_evidence,
+    static_resolver,
+    verify_evidence_chain,
+    verify_evidence_for_payload,
+    verify_instruction_evidence,
+)
+from harbour.merkle import build_batch  # one challenge + a merklePath per payload
 ```
