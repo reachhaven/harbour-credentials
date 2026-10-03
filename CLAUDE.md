@@ -86,6 +86,8 @@ Python (`src/python/harbour/`) and TypeScript (`src/typescript/harbour/`) implem
 | `delegation` | `delegation.py` | `delegation.ts` | Delegated signing evidence (OID4VP transaction_data) |
 | `sd_jwt_vp` / `sd-jwt-vp` | `sd_jwt_vp.py` | `sd-jwt-vp.ts` | SD-JWT VP issue/verify with evidence |
 | `x509` | `x509.py` | `x509.ts` | X.509 certificates / x5c chains |
+| `evidence` | `evidence.py` | `evidence.ts` | Passkey evidence (`HavenWebAuthnEvidence`) chain verification, single and batched |
+| `merkle` | `merkle.py` | `merkle.ts` | Merkle batches: one passkey assertion approving many payloads |
 | `generate_artifacts` | `generate_artifacts.py` | — | LinkML → OWL/SHACL/JSON-LD artifact generation |
 | credential pipeline | `credentials/` (CLI) | `story-sign.ts` / `story-verify.ts` (CLI) | End-to-end example signing/verification (see below) |
 
@@ -191,7 +193,7 @@ import {
 
 ## CLI Entry Points
 
-Every harbour module has an argparse `main()` with `--help`: `python -m harbour.{keys,signer,verifier,sd_jwt,kb_jwt,delegation,sd_jwt_vp,x509,generate_artifacts} --help`. Pipeline CLIs: `python -m credentials.example_signer --help`, `python -m credentials.verify_signed_examples --help`.
+Every harbour module has an argparse `main()` with `--help`: `python -m harbour.{keys,signer,verifier,sd_jwt,kb_jwt,delegation,sd_jwt_vp,x509,evidence,merkle,generate_artifacts} --help`. Pipeline CLIs: `python -m credentials.example_signer --help`, `python -m credentials.verify_signed_examples --help`.
 
 ## Coding Conventions
 

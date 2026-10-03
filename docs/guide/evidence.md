@@ -1,5 +1,12 @@
 # Evidence in Harbour Credentials
 
+!!! note "Passkey evidence"
+    Credentials issued by the Harbour passkey wallet carry a different kind of
+    evidence: a WebAuthn assertion by the approving person's passkey
+    (`HavenWebAuthnEvidence`), optionally approving a whole batch with one tap.
+    It is specified in [Passkey Evidence](../specs/passkey-evidence.md). This
+    guide describes the VP-based evidence of the example credential pipeline.
+
 Evidence is a W3C VC Data Model concept that provides cryptographic proof of **how** an issuer verified claims or **why** a holder is authorized to perform an action.
 
 ## What is Evidence?
