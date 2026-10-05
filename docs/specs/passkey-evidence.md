@@ -123,8 +123,10 @@ For an action that is not an issuance, `p` is an **instruction** object:
 - `kind` is `approval`, or `endorsement` when a person's own existing passkey
   approves a reissue of their own credential that only changes
   `authenticators`. For an endorsement `approver.role` is the person's own role.
-- `approverCredential` is omitted when the approving passkey is listed in the
-  trust anchor document.
+- `approverCredential` is omitted when the approver acts as a trust anchor
+  admin through a passkey listed in the trust anchor document. A person whose
+  passkey is listed there and who also administers another organisation
+  includes the member credential of that organisation to act for it.
 - `merklePath` is present only when one assertion approved several payloads
   (§5). Absent, `null` and `[]` all mean a batch of one.
 - The evidence is not covered by the digest; it is covered by the issuer
@@ -171,12 +173,15 @@ credential as `P`.
    presence (`0x01`) and user verification (`0x04`) set. The signature counter
    is not checked; verification is stateless.
 5. Find the approver's key.
-   1. If `E.kind` is `approval` and the trust anchor document references
+   1. If `E.kind` is `approval`, `E.approverCredential` is absent and the
+      trust anchor document references
       `<ta>#passkey-<base64url(SHA-256(rawId))>` from `authentication`, that
       method's `publicKeyJwk` is the key and the approver is a trust anchor
       admin. `E.approver.memberOf` MUST be the trust anchor DID and
       `E.approver.role` MUST be `admin`.
-   2. Otherwise `E.approverCredential` is required. Verify it as in step 1 and
+   2. Otherwise `E.approverCredential` is required, even when the passkey is
+      also listed in the trust anchor document: the approver then acts for
+      the organisation of their member credential. Verify it as in step 1 and
       call its payload `AC`. Require a member `vct` and
       `AC.iat <= P.iat <= AC.exp` (for an instruction, `issuedAt` in place of
       `P.iat`). The entry of `AC.authenticators` whose `credentialId` equals
@@ -194,9 +199,16 @@ credential as `P`.
    - Organisation credential: `P.iss` MUST be the trust anchor DID and the
      approver a trust anchor admin. Endorsements are not allowed.
    - Member credential of organisation `org` (the first `memberOf` entry):
-     `P.iss` MUST equal `org`. The approver MUST be an admin whose organisation
-     is `org`, or a trust anchor admin. When `org` is the trust anchor itself,
-     only a trust anchor admin may approve.
+     `P.iss` MUST equal `org`. The approver MUST be an admin. When `org` is
+     the trust anchor itself, only a trust anchor admin may approve.
+     Otherwise the approver MUST be an admin whose organisation is `org`, or
+     a trust anchor admin when `P.role` is `admin`. A trust anchor admin
+     approving a `member` credential of another organisation fails with
+     `approver-wrong-organisation`. The trust anchor seats an organisation's
+     admins; the organisation's own admins approve its members. A verifier
+     cannot tell a first admin from a later one, since the trust anchor
+     issues the organisation credential and could reissue it, so limiting
+     the trust anchor to the first admin is the issuer's policy.
    - Endorsement: the approver MUST come from step 5.2 with `AC.sub = P.sub`,
      the same organisation as `P` and `AC.role = P.role`. Compare the complete
      issuer-signed payloads of `AC` and `P`: only `authenticators`, `iat`, `jti`,
@@ -306,7 +318,11 @@ a `position` of `left` or `right`; anything else fails with
   batch, that screen MUST list every payload in the batch and their number.
 - **Authority is per payload.** One assertion proves one decision by one
   person, but step 7 runs for each credential separately. A batch cannot give
-  an approver authority they do not have for any individual member.
+  an approver authority they do not have for any individual member. Each
+  evidence object picks its approver form on its own (§4.3 step 5), so a
+  person who is a trust anchor admin and an admin of another organisation can
+  approve trust anchor items without `approverCredential` and that
+  organisation's items with it, under one assertion.
 - **Approver window.** `AC.iat <= P.iat <= AC.exp` is checked per credential,
   so all payloads of a batch should share the approval time as `iat`.
 

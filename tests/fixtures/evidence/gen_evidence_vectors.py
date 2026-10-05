@@ -342,8 +342,16 @@ def generate() -> dict[str, Any]:
     tenant.add_trust_anchor_passkey(ta_admin)
     by_ta = {"sub": f"urn:uuid:{uuid.uuid4()}", "memberOf": ta, "role": "admin"}
 
-    def person(org: str, role: str, approve: tuple, *, alg="ES256", **kwargs) -> Person:
-        passkey = SoftAuthenticator(alg)
+    def person(
+        org: str,
+        role: str,
+        approve: tuple,
+        *,
+        alg="ES256",
+        passkey: SoftAuthenticator | None = None,
+        **kwargs,
+    ) -> Person:
+        passkey = passkey or SoftAuthenticator(alg)
         key, approver, *rest = approve
         payload, sd_jwt = tenant.issue(
             tenant.prepare_member(org, role, passkey, **kwargs), key, approver, *rest
@@ -411,7 +419,7 @@ def generate() -> dict[str, Any]:
     )
     credential_case(
         "organisation-admin",
-        "Member credential of an organisation admin, approved by a trust anchor admin.",
+        "Admin credential of another organisation, approved by a trust anchor admin (seating its admin).",
         acme_admin.sd_jwt,
     )
     credential_case(
@@ -534,6 +542,49 @@ def generate() -> dict[str, Any]:
         "Approved by the admin of another organisation.",
         person(acme, "member", by(other_admin)).sd_jwt,
     )
+    credential_case(
+        "trust-anchor-approves-member-role",
+        "A trust anchor admin approves a member-role credential of another organisation (step 7).",
+        person(acme, "member", (ta_admin, by_ta)).sd_jwt,
+    )
+    assert cases[-1]["expected"]["reason"] == "approver-wrong-organisation"
+    assert cases[-1]["expected"]["depth"] == 0
+
+    # A trust anchor admin who is also an admin of acme, with one passkey.
+    dual_passkey = SoftAuthenticator()
+    tenant.add_trust_anchor_passkey(dual_passkey)
+    dual = person(acme, "admin", (ta_admin, by_ta), passkey=dual_passkey)
+    by_dual_ta = {"sub": dual.payload["sub"], "memberOf": ta, "role": "admin"}
+    credential_case(
+        "dual-role-organisation-form",
+        "A trust-anchor-listed passkey with approverCredential acts for that organisation (step 5.2).",
+        person(acme, "member", by(dual)).sd_jwt,
+    )
+    assert cases[-1]["expected"]["ok"], cases[-1]["expected"]
+    assert [a["via"] for a in cases[-1]["expected"]["approvers"]] == [
+        "credential",
+        "trust-anchor",
+    ]
+    credential_case(
+        "dual-role-trust-anchor-form-member",
+        "The same passkey without approverCredential is a trust anchor admin and cannot approve a member role.",
+        person(acme, "member", (dual_passkey, by_dual_ta)).sd_jwt,
+    )
+    assert cases[-1]["expected"]["reason"] == "approver-wrong-organisation"
+    credential_case(
+        "dual-role-trust-anchor-form-organisation",
+        "The same passkey without approverCredential approves an organisation credential (step 5.1).",
+        tenant.issue(
+            tenant.prepare_organisation(other, "Other GmbH"), dual_passkey, by_dual_ta
+        )[1],
+    )
+    assert cases[-1]["expected"]["ok"], cases[-1]["expected"]
+    credential_case(
+        "dual-role-organisation-without-credential",
+        "Claims to act for acme with a trust-anchor-listed passkey but no approverCredential.",
+        person(acme, "member", (dual_passkey, dual.approver())).sd_jwt,
+    )
+    assert cases[-1]["expected"]["reason"] == "approver-mismatch"
     _, wrong_origin = tenant.issue(
         tenant.prepare_member(acme, "member", SoftAuthenticator()),
         *by(acme_admin),

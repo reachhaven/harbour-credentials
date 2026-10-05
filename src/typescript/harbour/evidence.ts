@@ -554,8 +554,11 @@ async function verifyAssertion(
   let approver: Approver | undefined;
   let approverCredential: Payload | undefined;
 
-  // 5.1 An endorsement always goes through the approver credential.
-  if (e.kind === "approval") {
+  // 5.1 only for an approval without an approver credential. An endorsement
+  // must prove who the subject is, and an approver who carries a member
+  // credential acts for that credential's organisation, even when the passkey
+  // is also listed in the trust anchor document.
+  if (e.kind === "approval" && !e.approverCredential) {
     let vmId: string;
     try {
       vmId = passkeyVmId(ctx.ta, e.credentialId);
@@ -645,9 +648,18 @@ function checkAuthority(p: Payload, e: HavenWebAuthnEvidence, approver: Approver
   }
 
   if (approver.role !== "admin") throw new Fail("approver-not-admin", depth);
-  if (isTaAdmin) return;
-  if (fields.org === ctx.ta) throw new Fail("approver-not-trust-anchor", depth);
-  if (approver.memberOf !== fields.org) throw new Fail("approver-wrong-organisation", depth);
+  if (fields.org === ctx.ta) {
+    if (!isTaAdmin) throw new Fail("approver-not-trust-anchor", depth);
+    return;
+  }
+  if (approver.memberOf === fields.org) return;
+  // A trust anchor admin seats an organisation's admins, never its members.
+  if (isTaAdmin && fields.role === "admin") return;
+  throw new Fail(
+    "approver-wrong-organisation",
+    depth,
+    isTaAdmin ? "trust anchor admin approving a member role" : undefined,
+  );
 }
 
 async function verifyPayloadChain(p: Payload, ctx: Ctx, depth: number): Promise<EvidenceApprover[]> {

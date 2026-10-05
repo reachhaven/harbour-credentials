@@ -115,8 +115,9 @@ ResolveDid = Callable[[str], dict]
 
 @dataclass(frozen=True)
 class Approver:
-    """One level of a verified chain. ``via`` is ``"trust-anchor"`` when the key
-    is listed in the trust anchor document, ``"credential"`` otherwise."""
+    """One level of a verified chain. ``via`` is ``"trust-anchor"`` when a
+    passkey listed in the trust anchor document approved without an approver
+    credential (step 5.1), ``"credential"`` otherwise."""
 
     sub: str
     member_of: str
@@ -615,9 +616,11 @@ def _verify_assertion(
     approver: dict | None = None
     approver_credential: dict | None = None
 
-    # 5.1 An endorsement must prove who the subject is, so it always goes
-    # through the approver credential, even for a trust anchor passkey.
-    if e["kind"] == "approval":
+    # 5.1 only for an approval without an approver credential. An endorsement
+    # must prove who the subject is, and an approver who carries a member
+    # credential acts for that credential's organisation, even when the passkey
+    # is also listed in the trust anchor document.
+    if e["kind"] == "approval" and not e.get("approverCredential"):
         try:
             vm_id = passkey_vm_id(ctx.ta, e["credentialId"])
         except ValueError as err:
@@ -728,12 +731,20 @@ def _check_authority(p: dict, e: dict, approver: dict, ctx: _Ctx, depth: int) ->
 
     if approver["role"] != "admin":
         raise _Fail("approver-not-admin", depth)
-    if is_ta_admin:
-        return
     if org == ctx.ta:
-        raise _Fail("approver-not-trust-anchor", depth)
-    if approver["memberOf"] != org:
-        raise _Fail("approver-wrong-organisation", depth)
+        if not is_ta_admin:
+            raise _Fail("approver-not-trust-anchor", depth)
+        return
+    if approver["memberOf"] == org:
+        return
+    # A trust anchor admin seats an organisation's admins, never its members.
+    if is_ta_admin and role == "admin":
+        return
+    raise _Fail(
+        "approver-wrong-organisation",
+        depth,
+        "trust anchor admin approving a member role" if is_ta_admin else None,
+    )
 
 
 def _verify_payload_chain(p: dict, ctx: _Ctx, depth: int) -> list[Approver]:
