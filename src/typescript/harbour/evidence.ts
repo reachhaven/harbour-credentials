@@ -7,8 +7,13 @@
  * approver's passkey over the payload digest, or, for a batch approved with a
  * single tap, over the Merkle root of the batch (`merklePath`, see `merkle.ts`).
  *
+ * A trust anchor admin approves with a passkey taken from the trust anchor
+ * key log (§4.5) as of the payload's `iat`, never from the trust anchor DID
+ * document: the log is replayed once per verification and a broken log fails
+ * it (`key-log-invalid`, `key-log-unavailable`).
+ *
  * Both runtimes run the same checks in the same order and report the same
- * failure reasons. DID resolution is injected.
+ * failure reasons. DID and key log resolution are injected.
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -26,6 +31,7 @@ import {
 export const CREDENTIAL_JWT_TYP = "dc+sd-jwt";
 export const EVIDENCE_TYPE = "HavenWebAuthnEvidence";
 export const RELYING_PARTY_SERVICE_TYPE = "HavenWebAuthnRelyingParty";
+export const KEY_LOG_SERVICE_TYPE = "HavenTrustAnchorKeyLog";
 export const INSTRUCTION_CONTEXT = "https://schema.reachhaven.com/instructions/v1";
 export const DEFAULT_MAX_EVIDENCE_DEPTH = 8;
 
@@ -52,6 +58,7 @@ const B64URL_NONEMPTY = /^[A-Za-z0-9_-]+$/;
 const URN_UUID =
   /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CRSET_ENTRY_ID = /^0x[0-9a-f]{64}$/;
+const KEY_LOG_KINDS = ["credential", "revocation", "passkey_revoked"];
 
 // --- types ------------------------------------------------------------------
 
@@ -59,6 +66,21 @@ export type Jwk = Record<string, unknown> & { kty?: unknown; crv?: unknown };
 export type DidDocument = Record<string, unknown> & { id?: unknown };
 /** Resolves a DID to its document; must reject when it cannot be resolved. */
 export type ResolveDid = (did: string) => Promise<DidDocument>;
+/** Fetches the key log entries of a trust anchor; must reject when it cannot. */
+export type ResolveKeyLog = (trustAnchorDid: string) => Promise<unknown>;
+
+/** One trust anchor key log entry (spec §4.5). */
+export interface TrustAnchorKeyLogEntry {
+  seq: number;
+  kind: "credential" | "revocation" | "passkey_revoked";
+  at: number;
+  prev: string | null;
+  hash: string;
+  material:
+    | { kind: "credential"; jwt: string }
+    | { kind: "revocation"; instruction: Record<string, unknown>; evidence: Record<string, unknown> }
+    | { kind: "passkey_revoked"; sub: string; credentialId: string };
+}
 
 export interface EvidenceApprover {
   sub: string;
@@ -85,6 +107,8 @@ export interface HavenWebAuthnEvidence {
 
 export interface EvidenceOptions {
   resolveDid: ResolveDid;
+  /** The trust anchor key log; see `staticKeyLogs`. */
+  resolveKeyLog: ResolveKeyLog;
   trustAnchorDid: string;
   /** Verification time, epoch seconds. Default: the system clock. */
   now?: number;
@@ -98,6 +122,7 @@ interface Ctx {
   resolveDid: ResolveDid;
   ta: string;
   taDoc: DidDocument;
+  keys: TrustAnchorKeys;
   now: number;
   maxDepth: number;
   memberVcts: readonly string[];
@@ -127,6 +152,15 @@ class Fail extends Error {
       depth: this.depth,
       ...(this.detail === undefined ? {} : { detail: this.detail }),
     };
+  }
+}
+
+/** Thrown by `replayTrustAnchorKeyLog`; `reason` is `key-log-invalid`. */
+export class KeyLogError extends Error {
+  readonly reason = "key-log-invalid";
+  constructor(readonly detail: string) {
+    super(`key-log-invalid: ${detail}`);
+    this.name = "KeyLogError";
   }
 }
 
@@ -203,6 +237,15 @@ export function staticResolver(
     const doc = docs.get(did);
     if (!doc) throw new Error(`unknown DID ${did}`);
     return structuredClone(doc);
+  };
+}
+
+/** A key log resolver over a fixed `{ trust anchor DID: entries }` map. */
+export function staticKeyLogs(logs: Record<string, unknown>): ResolveKeyLog {
+  const map = new Map(Object.entries(logs));
+  return async (did) => {
+    if (!map.has(did)) throw new Error(`no key log for ${did}`);
+    return structuredClone(map.get(did));
   };
 }
 
@@ -480,6 +523,8 @@ const isStr = (v: unknown): v is string => typeof v === "string" && v.length > 0
 // runtimes accept the same values (JSON.parse cannot tell 1 from 1.0 and loses
 // precision beyond 2^53; JCS serialises both forms identically).
 const isInt = (v: unknown): v is number => Number.isSafeInteger(v);
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === "object" && !Array.isArray(v);
 
 function parseEvidence(e: unknown, depth: number): HavenWebAuthnEvidence {
   const o = e as Record<string, unknown>;
@@ -533,6 +578,231 @@ function memberFields(p: Payload): { org: string; role: "admin" | "member" } | u
   return { org: typeof memberOf === "string" ? memberOf : (memberOf as string[])[0], role: p.role };
 }
 
+// --- the trust anchor key log (spec §4.5) -----------------------------------
+
+type KeyLogOp =
+  | {
+      at: number;
+      kind: "credential";
+      sub: string;
+      role: "admin" | "member";
+      jti: string;
+      iat: number;
+      exp: number;
+      authenticators: Map<string, Jwk>;
+    }
+  | { at: number; kind: "revocation"; credential: string }
+  | { at: number; kind: "passkey_revoked"; sub: string; credentialId: string };
+
+/**
+ * A replayed trust anchor key log. `credentialJtis` holds the `jti` of every
+ * `credential` entry; `keysAt` gives the admin passkeys active at an instant.
+ */
+export class TrustAnchorKeys {
+  constructor(
+    private readonly ops: readonly KeyLogOp[],
+    readonly credentialJtis: ReadonlySet<string>,
+  ) {}
+
+  /**
+   * `credentialId -> { sub, jwk }` for every admin passkey active at `t`:
+   * entries with `at <= t` applied in order, then admins whose credential does
+   * not cover `t` (`iat <= t <= exp`) dropped.
+   */
+  keysAt(t: number): Map<string, { sub: string; jwk: Jwk }> {
+    const admins = new Map<
+      string,
+      { jti: string; iat: number; exp: number; authenticators: Map<string, Jwk> }
+    >();
+    for (const op of this.ops) {
+      if (op.at > t) break;
+      if (op.kind === "credential") {
+        admins.delete(op.sub);
+        if (op.role === "admin") {
+          admins.set(op.sub, {
+            jti: op.jti,
+            iat: op.iat,
+            exp: op.exp,
+            authenticators: new Map(op.authenticators),
+          });
+        }
+      } else if (op.kind === "revocation") {
+        for (const [sub, record] of [...admins]) {
+          if (record.jti === op.credential) admins.delete(sub);
+        }
+      } else {
+        admins.get(op.sub)?.authenticators.delete(op.credentialId);
+      }
+    }
+    const keys = new Map<string, { sub: string; jwk: Jwk }>();
+    for (const [sub, record] of admins) {
+      if (!(record.iat <= t && t <= record.exp)) continue;
+      for (const [credentialId, jwk] of record.authenticators) {
+        // The admin whose credential entry came later wins.
+        keys.delete(credentialId);
+        keys.set(credentialId, { sub, jwk });
+      }
+    }
+    return keys;
+  }
+}
+
+/** `b64url(SHA-256(JCS({ seq, kind, at, prev, material })))`. */
+export function keyLogEntryHash(entry: Record<string, unknown>): string {
+  const pick = (k: string) => (entry[k] === undefined ? null : entry[k]);
+  return payloadDigest({
+    seq: pick("seq"),
+    kind: pick("kind"),
+    at: pick("at"),
+    prev: pick("prev"),
+    material: pick("material"),
+  });
+}
+
+async function keyLogCredential(
+  material: Record<string, unknown>,
+  ta: string,
+  resolveDid: ResolveDid,
+  memberVcts: readonly string[],
+): Promise<Extract<KeyLogOp, { kind: "credential" }> | string> {
+  const jwt = material.jwt;
+  if (typeof jwt !== "string" || !jwt.endsWith("~") || jwt.split("~").length !== 2) {
+    return "credential jwt is not an issuer JWT with a trailing ~";
+  }
+  let p: Payload;
+  try {
+    ({ payload: p } = await verifyDidSignedJwt(jwt, { resolveDid }));
+  } catch (err) {
+    if (err instanceof JwsVerificationError) return `credential ${err.reason}`;
+    throw err;
+  }
+  const fields = memberFields(p);
+  if (
+    p.iss !== ta ||
+    !memberVcts.includes(p.vct as string) ||
+    !fields ||
+    fields.org !== ta ||
+    !isStr(p.sub) ||
+    !isStr(p.jti) ||
+    !isInt(p.iat) ||
+    !isInt(p.exp) ||
+    !Array.isArray(p.authenticators)
+  ) {
+    return "credential is not a trust anchor member credential";
+  }
+  const authenticators = new Map<string, Jwk>();
+  for (const a of p.authenticators as unknown[]) {
+    if (!isObject(a) || !isStr(a.credentialId) || !isObject(a.jwk)) {
+      return "credential has a malformed authenticator";
+    }
+    authenticators.set(a.credentialId, a.jwk as Jwk);
+  }
+  return {
+    at: 0,
+    kind: "credential",
+    sub: p.sub,
+    role: fields.role,
+    jti: p.jti,
+    iat: p.iat,
+    exp: p.exp,
+    authenticators,
+  };
+}
+
+/**
+ * Check the chain of a trust anchor key log and replay it. Throws
+ * `KeyLogError` on the first violation: `seq` not 1-based and gap-free, a
+ * wrong `prev` or `hash`, `at` decreasing, a malformed entry, or a
+ * `credential` entry that is not a trust anchor member credential signed by
+ * the trust anchor. The evidence of the logged credentials is not
+ * chain-verified: the log is the authority.
+ */
+export async function replayTrustAnchorKeyLog(
+  entries: unknown,
+  options: { trustAnchorDid: string; resolveDid: ResolveDid; memberVcts?: readonly string[] },
+): Promise<TrustAnchorKeys> {
+  const memberVcts = options.memberVcts ?? MEMBER_VCTS;
+  if (!Array.isArray(entries)) throw new KeyLogError("the key log is not an array");
+  const ops: KeyLogOp[] = [];
+  const jtis = new Set<string>();
+  let prevHash: string | null = null;
+  let prevAt: number | undefined;
+  for (const [i, entry] of entries.entries()) {
+    const invalid = (detail: string) => new KeyLogError(`entry ${i + 1}: ${detail}`);
+    if (
+      !isObject(entry) ||
+      !isInt(entry.seq) ||
+      !KEY_LOG_KINDS.includes(entry.kind as string) ||
+      !isInt(entry.at) ||
+      !(entry.prev === null || isStr(entry.prev)) ||
+      !isStr(entry.hash) ||
+      !isObject(entry.material) ||
+      entry.material.kind !== entry.kind
+    ) {
+      throw invalid("malformed entry");
+    }
+    if (entry.seq !== i + 1) throw invalid(`seq ${entry.seq}`);
+    if (entry.prev !== prevHash) throw invalid("prev is not the hash of the previous entry");
+    if (keyLogEntryHash(entry) !== entry.hash) throw invalid("hash does not match");
+    if (prevAt !== undefined && entry.at < prevAt) throw invalid("at decreases");
+    const material = entry.material;
+    const at = entry.at;
+    if (entry.kind === "credential") {
+      const data = await keyLogCredential(material, options.trustAnchorDid, options.resolveDid, memberVcts);
+      if (typeof data === "string") throw invalid(data);
+      jtis.add(data.jti);
+      ops.push({ ...data, at });
+    } else if (entry.kind === "revocation") {
+      const instruction = material.instruction;
+      if (!isObject(instruction) || !isStr(instruction.credential) || !isObject(material.evidence)) {
+        throw invalid("malformed revocation");
+      }
+      ops.push({ at, kind: "revocation", credential: instruction.credential });
+    } else {
+      if (!isStr(material.sub) || !isStr(material.credentialId)) {
+        throw invalid("malformed passkey_revoked");
+      }
+      ops.push({ at, kind: "passkey_revoked", sub: material.sub, credentialId: material.credentialId });
+    }
+    prevHash = entry.hash;
+    prevAt = at;
+  }
+  return new TrustAnchorKeys(ops, jtis);
+}
+
+/**
+ * The bootstrap rule of step 5.1: a trust anchor admin member credential
+ * approved by its own subject's passkey while no admin key is active.
+ */
+function bootstrapKey(
+  e: HavenWebAuthnEvidence,
+  p: Payload | undefined,
+  active: Map<string, unknown>,
+  ctx: Ctx,
+  unsigned: boolean,
+): Jwk | undefined {
+  if (!p || active.size > 0) return undefined;
+  const fields = memberFields(p);
+  if (
+    p.iss !== ctx.ta ||
+    !ctx.memberVcts.includes(p.vct as string) ||
+    fields?.org !== ctx.ta ||
+    fields.role !== "admin" ||
+    e.approver.sub !== p.sub ||
+    !Array.isArray(p.authenticators)
+  ) {
+    return undefined;
+  }
+  const match = (p.authenticators as unknown[]).find(
+    (a): a is Record<string, unknown> => isObject(a) && a.credentialId === e.credentialId,
+  );
+  if (!match || !isObject(match.jwk)) return undefined;
+  // A signed credential must be in the log; the issuer's pre-signing check
+  // runs before it appends that entry.
+  if (!unsigned && !ctx.keys.credentialJtis.has(p.jti as string)) return undefined;
+  return match.jwk as Jwk;
+}
+
 function challengeFor(payload: Payload, e: HavenWebAuthnEvidence, depth: number): string {
   try {
     return evidenceChallenge(payload, e.merklePath);
@@ -548,6 +818,8 @@ async function verifyAssertion(
   anchorTime: number,
   ctx: Ctx,
   depth: number,
+  subject?: Payload,
+  unsigned = false,
 ): Promise<{ approver: Approver; approverCredential?: Payload }> {
   const rp = readRelyingParty(ctx.taDoc);
   if (!rp) throw new Fail("relying-party-missing", depth);
@@ -561,22 +833,23 @@ async function verifyAssertion(
   // 5.1 only for an approval without an approver credential. An endorsement
   // must prove who the subject is, and an approver who carries a member
   // credential acts for that credential's organisation, even when the passkey
-  // is also listed in the trust anchor document.
+  // is also a trust anchor admin passkey. The key comes from the key log as
+  // of the anchor time, never from the trust anchor document.
   if (e.kind === "approval" && !e.approverCredential) {
-    let vmId: string;
-    try {
-      vmId = passkeyVmId(ctx.ta, e.credentialId);
-    } catch {
-      throw new Fail("malformed-evidence", depth, "credentialId");
+    const active = ctx.keys.keysAt(anchorTime);
+    const found = active.get(e.credentialId);
+    let sub: string;
+    if (found) {
+      ({ sub, jwk: key } = found);
+    } else {
+      key = bootstrapKey(e, subject, active, ctx, unsigned);
+      if (!key) throw new Fail("approver-key-not-found", depth, "not a trust anchor admin passkey at iat");
+      sub = subject!.sub as string;
     }
-    const vm = findVerificationMethod(ctx.taDoc, vmId, "authentication");
-    if (vm) {
-      if (e.approver.memberOf !== ctx.ta || e.approver.role !== "admin") {
-        throw new Fail("approver-mismatch", depth, "key is a trust anchor passkey");
-      }
-      key = vm.publicKeyJwk as Jwk;
-      approver = { sub: e.approver.sub, memberOf: ctx.ta, role: "admin", via: "trust-anchor" };
+    if (e.approver.sub !== sub || e.approver.memberOf !== ctx.ta || e.approver.role !== "admin") {
+      throw new Fail("approver-mismatch", depth, "key is a trust anchor passkey");
     }
+    approver = { sub, memberOf: ctx.ta, role: "admin", via: "trust-anchor" };
   }
 
   // 5.2
@@ -666,7 +939,12 @@ function checkAuthority(p: Payload, e: HavenWebAuthnEvidence, approver: Approver
   );
 }
 
-async function verifyPayloadChain(p: Payload, ctx: Ctx, depth: number): Promise<EvidenceApprover[]> {
+async function verifyPayloadChain(
+  p: Payload,
+  ctx: Ctx,
+  depth: number,
+  unsigned = false,
+): Promise<EvidenceApprover[]> {
   if (depth > ctx.maxDepth) throw new Fail("depth-exceeded", depth);
   if (!isStr(p.iss) || !isStr(p.sub) || !isInt(p.iat) || !isInt(p.exp) || !Array.isArray(p.evidence)) {
     throw new Fail("malformed-credential", depth);
@@ -690,6 +968,8 @@ async function verifyPayloadChain(p: Payload, ctx: Ctx, depth: number): Promise<
     p.iat,
     ctx,
     depth,
+    p,
+    unsigned,
   );
   checkAuthority(p, e, approver, ctx, depth);
   if (e.kind === "endorsement") {
@@ -718,13 +998,32 @@ async function context(options: EvidenceOptions): Promise<Ctx> {
   } catch (e) {
     throw new Fail("did-resolution-failed", 0, (e as Error).message);
   }
+  const memberVcts = options.memberVcts ?? MEMBER_VCTS;
+  let entries: unknown;
+  try {
+    entries = await options.resolveKeyLog(options.trustAnchorDid);
+  } catch (e) {
+    throw new Fail("key-log-unavailable", 0, (e as Error).message);
+  }
+  let keys: TrustAnchorKeys;
+  try {
+    keys = await replayTrustAnchorKeyLog(entries, {
+      trustAnchorDid: options.trustAnchorDid,
+      resolveDid: options.resolveDid,
+      memberVcts,
+    });
+  } catch (e) {
+    if (e instanceof KeyLogError) throw new Fail(e.reason, 0, e.detail);
+    throw e;
+  }
   return {
     resolveDid: options.resolveDid,
     ta: options.trustAnchorDid,
     taDoc,
+    keys,
     now: options.now ?? Math.floor(Date.now() / 1000),
     maxDepth: options.maxDepth ?? DEFAULT_MAX_EVIDENCE_DEPTH,
-    memberVcts: options.memberVcts ?? MEMBER_VCTS,
+    memberVcts,
     organisationVcts: options.organisationVcts ?? ORGANISATION_VCTS,
   };
 }
@@ -772,7 +1071,9 @@ export async function verifyEvidenceForPayload(
   if ("evidence" in payload) {
     return { ok: false, reason: "malformed-credential", depth: 0, detail: "the payload already carries evidence" };
   }
-  return run(async () => verifyPayloadChain({ ...payload, evidence: [evidence] }, await context(options), 0));
+  return run(async () =>
+    verifyPayloadChain({ ...payload, evidence: [evidence] }, await context(options), 0, true),
+  );
 }
 
 /**

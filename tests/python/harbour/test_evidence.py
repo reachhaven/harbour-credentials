@@ -11,6 +11,8 @@ from harbour.evidence import (
     _der_to_raw,
     evidence_challenge,
     payload_digest,
+    replay_trust_anchor_key_log,
+    static_key_logs,
     static_resolver,
     verify_did_signed_jwt,
     verify_evidence_chain,
@@ -43,6 +45,7 @@ def _run(vectors: dict, case: dict) -> EvidenceChainResult:
         "resolve_did": static_resolver(
             case.get("didDocuments") or vectors["didDocuments"]
         ),
+        "resolve_key_log": static_key_logs(case.get("keyLogs", vectors["keyLogs"])),
         "trust_anchor_did": vectors["trustAnchorDid"],
         "now": vectors["now"],
     }
@@ -71,6 +74,10 @@ class TestVectors:
         outcomes = {c["expected"]["ok"] for c in VECTORS["cases"]}
         assert outcomes == {True, False}
 
+    def test_every_key_log_case_kind_is_present(self):
+        kinds = {e["kind"] for log in VECTORS["keyLogs"].values() for e in log}
+        assert kinds == {"credential", "revocation", "passkey_revoked"}
+
     def test_batch_members_share_one_assertion(self):
         members = [
             c for c in VECTORS["cases"] if c["name"].startswith("batch-3-member-")
@@ -97,12 +104,8 @@ def eco():
     acme = f"did:web:{gen.HOST}:participants:acme"
     tenant.add_did(acme)
     ta_admin = gen.SoftAuthenticator()
-    tenant.add_trust_anchor_passkey(ta_admin)
-    by_ta = {
-        "sub": "urn:uuid:00000000-0000-4000-8000-000000000001",
-        "memberOf": tenant.trust_anchor,
-        "role": "admin",
-    }
+    iat = gen.NOW - 20 * gen.DAY
+    by_ta = tenant.seat_trust_anchor_admin(ta_admin, iat=iat, at=iat + 60).approver()
     admin_key = gen.SoftAuthenticator(alg="EdDSA")
     [(p, d, e)] = tenant.approve_batch(
         [tenant.prepare_member(acme, "admin", admin_key)], ta_admin, by_ta
@@ -117,6 +120,7 @@ def eco():
         "by_admin": {"sub": p["sub"], "memberOf": acme, "role": "admin"},
         "opts": {
             "resolve_did": tenant.resolve_did,
+            "resolve_key_log": tenant.resolve_key_log,
             "trust_anchor_did": tenant.trust_anchor,
             "now": gen.NOW,
         },
@@ -191,6 +195,7 @@ class TestEdges:
         result = verify_evidence_chain(
             eco["admin_jwt"],
             resolve_did=static_resolver({}),
+            resolve_key_log=eco["tenant"].resolve_key_log,
             trust_anchor_did=eco["tenant"].trust_anchor,
         )
         assert (result.reason, result.depth) == ("did-resolution-failed", 0)
@@ -231,6 +236,57 @@ class TestEdges:
     def test_result_is_falsy_on_failure(self):
         assert not EvidenceChainResult(ok=False, reason="x", depth=0)
         assert EvidenceChainResult(ok=True)
+
+
+class TestKeyLog:
+    """Replay and the bootstrap rule (§4.5, step 5.1)."""
+
+    def _self_approved(self, gen, tenant, iat):
+        passkey = gen.SoftAuthenticator()
+        prepared = tenant.prepare_member(tenant.trust_anchor, "admin", passkey, iat=iat)
+        approver = {
+            "sub": prepared[0]["sub"],
+            "memberOf": tenant.trust_anchor,
+            "role": "admin",
+        }
+        [(p, d, e)] = tenant.approve_batch([prepared], passkey, approver)
+        return p, d, e
+
+    def test_bootstrap_on_an_empty_log(self):
+        """Before signing, a self-approved first admin needs no log entry."""
+        gen = _generator()
+        tenant = gen.Tenant()
+        p, d, e = self._self_approved(gen, tenant, gen.NOW - gen.DAY)
+        opts = {
+            "resolve_did": tenant.resolve_did,
+            "resolve_key_log": tenant.resolve_key_log,
+            "trust_anchor_did": tenant.trust_anchor,
+            "now": gen.NOW,
+        }
+        assert verify_evidence_for_payload(p, e, **opts).ok
+        result = verify_evidence_chain(tenant.sign(p, d, [e]), **opts)
+        assert (result.reason, result.depth) == ("approver-key-not-found", 0)
+
+    def test_replay_keys_at(self, eco):
+        tenant = eco["tenant"]
+        keys = replay_trust_anchor_key_log(
+            tenant.key_logs[tenant.trust_anchor],
+            trust_anchor_did=tenant.trust_anchor,
+            resolve_did=tenant.resolve_did,
+        )
+        iat = eco["gen"].NOW - 20 * eco["gen"].DAY
+        assert keys.keys_at(iat) == {}
+        [(credential_id, key)] = keys.keys_at(iat + 60).items()
+        assert key["sub"] and key["jwk"]["kty"]
+
+    def test_replay_rejects_a_non_array(self, eco):
+        with pytest.raises(ValueError) as error:
+            replay_trust_anchor_key_log(
+                {"entries": []},
+                trust_anchor_did=eco["tenant"].trust_anchor,
+                resolve_did=eco["tenant"].resolve_did,
+            )
+        assert error.value.args[0] == "key-log-invalid"
 
 
 class TestDer:

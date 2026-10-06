@@ -50,6 +50,8 @@ import {
   buildBatch,
   buildWebAuthnEvidence,
   staticResolver,
+  staticKeyLogs, // { [trustAnchorDid]: entries } -> resolveKeyLog
+  replayTrustAnchorKeyLog,
   verifyEvidenceChain,
   verifyEvidenceForPayload,
   verifyInstructionEvidence,

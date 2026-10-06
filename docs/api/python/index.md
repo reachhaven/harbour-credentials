@@ -84,6 +84,8 @@ from harbour.evidence import (
     payload_digest,
     build_webauthn_evidence,
     static_resolver,
+    static_key_logs,  # {trust anchor DID: entries} -> resolve_key_log
+    replay_trust_anchor_key_log,
     verify_evidence_chain,
     verify_evidence_for_payload,
     verify_instruction_evidence,
