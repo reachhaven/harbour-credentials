@@ -45,6 +45,8 @@ from harbour.verifier import (
 from harbour.sd_jwt import (
     issue_sd_jwt_vc,
     verify_sd_jwt_vc,
+    build_sd_jwt_payload,  # fix salts, return (payload, disclosures)
+    sign_sd_jwt,           # sign a prepared payload
 )
 
 # KB-JWT

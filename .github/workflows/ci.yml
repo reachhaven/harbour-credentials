@@ -162,6 +162,7 @@ jobs:
     needs: [test-python, test-ts]
     env:
       UV_PYTHON: "3.12"
+      HARBOUR_REQUIRE_INTEROP: "1"
     steps:
       - uses: actions/checkout@v4
         with:

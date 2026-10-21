@@ -16,6 +16,7 @@ import {
   createDelegationChallenge,
   type TransactionData,
 } from "./delegation.js";
+import { ACCEPTED_SD_JWT_VC_TYPS, SD_JWT_VC_TYP } from "./sd-jwt.js";
 import { VerificationError } from "./verifier.js";
 
 const SD_JWT_SEPARATOR = "~";
@@ -260,9 +261,9 @@ export async function verifySdJwtVp(
     );
   }
 
-  if (vcResult.protectedHeader.typ !== "vc+sd-jwt") {
+  if (!ACCEPTED_SD_JWT_VC_TYPS.includes(vcResult.protectedHeader.typ ?? "")) {
     throw new VerificationError(
-      `Unexpected VC typ: expected 'vc+sd-jwt', got '${vcResult.protectedHeader.typ}'`
+      `Unexpected VC typ: expected '${SD_JWT_VC_TYP}', got '${vcResult.protectedHeader.typ}'`
     );
   }
 

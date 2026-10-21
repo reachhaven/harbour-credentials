@@ -63,9 +63,15 @@ interface VerifiableCredential {
   [key: string]: unknown;
 }
 
-interface SdJwtOptions {
-  disclosableClaims?: string[];
-  hashAlgorithm?: 'sha-256';
+// issueSdJwtVc(claims, privateKey, options)
+interface SdJwtIssueOptions {
+  vct: string;
+  /** Dot paths ("address.city") or segment lists (["harbour.gx:labelLevel"]). */
+  disclosable?: (string | string[])[];
+  cnf?: Record<string, unknown>;
+  kid?: string;
+  x5c?: string[];
+  alg?: string;
 }
 
 interface KbJwtOptions {

@@ -263,7 +263,7 @@ test-ts:
 
 # Run the cross-runtime interop tests (requires both Python + TypeScript).
 test-interop:
-    {{run}} python -m pytest tests/interop/ -v
+    {{run}} python -m pytest tests/interop/ -v -rs
 
 # `generate` and `story-sign` lead the dependency list because they produce inputs the
 # suite reads and `just clean` removes (as does a fresh clone — both are gitignored):
