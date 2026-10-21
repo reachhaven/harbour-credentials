@@ -40,10 +40,14 @@ def _generator():
 
 def _run(vectors: dict, case: dict) -> EvidenceChainResult:
     kwargs = {
-        "resolve_did": static_resolver(vectors["didDocuments"]),
+        "resolve_did": static_resolver(
+            case.get("didDocuments") or vectors["didDocuments"]
+        ),
         "trust_anchor_did": vectors["trustAnchorDid"],
         "now": vectors["now"],
     }
+    if "maxDepth" in case:
+        kwargs["max_depth"] = case["maxDepth"]
     if "credential" in case:
         return verify_evidence_chain(case["credential"], **kwargs)
     return verify_instruction_evidence(case["instruction"], case["evidence"], **kwargs)

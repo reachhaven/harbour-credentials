@@ -160,6 +160,10 @@ credential as `P`.
    signature with the key the `iss` document lists under `assertionMethod` for
    that `kid`. Require `iss`, `sub`, integer `iat` and `exp`, an `evidence`
    array, `iat` at most 60 s in the future, and a member or organisation `vct`.
+   An integer here is a JSON number without a fractional part whose magnitude
+   is at most 2^53 − 1, so that every JSON parser reads the same value. A
+   payload that is not RFC 8259 JSON (`NaN`, `Infinity`) is
+   `malformed-credential`.
    If `P` is the trust anchor's own organisation credential with
    `evidence: []`, the chain ends successfully. Otherwise require exactly one
    evidence object `E`.
@@ -340,9 +344,11 @@ a `position` of `left` or `right`; anything else fails with
 - `tests/fixtures/evidence/evidence-vectors.json`: DID documents, credentials
   and instructions with their expected results, covering single approvals,
   endorsements, revocation instructions, batches of 3 and 5, a mixed credential
-  and instruction batch, and negative cases (tampered payloads, wrong
-  approvers, origins and flags, malformed paths). Both runtimes must return the
-  same `ok`, `approvers`, `reason` and `depth` for every case.
+  and instruction batch, and negative cases (tampered payloads and
+  signatures, wrong approvers, origins and flags, malformed paths), with at
+  least one case for every failure reason in §4.4. A case may carry its own
+  `didDocuments` or `maxDepth`. Both runtimes must return the same `ok`, `approvers`,
+  `reason` and `depth` for every case.
 - `tests/fixtures/evidence/merkle-vectors.json`: known answers for the tree,
   batch sizes 1 to 9.
 

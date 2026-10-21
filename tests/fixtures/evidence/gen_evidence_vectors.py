@@ -24,6 +24,7 @@ import hashlib
 import json
 import secrets
 import uuid
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from joserfc import jwk as jose_jwk
 from joserfc import jws
 
 from harbour._crypto import import_private_key
@@ -106,10 +108,20 @@ class SoftAuthenticator:
         origin: str = ORIGIN,
         rp_id: str = RP_ID,
         flags: int = 0x05,
+        client_data_extra: dict[str, Any] | None = None,
     ) -> dict[str, str]:
-        """Assertion over *challenge* (base64url); ES256 signatures are DER."""
+        """Assertion over *challenge* (base64url); ES256 signatures are DER.
+
+        *client_data_extra* adds to or overrides clientDataJSON members
+        (negative cases such as ``crossOrigin`` or a wrong ``type``).
+        """
         client_data = json.dumps(
-            {"type": "webauthn.get", "challenge": challenge, "origin": origin},
+            {
+                "type": "webauthn.get",
+                "challenge": challenge,
+                "origin": origin,
+                **(client_data_extra or {}),
+            },
             separators=(",", ":"),
         ).encode()
         self._count += 1
@@ -234,10 +246,15 @@ class Tenant:
         )
 
     def prepare_organisation(
-        self, sub: str, name: str, *, iat: int = NOW - 10 * DAY
+        self,
+        sub: str,
+        name: str,
+        *,
+        iat: int = NOW - 10 * DAY,
+        iss: str | None = None,
     ) -> tuple[dict, list[str]]:
         claims = {
-            **self._common(self.trust_anchor, sub, ORGANISATION_VCT, iat),
+            **self._common(iss or self.trust_anchor, sub, ORGANISATION_VCT, iat),
             "name": name,
         }
         return build_sd_jwt_payload(claims, vct=claims.pop("vct"))
@@ -250,10 +267,30 @@ class Tenant:
             kid=self.kid(payload["iss"]),
         )
 
-    def sign_raw(self, payload: dict, *, typ: str) -> str:
-        """Sign *payload* as is with an arbitrary ``typ`` (negative cases)."""
-        header = {"alg": "ES256", "typ": typ, "kid": self.kid(payload["iss"])}
+    def sign_raw(
+        self,
+        payload: dict,
+        *,
+        typ: str,
+        kid: str | None = None,
+        alg: str = "ES256",
+    ) -> str:
+        """Sign *payload* as is with an arbitrary header (negative cases).
+
+        Any *alg* other than ES256 yields a forged token with a bogus
+        signature: the verifier must reject the header before verifying.
+        """
+        header = {"alg": alg, "typ": typ, "kid": kid or self.kid(payload["iss"])}
         body = json.dumps(payload, ensure_ascii=False).encode()
+        if alg != "ES256":
+            return (
+                b64url_encode(json.dumps(header).encode())
+                + "."
+                + b64url_encode(body)
+                + "."
+                + b64url_encode(b"\x00" * 64)
+                + "~"
+            )
         key = import_private_key(self._signing_key, "ES256")
         return jws.serialize_compact(header, body, key, algorithms=["ES256"]) + "~"
 
@@ -368,18 +405,35 @@ def generate() -> dict[str, Any]:
 
     cases: list[dict[str, Any]] = []
 
-    def credential_case(name: str, description: str, sd_jwt: str) -> None:
+    def credential_case(
+        name: str,
+        description: str,
+        sd_jwt: str,
+        *,
+        did_documents: dict[str, dict] | None = None,
+        max_depth: int | None = None,
+    ) -> None:
+        """*did_documents* replaces the shared documents and *max_depth* the
+        default depth limit for this case only."""
+        docs = tenant.docs if did_documents is None else did_documents
         result = verify_evidence_chain(
-            sd_jwt, resolve_did=tenant.resolve_did, trust_anchor_did=ta, now=NOW
+            sd_jwt,
+            resolve_did=static_resolver(docs),
+            trust_anchor_did=ta,
+            now=NOW,
+            **({} if max_depth is None else {"max_depth": max_depth}),
         )
-        cases.append(
-            {
-                "name": name,
-                "description": description,
-                "credential": sd_jwt,
-                "expected": result.to_dict(),
-            }
-        )
+        case: dict[str, Any] = {
+            "name": name,
+            "description": description,
+            "credential": sd_jwt,
+            "expected": result.to_dict(),
+        }
+        if did_documents is not None:
+            case["didDocuments"] = did_documents
+        if max_depth is not None:
+            case["maxDepth"] = max_depth
+        cases.append(case)
 
     def instruction_case(
         name: str, description: str, instruction: dict, evidence: dict
@@ -743,9 +797,378 @@ def generate() -> dict[str, Any]:
         "path-bad-position", "A path element with position 'up'.", bad_position
     )
 
+    # --- one vector per remaining failure reason (§4.4) ------------------------
+
+    def tampered(evidence: dict, **changes: Any) -> dict:
+        return {**json.loads(json.dumps(evidence)), **changes}
+
+    def flip_last_byte(b64: str) -> str:
+        raw = bytearray(b64url_decode(b64))
+        raw[-1] ^= 0x01
+        return b64url_encode(bytes(raw))
+
+    def with_evidence(prepared: tuple[dict, list[str]], evidence: dict) -> str:
+        payload, disclosures = prepared
+        return tenant.sign(payload, disclosures, [evidence])
+
+    def approved(prepared: tuple[dict, list[str]], approve: tuple, **kw) -> dict:
+        """The evidence object for *prepared*, approved by *approve*."""
+        key, approver, *rest = approve
+        [(_, _, evidence)] = tenant.approve_batch(
+            [prepared], key, approver, *rest, **kw
+        )
+        return evidence
+
+    def expect(reason: str, depth: int = 0) -> None:
+        got = cases[-1]["expected"]
+        assert (got.get("reason"), got.get("depth")) == (reason, depth), (
+            cases[-1]["name"],
+            got,
+        )
+
+    def expect_ok() -> None:
+        assert cases[-1]["expected"]["ok"], (cases[-1]["name"], cases[-1]["expected"])
+
+    def fresh() -> tuple[dict, list[str]]:
+        return tenant.prepare_member(acme, "member", SoftAuthenticator())
+
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "webauthn-signature-tampered",
+        "ES256 assertion signature with one flipped bit.",
+        with_evidence(p, tampered(e, signature=flip_last_byte(e["signature"]))),
+    )
+    expect("bad-webauthn-signature")
+    p = fresh()
+    e = approved(p, by(ed_admin))
+    credential_case(
+        "webauthn-signature-tampered-eddsa",
+        "Ed25519 assertion signature with one flipped bit.",
+        with_evidence(p, tampered(e, signature=flip_last_byte(e["signature"]))),
+    )
+    expect("bad-webauthn-signature")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "webauthn-signature-other-passkey",
+        "credentialId names the admin's passkey, but another passkey signed.",
+        with_evidence(
+            p, tampered(e, signature=approved(p, by(other_admin))["signature"])
+        ),
+    )
+    expect("bad-webauthn-signature")
+    credential_case(
+        "rp-id-hash-mismatch",
+        "authenticatorData for a different RP ID.",
+        tenant.issue(fresh(), *by(acme_admin), rp_id="evil.example")[1],
+    )
+    expect("rp-id-hash-mismatch")
+    credential_case(
+        "cross-origin",
+        "clientDataJSON with crossOrigin: true.",
+        tenant.issue(fresh(), *by(acme_admin), client_data_extra={"crossOrigin": True})[
+            1
+        ],
+    )
+    expect("cross-origin")
+    credential_case(
+        "user-not-present",
+        "Flags byte without user presence.",
+        tenant.issue(fresh(), *by(acme_admin), flags=0x04)[1],
+    )
+    expect("user-not-present")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "authenticator-data-short",
+        "authenticatorData of 10 bytes.",
+        with_evidence(p, tampered(e, authenticatorData=b64url_encode(b"\x00" * 10))),
+    )
+    expect("authenticator-data-invalid")
+    credential_case(
+        "client-data-wrong-type",
+        "clientDataJSON type webauthn.create.",
+        tenant.issue(
+            fresh(), *by(acme_admin), client_data_extra={"type": "webauthn.create"}
+        )[1],
+    )
+    expect("client-data-invalid")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "client-data-not-an-object",
+        "clientDataJSON decodes to a JSON array.",
+        with_evidence(p, tampered(e, clientDataJSON=b64url_encode(b"[]"))),
+    )
+    expect("client-data-invalid")
+    p = fresh()
+    credential_case(
+        "client-data-challenge-padded",
+        "The challenge carries base64 padding; the comparison is exact.",
+        with_evidence(
+            p,
+            approved(
+                p,
+                by(acme_admin),
+                client_data_extra={"challenge": payload_digest(p[0]) + "="},
+            ),
+        ),
+    )
+    expect("digest-mismatch")
+    credential_case(
+        "approver-credential-out-of-window",
+        "P.iat lies before the approver credential's iat.",
+        person(acme, "member", by(acme_admin), iat=NOW - 100 * DAY).sd_jwt,
+    )
+    expect("approver-credential-out-of-window")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "approver-key-not-found",
+        "credentialId not among the approver credential's authenticators.",
+        with_evidence(
+            p, tampered(e, credentialId=b64url_encode(secrets.token_bytes(16)))
+        ),
+    )
+    expect("approver-key-not-found")
+    credential_case(
+        "issuer-not-organisation",
+        "Member credential issued by one organisation with memberOf another.",
+        person(other, "member", by(acme_admin), member_of=acme).sd_jwt,
+    )
+    expect("issuer-not-organisation")
+    credential_case(
+        "issuer-not-trust-anchor",
+        "Organisation credential issued by an organisation, not the trust anchor.",
+        tenant.issue(
+            tenant.prepare_organisation(other, "Other GmbH", iss=acme), ta_admin, by_ta
+        )[1],
+    )
+    expect("issuer-not-trust-anchor")
+    credential_case(
+        "endorsement-by-admin",
+        "kind endorsement, but the approver is the organisation admin, not the subject.",
+        tenant.issue(fresh(), *by(acme_admin), kind="endorsement")[1],
+    )
+    expect("endorsement-subject-mismatch")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "evidence-count-two", "Two evidence objects.", tenant.sign(p[0], p[1], [e, e])
+    )
+    expect("evidence-count")
+    credential_case(
+        "evidence-count-zero",
+        "A member credential with evidence: [].",
+        tenant.sign(*fresh(), []),
+    )
+    expect("evidence-count")
+    credential_case(
+        "unknown-vct",
+        "A vct outside the member and organisation lists.",
+        person(acme, "member", by(acme_admin), vct="haven:UnknownCredential").sd_jwt,
+    )
+    expect("unknown-vct")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "approver-credential-not-member",
+        "approverCredential is an organisation credential.",
+        with_evidence(p, tampered(e, approverCredential=acme_org.split("~")[0] + "~")),
+    )
+    expect("approver-credential-not-member", 1)
+    credential_case(
+        "depth-exceeded",
+        "A chain of two approver credentials verified with maxDepth 1.",
+        person(acme, "member", by(person(acme, "admin", by(acme_admin)))).sd_jwt,
+        max_depth=1,
+    )
+    expect("depth-exceeded", 2)
+    credential_case(
+        "issued-in-future",
+        "P.iat one hour after the verification time.",
+        person(acme, "member", by(acme_admin), iat=NOW + 3600).sd_jwt,
+    )
+    expect("issued-in-future")
+    no_exp, no_exp_disclosures = fresh()
+    del no_exp["exp"]
+    credential_case(
+        "malformed-credential-no-exp",
+        "A member credential without exp.",
+        tenant.issue((no_exp, no_exp_disclosures), *by(acme_admin))[1],
+    )
+    expect("malformed-credential")
+    credential_case(
+        "approver-not-trust-anchor-organisation",
+        "Organisation credential approved by an organisation admin.",
+        tenant.issue(tenant.prepare_organisation(other, "Other GmbH"), *by(acme_admin))[
+            1
+        ],
+    )
+    expect("approver-not-trust-anchor")
+    credential_case(
+        "approver-not-trust-anchor-staff",
+        "Member credential of the trust anchor itself, approved by an organisation admin.",
+        person(ta, "member", by(acme_admin)).sd_jwt,
+    )
+    expect("approver-not-trust-anchor")
+    credential_case(
+        "unsupported-alg",
+        "Issuer JWT header alg RS256.",
+        tenant.sign_raw(member.payload, typ="dc+sd-jwt", alg="RS256"),
+    )
+    expect("unsupported-alg")
+    credential_case(
+        "issuer-key-not-found",
+        "kid names a key the issuer document does not list.",
+        tenant.sign_raw(member.payload, typ="dc+sd-jwt", kid=f"{acme}#key-unknown"),
+    )
+    expect("issuer-key-not-found")
+    credential_case(
+        "issuer-key-of-other-did",
+        "kid belongs to another DID than iss.",
+        tenant.sign_raw(member.payload, typ="dc+sd-jwt", kid=tenant.kid(other)),
+    )
+    expect("issuer-key-not-found")
+    credential_case(
+        "issuer-kid-relative",
+        "kid as a relative DID URL (#key-...), made absolute against iss.",
+        tenant.sign_raw(
+            member.payload, typ="dc+sd-jwt", kid="#" + tenant.kid(acme).split("#", 1)[1]
+        ),
+    )
+    expect_ok()
+    ghost = f"did:web:{HOST}:participants:ghost"
+    ghost_admin, _ = tenant.prepare_member(ghost, "admin", SoftAuthenticator())
+    ghost_token = tenant.sign_raw({**ghost_admin, "evidence": []}, typ="dc+sd-jwt")
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "did-resolution-failed",
+        "approverCredential issued by a DID that does not resolve.",
+        with_evidence(
+            p,
+            tampered(
+                e,
+                approverCredential=ghost_token,
+                approver={
+                    "sub": ghost_admin["sub"],
+                    "memberOf": ghost,
+                    "role": "admin",
+                },
+            ),
+        ),
+    )
+    expect("did-resolution-failed", 1)
+    instruction_case(
+        "malformed-instruction",
+        "A revocation instruction without nonce.",
+        {k: v for k, v in instruction.items() if k != "nonce"},
+        revoke_evidence,
+    )
+    expect("malformed-instruction")
+
+    # Cases that need their own DID documents.
+    no_service = json.loads(json.dumps(tenant.docs))
+    del no_service[ta]["service"]
+    credential_case(
+        "relying-party-missing",
+        "Trust anchor document without the HavenWebAuthnRelyingParty service.",
+        member.sd_jwt,
+        did_documents=no_service,
+    )
+    expect("relying-party-missing")
+    jwk_array = json.loads(json.dumps(tenant.docs))
+    jwk_array[acme]["verificationMethod"][0]["publicKeyJwk"] = []
+    credential_case(
+        "issuer-public-key-jwk-array",
+        "Issuer verification method whose publicKeyJwk is an array: not a key.",
+        member.sd_jwt,
+        did_documents=jwk_array,
+    )
+    expect("issuer-key-not-found")
+
+    # Values that JSON parsers read differently must still give one result.
+    ac_payload = json.loads(b64url_decode(acme_admin.credential.split(".")[1]))
+    ac_jwk_array = tenant.sign_raw(
+        {
+            **ac_payload,
+            "authenticators": [
+                {"credentialId": acme_admin.passkey.credential_id, "jwk": []}
+            ],
+        },
+        typ="dc+sd-jwt",
+    )
+    p = fresh()
+    e = approved(p, by(acme_admin))
+    credential_case(
+        "approver-jwk-array",
+        "An authenticators entry whose jwk is an array: not a key.",
+        with_evidence(p, tampered(e, approverCredential=ac_jwk_array)),
+    )
+    expect("approver-key-not-found")
+    credential_case(
+        "payload-nan",
+        "A payload containing NaN is not JSON (RFC 8259 §6) and has no JCS form.",
+        tenant.sign_raw({**member.payload, "x": float("nan")}, typ="dc+sd-jwt"),
+    )
+    expect("malformed-credential")
+    credential_case(
+        "iat-integral-float",
+        "iat written as 1799136000.0: the same JSON number, accepted by both runtimes.",
+        tenant.sign_raw(
+            {**member.payload, "iat": float(member.payload["iat"])}, typ="dc+sd-jwt"
+        ),
+    )
+    expect_ok()
+    credential_case(
+        "iat-beyond-safe-integer",
+        "iat above 2^53 - 1 is not read identically by every JSON parser.",
+        tenant.sign_raw({**member.payload, "iat": 2**53 + 1}, typ="dc+sd-jwt"),
+    )
+    expect("malformed-credential")
+
+    # An issuer signing with an Ed25519 key: EdDSA and the fully-specified
+    # Ed25519 alg (RFC 9864) are both accepted.
+    ed_org = f"did:web:{HOST}:participants:ed-org"
+    ed_signing_key = Ed25519PrivateKey.generate()
+    ed_jwk = _jwk(ed_signing_key.public_key())
+    ed_kid = f"{ed_org}#key-{_thumbprint(ed_jwk)}"
+    tenant.docs[ed_org] = {
+        "@context": ["https://www.w3.org/ns/did/v1"],
+        "id": ed_org,
+        "verificationMethod": [
+            {
+                "id": ed_kid,
+                "type": "JsonWebKey",
+                "controller": ed_org,
+                "publicKeyJwk": ed_jwk,
+            }
+        ],
+        "assertionMethod": [ed_kid],
+    }
+    ed_prepared = tenant.prepare_member(ed_org, "admin", SoftAuthenticator())
+    ed_evidence = approved(ed_prepared, (ta_admin, by_ta))
+    for alg in ("EdDSA", "Ed25519"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # joserfc flags EdDSA as deprecated
+            token = jws.serialize_compact(
+                {"alg": alg, "typ": "dc+sd-jwt", "kid": ed_kid},
+                json.dumps({**ed_prepared[0], "evidence": [ed_evidence]}).encode(),
+                jose_jwk.import_key(ed_signing_key, "OKP"),
+                algorithms=[alg],
+            )
+            credential_case(
+                f"issuer-alg-{alg}",
+                f"Issuer JWT signed by an Ed25519 key with alg {alg}.",
+                token + "~",
+            )
+        expect_ok()
+
     digests = [
-        {"input": p, "digest": payload_digest(p)}
-        for p in (
+        {"input": obj, "digest": payload_digest(obj)}
+        for obj in (
             {k: v for k, v in member.payload.items() if k != "evidence"},
             instruction,
         )

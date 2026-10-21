@@ -391,8 +391,8 @@ def verify_did_signed_jwt(
     try:
         if len(parts) != 3:
             raise ValueError
-        header = json.loads(b64url_decode(parts[0]))
-        payload = json.loads(b64url_decode(parts[1]))
+        header = json.loads(b64url_decode(parts[0]), parse_constant=_reject_constant)
+        payload = json.loads(b64url_decode(parts[1]), parse_constant=_reject_constant)
         if not isinstance(header, dict) or not isinstance(payload, dict):
             raise ValueError
     except ValueError as e:
@@ -449,7 +449,10 @@ def verify_did_signed_jwt(
 
 def _check_client_data(e: dict, challenge: str, origins: list[str], depth: int) -> None:
     try:
-        cd = json.loads(b64url_decode(e["clientDataJSON"]).decode("utf-8"))
+        cd = json.loads(
+            b64url_decode(e["clientDataJSON"]).decode("utf-8"),
+            parse_constant=_reject_constant,
+        )
     except (ValueError, UnicodeDecodeError) as err:
         raise _Fail("client-data-invalid", depth, "clientDataJSON is not JSON") from err
     if not isinstance(cd, dict):
@@ -530,8 +533,24 @@ def _is_str(v: Any) -> bool:
     return isinstance(v, str) and len(v) > 0
 
 
+# A JSON integer: an integral number inside the IEEE 754 safe range, so that
+# both runtimes accept the same values. JSON.parse cannot tell 1 from 1.0 and
+# loses precision beyond 2^53; JCS serialises both forms identically.
+_MAX_SAFE_INTEGER = 2**53 - 1
+
+
 def _is_int(v: Any) -> bool:
-    return isinstance(v, int) and not isinstance(v, bool)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return False
+    if isinstance(v, float) and not v.is_integer():
+        return False
+    return abs(v) <= _MAX_SAFE_INTEGER
+
+
+def _reject_constant(name: str) -> Any:
+    """``json.loads`` hook: ``NaN`` and ``Infinity`` are not JSON (RFC 8259 §6)
+    and have no JCS form. ``JSON.parse`` rejects them, so this side must too."""
+    raise ValueError(f"non-finite JSON constant {name}")
 
 
 def _parse_evidence(e: Any, depth: int) -> dict:
@@ -598,6 +617,8 @@ def _challenge(payload: dict, e: dict, depth: int) -> str:
         return evidence_challenge(payload, e.get("merklePath"))
     except MerklePathError as err:
         raise _Fail("malformed-evidence", depth, str(err)) from err
+    except ValueError as err:  # a payload value with no JCS form
+        raise _Fail("malformed-credential", depth, str(err)) from err
 
 
 def _verify_assertion(

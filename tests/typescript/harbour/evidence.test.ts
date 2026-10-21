@@ -35,6 +35,8 @@ type Vectors = {
     credential?: string;
     instruction?: Record<string, unknown>;
     evidence?: unknown;
+    didDocuments?: Record<string, Record<string, unknown>>;
+    maxDepth?: number;
     expected: Record<string, unknown>;
   }[];
 };
@@ -51,9 +53,10 @@ const withoutDetail = (expected: Record<string, unknown>, actual: EvidenceChainR
 
 const run = (v: Vectors, c: Vectors["cases"][number]): Promise<EvidenceChainResult> => {
   const options = {
-    resolveDid: staticResolver(v.didDocuments),
+    resolveDid: staticResolver(c.didDocuments ?? v.didDocuments),
     trustAnchorDid: v.trustAnchorDid,
     now: v.now,
+    ...(c.maxDepth === undefined ? {} : { maxDepth: c.maxDepth }),
   };
   return c.credential
     ? verifyEvidenceChain(c.credential, options)

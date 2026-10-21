@@ -226,7 +226,8 @@ function findVerificationMethod(
     typeof (m as Record<string, unknown>).id === "string" &&
     absolute(doc, (m as Record<string, string>).id) === wanted &&
     !!(m as Record<string, unknown>).publicKeyJwk &&
-    typeof (m as Record<string, unknown>).publicKeyJwk === "object";
+    typeof (m as Record<string, unknown>).publicKeyJwk === "object" &&
+    !Array.isArray((m as Record<string, unknown>).publicKeyJwk);
   for (const ref of refs) {
     if (typeof ref === "string") {
       if (absolute(doc, ref) !== wanted) continue;
@@ -475,7 +476,10 @@ async function verifyAssertionSignature(
 // --- the chain (spec §4) ----------------------------------------------------
 
 const isStr = (v: unknown): v is string => typeof v === "string" && v.length > 0;
-const isInt = (v: unknown): v is number => Number.isInteger(v);
+// A JSON integer: integral and inside the IEEE 754 safe range, so that both
+// runtimes accept the same values (JSON.parse cannot tell 1 from 1.0 and loses
+// precision beyond 2^53; JCS serialises both forms identically).
+const isInt = (v: unknown): v is number => Number.isSafeInteger(v);
 
 function parseEvidence(e: unknown, depth: number): HavenWebAuthnEvidence {
   const o = e as Record<string, unknown>;
@@ -599,7 +603,7 @@ async function verifyAssertion(
     const match = (ac.authenticators as { credentialId?: unknown; jwk?: unknown }[]).find(
       (a) => a && a.credentialId === e.credentialId,
     );
-    if (!match || !match.jwk || typeof match.jwk !== "object") {
+    if (!match || !match.jwk || typeof match.jwk !== "object" || Array.isArray(match.jwk)) {
       throw new Fail("approver-key-not-found", depth);
     }
     approver = { sub: ac.sub, memberOf: fields.org, role: fields.role, via: "credential" };
