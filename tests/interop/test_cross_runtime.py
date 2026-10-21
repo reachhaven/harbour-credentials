@@ -1,6 +1,7 @@
 """Cross-runtime interop tests: Python signs → Node.js verifies (and vice versa)."""
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -24,16 +25,21 @@ TS_DIR = Path(__file__).resolve().parents[2] / "src" / "typescript" / "harbour"
 
 
 def _yarn_command() -> list[str]:
-    """Resolve the yarn invocation, falling back to corepack.
+    """Resolve the yarn invocation the repo mandates: ``corepack yarn``.
 
-    The repo mandates `corepack yarn`; on corepack-only machines there is no
-    bare `yarn` on PATH, and probing only for it made this whole suite skip
-    silently.
+    Prefer corepack — every ``just`` recipe and the CI build step use it, so it
+    is known to work for this Yarn 4 workspace, whereas a bare ``yarn`` on the
+    GitHub runners is the preinstalled Yarn 1 — and fall back to a bare
+    ``yarn`` only when corepack is absent. Keep the paths ``shutil.which``
+    resolved: on Windows both are ``.cmd`` shims, which ``subprocess`` cannot
+    launch by bare name.
     """
-    if shutil.which("yarn"):
-        return ["yarn"]
-    if shutil.which("corepack"):
-        return ["corepack", "yarn"]
+    corepack = shutil.which("corepack")
+    if corepack:
+        return [corepack, "yarn"]
+    yarn = shutil.which("yarn")
+    if yarn:
+        return [yarn]
     return ["yarn"]
 
 
@@ -71,18 +77,32 @@ def _run_ts(script: str) -> str:
     return _run_node(script, runner="tsx", suffix=".ts")
 
 
-def _can_run_node_jose() -> bool:
-    """Check whether yarn-managed Node can import jose in the TS workspace."""
+def _node_jose_probe_error() -> str | None:
+    """Return None if yarn-managed Node can import jose, else the failure text."""
     try:
-        return _run_node('import "jose"; console.log("OK");') == "OK"
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError, RuntimeError):
-        return False
+        out = _run_node('import "jose"; console.log("OK");')
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError, RuntimeError) as e:
+        return f"{type(e).__name__}: {e}"
+    return None if out == "OK" else f"unexpected probe output: {out!r}"
 
 
-# Skip if TypeScript runtime dependencies are unavailable
+_PROBE_ERROR = _node_jose_probe_error()
+
+# Locally, a missing TypeScript toolchain skips the suite. CI sets
+# HARBOUR_REQUIRE_INTEROP so a broken toolchain fails the job loudly instead
+# of turning the whole cross-runtime suite into a green "16 skipped".
+if _PROBE_ERROR is not None and os.environ.get("HARBOUR_REQUIRE_INTEROP"):
+    raise RuntimeError(
+        "HARBOUR_REQUIRE_INTEROP is set but the TypeScript runtime is unavailable "
+        f"(yarn command: {' '.join(_YARN)}):\n{_PROBE_ERROR}"
+    )
+
 pytestmark = pytest.mark.skipif(
-    not _can_run_node_jose(),
-    reason="TypeScript runtime dependencies unavailable (run 'just setup-ts').",
+    _PROBE_ERROR is not None,
+    reason=(
+        "TypeScript runtime dependencies unavailable (run 'just setup-ts'): "
+        f"{_PROBE_ERROR}"
+    ),
 )
 
 

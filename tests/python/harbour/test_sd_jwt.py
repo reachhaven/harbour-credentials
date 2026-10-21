@@ -456,6 +456,36 @@ class TestReservedClaims:
         assert result["iat"] == SAMPLE_CLAIMS["iat"]
 
 
+class TestDigestOrderHiding:
+    """RFC 9901 §4.2.4.2: _sd arrays must not reveal the original claim order."""
+
+    CLAIMS = {
+        "z": 1,
+        "a": 2,
+        "m": 3,
+        "address": {"zip": "80331", "city": "Munich", "country": "DE"},
+    }
+    DISCLOSABLE = ["z", "a", "m", "address.zip", "address.city", "address.country"]
+
+    def test_sd_arrays_are_sorted_at_every_level(self):
+        payload, disclosures = build_sd_jwt_payload(
+            self.CLAIMS, vct=VCT, disclosable=self.DISCLOSABLE
+        )
+        assert payload["_sd"] == sorted(payload["_sd"])
+        assert payload["address"]["_sd"] == sorted(payload["address"]["_sd"])
+        assert len(payload["_sd"]) == len(payload["address"]["_sd"]) == 3
+        # Disclosures keep declaration order; only the digests are reordered.
+        assert len(disclosures) == len(self.DISCLOSABLE)
+
+    def test_sorted_digests_still_bind_disclosures(
+        self, p256_private_key, p256_public_key
+    ):
+        sd_jwt = issue_sd_jwt_vc(
+            self.CLAIMS, p256_private_key, vct=VCT, disclosable=self.DISCLOSABLE
+        )
+        assert verify_sd_jwt_vc(sd_jwt, p256_public_key) == {**self.CLAIMS, "vct": VCT}
+
+
 class TestBuildAndSign:
     """build_sd_jwt_payload + sign_sd_jwt: hash the payload, then sign it."""
 

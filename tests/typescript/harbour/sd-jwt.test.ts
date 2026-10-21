@@ -296,6 +296,33 @@ describe("SD-JWT-VC disclosable path validation", () => {
   });
 });
 
+describe("SD-JWT-VC digest order hiding", () => {
+  // RFC 9901 §4.2.4.2: _sd arrays must not reveal the original claim order.
+  const claims = {
+    z: 1,
+    a: 2,
+    m: 3,
+    address: { zip: "80331", city: "Munich", country: "DE" },
+  };
+  const disclosable = ["z", "a", "m", "address.zip", "address.city", "address.country"];
+
+  it("sorts every _sd array", () => {
+    const { payload, disclosures } = buildSdJwtPayload(claims, { vct: VCT, disclosable });
+    const top = payload._sd as string[];
+    const nested = (payload.address as Record<string, unknown>)._sd as string[];
+    expect(top).toEqual([...top].sort());
+    expect(nested).toEqual([...nested].sort());
+    expect(top).toHaveLength(3);
+    expect(nested).toHaveLength(3);
+    expect(disclosures).toHaveLength(disclosable.length);
+  });
+
+  it("still binds every disclosure after sorting", async () => {
+    const sdJwt = await issueSdJwtVc(claims, privateKey, { vct: VCT, disclosable });
+    expect(await verifySdJwtVc(sdJwt, publicKey)).toEqual({ ...claims, vct: VCT });
+  });
+});
+
 describe("SD-JWT-VC build and sign", () => {
   it("signs exactly the built payload", async () => {
     const { payload, disclosures } = buildSdJwtPayload(SAMPLE_CLAIMS, {

@@ -142,6 +142,7 @@ function applyStructuredDisclosures(
 ): { payload: Record<string, unknown>; disclosures: string[] } {
   const result = structuredClone(payload);
   const disclosures: string[] = [];
+  const sdArrays = new Set<string[]>();
 
   for (const parts of normalizeDisclosablePaths(disclosable)) {
     // Own-property checks only: `in` would follow inherited properties
@@ -168,11 +169,24 @@ function applyStructuredDisclosures(
     disclosures.push(discB64);
     if (!Array.isArray(obj._sd)) obj._sd = [];
     (obj._sd as string[]).push(digest);
+    sdArrays.add(obj._sd as string[]);
   }
+
+  // RFC 9901 §4.2.4.2: the Issuer MUST hide the original order of the claims
+  // in each _sd array — otherwise the position of a leftover digest tells the
+  // Verifier which claim the Holder withheld. Sorting is the deterministic
+  // shuffle the RFC suggests; base64url digests are ASCII, so the default
+  // UTF-16 sort matches Python's code-point sort byte for byte.
+  for (const sd of sdArrays) sd.sort();
+
   return { payload: result, disclosures };
 }
 
-/** Build the issuer SD-JWT payload (with `_sd` digests) and its disclosures. */
+/**
+ * Build the issuer SD-JWT payload (with `_sd` digests) and its disclosures.
+ * Every `_sd` array is sorted so its order reveals nothing about the concealed
+ * claims (RFC 9901 §4.2.4.2).
+ */
 export function buildSdJwtPayload(
   claims: Record<string, unknown>,
   options: {

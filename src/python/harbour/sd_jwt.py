@@ -132,7 +132,8 @@ def _apply_structured_disclosures(
         disclosable: Claim paths as segment lists or dot-separated strings.
 
     Returns:
-        Tuple of (modified payload with _sd arrays, list of disclosure strings).
+        Tuple of (modified payload with sorted ``_sd`` arrays, list of
+        disclosure strings in declaration order).
 
     Raises:
         ValueError: if a declared path does not resolve to an existing claim —
@@ -144,6 +145,7 @@ def _apply_structured_disclosures(
     """
     result = copy.deepcopy(payload)
     disclosures: list[str] = []
+    sd_arrays: list[list[str]] = []
 
     for parts in _normalize_disclosable_paths(disclosable):
         parent = result
@@ -162,7 +164,16 @@ def _apply_structured_disclosures(
         value = parent.pop(leaf_key)
         disc_b64, digest = _create_disclosure(leaf_key, value)
         disclosures.append(disc_b64)
-        parent.setdefault("_sd", []).append(digest)
+        sd_array = parent.setdefault("_sd", [])
+        sd_array.append(digest)
+        sd_arrays.append(sd_array)
+
+    # RFC 9901 §4.2.4.2: the Issuer MUST hide the original order of the claims
+    # in each _sd array — otherwise the position of a leftover digest tells the
+    # Verifier which claim the Holder withheld. Sorting is the deterministic
+    # shuffle the RFC suggests and keeps both runtimes byte-identical.
+    for sd_array in sd_arrays:
+        sd_array.sort()
 
     return result, disclosures
 
@@ -197,7 +208,9 @@ def build_sd_jwt_payload(
 
     Returns:
         ``(payload, disclosures)`` — the issuer payload and the base64url
-        disclosure strings (salts already fixed).
+        disclosure strings (salts already fixed). Every ``_sd`` array is sorted
+        so its order reveals nothing about the concealed claims
+        (RFC 9901 §4.2.4.2).
     """
     disclosable = disclosable or []
     payload = {**claims, "vct": vct}
