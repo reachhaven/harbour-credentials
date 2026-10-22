@@ -1,13 +1,17 @@
 """Generate the passkey-evidence test vectors.
 
-Builds a small tenant (one signing key, trust anchor and organisation DID
-documents, software passkeys), issues credentials with ``HavenWebAuthnEvidence``
-(``docs/specs/passkey-evidence.md``) and writes:
+Builds a small tenant (trust anchor and organisation DID documents, software
+passkeys, the trust anchor key log), issues credentials with
+``HavenWebAuthnEvidence`` (``docs/specs/passkey-evidence.md``) and writes:
 
 - ``evidence-vectors.json``: evidence chains (single approvals, endorsements,
-  revocation instructions), batch approvals (§5) and negative cases, each with
-  the Python verifier's result. The TypeScript suite verifies the same vectors
-  and must agree.
+  revocation instructions), batch approvals (§5), key log replay (§4.5) and
+  negative cases, each with the Python verifier's result. The TypeScript suite
+  verifies the same vectors and must agree.
+
+The trust anchor DID signs with ``tests/fixtures/keys/trust-anchor.p256.json``
+(so the TypeScript suite can append key log entries of its own); every other
+DID shares one random tenant key.
 - ``merkle-vectors.json``: deterministic known answers for the Merkle tree.
 
 Usage:
@@ -38,10 +42,13 @@ from joserfc import jws
 
 from harbour._crypto import import_private_key
 from harbour.evidence import (
+    KEY_LOG_SERVICE_TYPE,
     RELYING_PARTY_SERVICE_TYPE,
     build_webauthn_evidence,
+    key_log_entry_hash,
     passkey_vm_id,
     payload_digest,
+    static_key_logs,
     static_resolver,
     verify_evidence_chain,
     verify_instruction_evidence,
@@ -51,6 +58,9 @@ from harbour.sd_jwt import build_sd_jwt_payload, sign_sd_jwt
 
 OUT = Path(__file__).with_name("evidence-vectors.json")
 MERKLE_OUT = Path(__file__).with_name("merkle-vectors.json")
+TRUST_ANCHOR_KEY = (
+    Path(__file__).resolve().parents[1] / "keys" / "trust-anchor.p256.json"
+)
 
 NOW = 1_800_000_000
 DAY = 86_400
@@ -144,15 +154,27 @@ class SoftAuthenticator:
         }
 
 
+def _trust_anchor_key() -> ec.EllipticCurvePrivateKey:
+    jwk = json.loads(TRUST_ANCHOR_KEY.read_text(encoding="utf-8"))
+    key = ec.derive_private_key(
+        int.from_bytes(b64url_decode(jwk["d"]), "big"), ec.SECP256R1()
+    )
+    assert _jwk(key.public_key()) == {k: jwk[k] for k in ("kty", "crv", "x", "y")}
+    return key
+
+
 class Tenant:
-    """One tenant: a signing key shared by every DID document it serves."""
+    """One tenant: the trust anchor signs with the trust-anchor fixture key,
+    every other DID document it serves shares one random signing key."""
 
     def __init__(self):
         self._signing_key = ec.generate_private_key(ec.SECP256R1())
+        self._trust_anchor_key = _trust_anchor_key()
         self.signing_jwk = _jwk(self._signing_key.public_key())
         self.service = f"did:web:{HOST}"
         self.trust_anchor = f"did:web:{HOST}:participants:trust-anchor"
         self.docs: dict[str, dict] = {}
+        self.key_logs: dict[str, list[dict]] = {self.trust_anchor: []}
         ta_doc = self.add_did(self.trust_anchor)
         ta_doc["authentication"] = []
         ta_doc["service"] = [
@@ -160,12 +182,20 @@ class Tenant:
                 "id": f"{self.trust_anchor}#wallet",
                 "type": RELYING_PARTY_SERVICE_TYPE,
                 "serviceEndpoint": {"rpId": RP_ID, "origins": [ORIGIN]},
-            }
+            },
+            {
+                "id": f"{self.trust_anchor}#key-log",
+                "type": KEY_LOG_SERVICE_TYPE,
+                "serviceEndpoint": f"https://{HOST}/participants/trust-anchor/key-log",
+            },
         ]
         self.add_did(self.service)
 
+    def _key(self, did: str) -> ec.EllipticCurvePrivateKey:
+        return self._trust_anchor_key if did == self.trust_anchor else self._signing_key
+
     def kid(self, did: str) -> str:
-        return f"{did}#key-{_thumbprint(self.signing_jwk)}"
+        return f"{did}#key-{_thumbprint(_jwk(self._key(did).public_key()))}"
 
     def add_did(self, did: str) -> dict:
         if did not in self.docs:
@@ -178,15 +208,74 @@ class Tenant:
                         "id": kid,
                         "type": "JsonWebKey",
                         "controller": did,
-                        "publicKeyJwk": self.signing_jwk,
+                        "publicKeyJwk": _jwk(self._key(did).public_key()),
                     }
                 ],
                 "assertionMethod": [kid],
             }
         return self.docs[did]
 
+    def append_key_log(self, material: dict, at: int) -> dict:
+        """Append one entry to the trust anchor key log (spec §4.5)."""
+        log = self.key_logs[self.trust_anchor]
+        assert not log or log[-1]["at"] <= at, (
+            "key log entries must not go back in time"
+        )
+        unhashed = {
+            "seq": len(log) + 1,
+            "kind": material["kind"],
+            "at": at,
+            "prev": log[-1]["hash"] if log else None,
+            "material": material,
+        }
+        entry = {**unhashed, "hash": key_log_entry_hash(unhashed)}
+        log.append(entry)
+        return entry
+
+    def seat_trust_anchor_admin(
+        self,
+        passkeys: SoftAuthenticator | list[SoftAuthenticator],
+        *,
+        iat: int,
+        at: int,
+        by: tuple | None = None,
+        sub: str | None = None,
+        role: str = "admin",
+    ) -> Person:
+        """Issue a trust anchor member credential and log it at *at*.
+
+        *by* is ``(passkey, approver)`` of an active trust anchor admin; without
+        it the subject approves their own credential (the bootstrap rule).
+        """
+        passkeys = passkeys if isinstance(passkeys, list) else [passkeys]
+        sub = sub or f"urn:uuid:{uuid.uuid4()}"
+        prepared = self.prepare_member(
+            self.trust_anchor, role, passkeys, sub=sub, iat=iat
+        )
+        key, approver = by or (
+            passkeys[0],
+            {"sub": sub, "memberOf": self.trust_anchor, "role": "admin"},
+        )
+        payload, sd_jwt = self.issue(prepared, key, approver)
+        member = Person(payload, sd_jwt, passkeys[0])
+        self.append_key_log({"kind": "credential", "jwt": member.credential}, at)
+        if role == "admin":
+            for passkey in passkeys:
+                self.add_trust_anchor_passkey(passkey)
+        return member
+
+    @property
+    def resolve_key_log(self):
+        return static_key_logs(self.key_logs)
+
     def add_trust_anchor_passkey(self, passkey: SoftAuthenticator) -> None:
+        """List *passkey* under ``authentication`` (informational only)."""
         doc = self.docs[self.trust_anchor]
+        if any(
+            vm["id"] == passkey_vm_id(self.trust_anchor, passkey.credential_id)
+            for vm in doc["verificationMethod"]
+        ):
+            return
         vm_id = passkey_vm_id(self.trust_anchor, passkey.credential_id)
         doc["verificationMethod"].append(
             {
@@ -197,6 +286,14 @@ class Tenant:
             }
         )
         doc["authentication"].append(vm_id)
+
+    def remove_trust_anchor_passkey(self, passkey: SoftAuthenticator) -> None:
+        doc = self.docs[self.trust_anchor]
+        vm_id = passkey_vm_id(self.trust_anchor, passkey.credential_id)
+        doc["verificationMethod"] = [
+            vm for vm in doc["verificationMethod"] if vm["id"] != vm_id
+        ]
+        doc["authentication"] = [a for a in doc["authentication"] if a != vm_id]
 
     @property
     def resolve_did(self):
@@ -263,7 +360,7 @@ class Tenant:
         return sign_sd_jwt(
             {**payload, "evidence": evidence},
             disclosures,
-            self._signing_key,
+            self._key(payload["iss"]),
             kid=self.kid(payload["iss"]),
         )
 
@@ -291,7 +388,7 @@ class Tenant:
                 + b64url_encode(b"\x00" * 64)
                 + "~"
             )
-        key = import_private_key(self._signing_key, "ES256")
+        key = import_private_key(self._key(payload["iss"]), "ES256")
         return jws.serialize_compact(header, body, key, algorithms=["ES256"]) + "~"
 
     def approve_batch(
@@ -368,16 +465,78 @@ def generate() -> dict[str, Any]:
     ta = tenant.trust_anchor
     acme = f"did:web:{HOST}:participants:acme"
     other = f"did:web:{HOST}:participants:other"
+    keyed = f"did:web:{HOST}:participants:keyed"
     for did in (
         acme,
         other,
+        keyed,
         *(f"did:web:{HOST}:participants:org-{i}" for i in range(5)),
     ):
         tenant.add_did(did)
 
+    # --- the trust anchor key log (§4.5), appended in time order -------------
+    #
+    # genesis   NOW-30d  ta_admin approves their own admin credential (bootstrap)
+    # demoted   NOW-25d  seated by ta_admin, demoted to member at NOW-6d
+    # revoked   NOW-24d  seated by ta_admin, credential revoked at NOW-7d
+    # dual      NOW-20d  seated by ta_admin, also an admin of acme
+    # two_keys  NOW-15d  seated by ta_admin with two passkeys, one revoked at NOW-5d
+    # late      NOW-3d   seated by ta_admin
+    #
+    # Each credential entry is logged a minute after its iat, as the issuer
+    # signs after the approval.
+
+    def seat(passkeys, days_ago: int, **kwargs) -> Person:
+        iat = NOW - days_ago * DAY
+        return tenant.seat_trust_anchor_admin(passkeys, iat=iat, at=iat + 60, **kwargs)
+
     ta_admin = SoftAuthenticator()
-    tenant.add_trust_anchor_passkey(ta_admin)
-    by_ta = {"sub": f"urn:uuid:{uuid.uuid4()}", "memberOf": ta, "role": "admin"}
+    genesis = seat(ta_admin, 30)
+    by_ta = genesis.approver()
+    by_genesis = (ta_admin, by_ta)
+    demoted_key, revoked_key, dual_passkey = (SoftAuthenticator() for _ in range(3))
+    kept_key, dropped_key, late_key = (SoftAuthenticator() for _ in range(3))
+    demoted = seat(demoted_key, 25, by=by_genesis)
+    revoked = seat(revoked_key, 24, by=by_genesis)
+    dual_sub = f"urn:uuid:{uuid.uuid4()}"
+    seat(dual_passkey, 20, by=by_genesis, sub=dual_sub)
+    two_keys = seat([kept_key, dropped_key], 15, by=by_genesis)
+    revocation = {
+        "@context": INSTRUCTION_CONTEXT,
+        "type": "haven:RevokeCredential",
+        "tenant": "acme-tenant",
+        "credential": revoked.payload["jti"],
+        "entry": revoked.payload["credentialStatus"][0]["id"],
+        "actor": by_ta["sub"],
+        "issuedAt": NOW - 7 * DAY,
+        "nonce": "n-key-log-0001",
+    }
+    [(_, _, revocation_evidence)] = tenant.approve_batch(
+        [(revocation, [])], *by_genesis
+    )
+    tenant.append_key_log(
+        {
+            "kind": "revocation",
+            "instruction": revocation,
+            "evidence": revocation_evidence,
+        },
+        NOW - 7 * DAY,
+    )
+    tenant.remove_trust_anchor_passkey(revoked_key)
+    seat(demoted_key, 6, by=by_genesis, sub=demoted.payload["sub"], role="member")
+    tenant.remove_trust_anchor_passkey(demoted_key)
+    tenant.append_key_log(
+        {
+            "kind": "passkey_revoked",
+            "sub": two_keys.payload["sub"],
+            "credentialId": dropped_key.credential_id,
+        },
+        NOW - 5 * DAY,
+    )
+    tenant.remove_trust_anchor_passkey(dropped_key)
+    late = seat(late_key, 3, by=by_genesis)
+    key_log = tenant.key_logs[ta]
+    key_log_length = len(key_log)
 
     def person(
         org: str,
@@ -411,14 +570,21 @@ def generate() -> dict[str, Any]:
         sd_jwt: str,
         *,
         did_documents: dict[str, dict] | None = None,
+        key_logs: dict[str, list] | None = None,
         max_depth: int | None = None,
     ) -> None:
-        """*did_documents* replaces the shared documents and *max_depth* the
-        default depth limit for this case only."""
+        """*did_documents*, *key_logs* and *max_depth* replace the shared DID
+        documents, the top-level ``keyLogs`` and the default depth limit for
+        this case only."""
         docs = tenant.docs if did_documents is None else did_documents
         result = verify_evidence_chain(
             sd_jwt,
             resolve_did=static_resolver(docs),
+            resolve_key_log=(
+                tenant.resolve_key_log
+                if key_logs is None
+                else static_key_logs(key_logs)
+            ),
             trust_anchor_did=ta,
             now=NOW,
             **({} if max_depth is None else {"max_depth": max_depth}),
@@ -431,6 +597,8 @@ def generate() -> dict[str, Any]:
         }
         if did_documents is not None:
             case["didDocuments"] = did_documents
+        if key_logs is not None:
+            case["keyLogs"] = key_logs
         if max_depth is not None:
             case["maxDepth"] = max_depth
         cases.append(case)
@@ -442,6 +610,7 @@ def generate() -> dict[str, Any]:
             instruction,
             evidence,
             resolve_did=tenant.resolve_did,
+            resolve_key_log=tenant.resolve_key_log,
             trust_anchor_did=ta,
             now=NOW,
         )
@@ -471,6 +640,10 @@ def generate() -> dict[str, Any]:
         "Organisation credential approved by a trust anchor admin passkey (step 5.1).",
         acme_org,
     )
+    assert cases[-1]["expected"] == {
+        "ok": True,
+        "approvers": [{"sub": by_ta["sub"], "memberOf": ta, "via": "trust-anchor"}],
+    }
     credential_case(
         "organisation-admin",
         "Admin credential of another organisation, approved by a trust anchor admin (seating its admin).",
@@ -604,10 +777,9 @@ def generate() -> dict[str, Any]:
     assert cases[-1]["expected"]["reason"] == "approver-wrong-organisation"
     assert cases[-1]["expected"]["depth"] == 0
 
-    # A trust anchor admin who is also an admin of acme, with one passkey.
-    dual_passkey = SoftAuthenticator()
-    tenant.add_trust_anchor_passkey(dual_passkey)
-    dual = person(acme, "admin", (ta_admin, by_ta), passkey=dual_passkey)
+    # A trust anchor admin (seated in the key log) who is also an admin of acme,
+    # with one passkey.
+    dual = person(acme, "admin", by_genesis, passkey=dual_passkey, sub=dual_sub)
     by_dual_ta = {"sub": dual.payload["sub"], "memberOf": ta, "role": "admin"}
     credential_case(
         "dual-role-organisation-form",
@@ -669,9 +841,10 @@ def generate() -> dict[str, Any]:
     )
     credential_case(
         "unknown-trust-anchor-passkey",
-        "Signed by a passkey the trust anchor document does not list.",
+        "Signed by a passkey that is in neither the key log nor the trust anchor document.",
         stranger,
     )
+    assert cases[-1]["expected"]["reason"] == "approver-key-not-found"
 
     # --- instructions ---------------------------------------------------------
 
@@ -1166,6 +1339,458 @@ def generate() -> dict[str, Any]:
             )
         expect_ok()
 
+    # --- the trust anchor key log (§4.5) -------------------------------------
+
+    def keyed_org(passkey: SoftAuthenticator, approver: dict, days_ago: int) -> str:
+        prepared = tenant.prepare_organisation(
+            keyed, "Keyed GmbH", iat=NOW - days_ago * DAY
+        )
+        return tenant.issue(prepared, passkey, approver)[1]
+
+    def expect_result(result: dict) -> None:
+        assert cases[-1]["expected"] == result, (
+            cases[-1]["name"],
+            cases[-1]["expected"],
+        )
+
+    def expect_ok_by(approver: Person) -> None:
+        expect_result(
+            {
+                "ok": True,
+                "approvers": [
+                    {
+                        "sub": approver.payload["sub"],
+                        "memberOf": ta,
+                        "via": "trust-anchor",
+                    }
+                ],
+            }
+        )
+
+    def expect_key_not_found() -> None:
+        assert cases[-1]["expected"]["ok"] is False
+        assert (cases[-1]["expected"]["reason"], cases[-1]["expected"]["depth"]) == (
+            "approver-key-not-found",
+            0,
+        ), (cases[-1]["name"], cases[-1]["expected"])
+
+    credential_case(
+        "key-log-genesis-bootstrap",
+        "The first trust anchor admin approves their own admin credential: the "
+        "log has no active key at its iat and the credential is its genesis entry.",
+        genesis.sd_jwt,
+    )
+    expect_ok_by(genesis)
+    credential_case(
+        "key-log-replay",
+        "Approved by an admin seated after the genesis, with every kind of entry replayed before iat.",
+        keyed_org(kept_key, two_keys.approver(), 1),
+    )
+    expect_ok_by(two_keys)
+    credential_case(
+        "key-log-added-after-iat",
+        "The approver key is in the log now, but was added after the payload's iat.",
+        keyed_org(late_key, late.approver(), 10),
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-passkey-revoked-after-iat",
+        "The approver key was active at iat and removed since by passkey_revoked.",
+        keyed_org(dropped_key, two_keys.approver(), 8),
+    )
+    expect_ok_by(two_keys)
+    credential_case(
+        "key-log-passkey-revoked-before-iat",
+        "The approver key was removed by passkey_revoked before iat.",
+        keyed_org(dropped_key, two_keys.approver(), 4),
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-demoted-after-iat",
+        "The approver was a trust anchor admin at iat and demoted to member since.",
+        keyed_org(demoted_key, demoted.approver(), 8),
+    )
+    expect_ok_by(demoted)
+    credential_case(
+        "key-log-demoted-before-iat",
+        "The approver was demoted (a successor credential with role member) before iat.",
+        keyed_org(demoted_key, demoted.approver(), 4),
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-revoked-after-iat",
+        "The approver's admin credential was revoked by a logged instruction after iat.",
+        keyed_org(revoked_key, revoked.approver(), 10),
+    )
+    expect_ok_by(revoked)
+    credential_case(
+        "key-log-revoked-before-iat",
+        "The approver's admin credential was revoked by a logged instruction before iat.",
+        keyed_org(revoked_key, revoked.approver(), 5),
+    )
+    expect_key_not_found()
+
+    def self_approved(passkey: SoftAuthenticator, days_ago: int) -> str:
+        prepared = tenant.prepare_member(ta, "admin", passkey, iat=NOW - days_ago * DAY)
+        approver = {"sub": prepared[0]["sub"], "memberOf": ta, "role": "admin"}
+        return tenant.issue(prepared, passkey, approver)[1]
+
+    credential_case(
+        "key-log-self-approval-while-admin-active",
+        "A trust anchor admin credential approved by its own subject while other admin keys are active.",
+        self_approved(SoftAuthenticator(), 2),
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-self-approval-not-logged",
+        "A self-approved trust anchor admin credential dated before the genesis "
+        "(no active key) whose jti is not in the log.",
+        self_approved(SoftAuthenticator(), 40),
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-approver-sub-mismatch",
+        "A trust anchor admin key whose evidence names another subject.",
+        keyed_org(ta_admin, {**by_ta, "sub": f"urn:uuid:{uuid.uuid4()}"}, 1),
+    )
+    assert cases[-1]["expected"]["reason"] == "approver-mismatch"
+    document_only = SoftAuthenticator()
+    tenant.add_trust_anchor_passkey(document_only)
+    credential_case(
+        "key-log-document-only-passkey",
+        "A passkey listed under authentication in the trust anchor document but not in the key log.",
+        keyed_org(
+            document_only,
+            {"sub": f"urn:uuid:{uuid.uuid4()}", "memberOf": ta, "role": "admin"},
+            1,
+        ),
+    )
+    expect_key_not_found()
+
+    def broken(change) -> dict[str, list]:
+        entries = json.loads(json.dumps(key_log))
+        change(entries)
+        return {ta: entries}
+
+    def rechain(entries: list[dict], start: int) -> None:
+        for i in range(start, len(entries)):
+            entries[i]["prev"] = entries[i - 1]["hash"] if i else None
+            entries[i]["hash"] = key_log_entry_hash(entries[i])
+
+    def broken_prev(entries: list[dict]) -> None:
+        entries[2]["prev"] = entries[0]["hash"]
+        entries[2]["hash"] = key_log_entry_hash(entries[2])
+        rechain(entries, 3)
+
+    def seq_gap(entries: list[dict]) -> None:
+        for entry in entries[3:]:
+            entry["seq"] += 1
+        rechain(entries, 3)
+
+    def stale_hash(entries: list[dict]) -> None:
+        entries[1]["at"] -= 1
+
+    def foreign_credential(entries: list[dict]) -> None:
+        entries[1]["material"]["jwt"] = acme_admin.credential
+        rechain(entries, 1)
+
+    def at_decreases(entries: list[dict]) -> None:
+        entries[2]["at"] = entries[0]["at"] - 1
+        rechain(entries, 2)
+
+    for name, description, change in [
+        (
+            "broken-prev",
+            "Entry 3's prev names entry 1 (hashes recomputed).",
+            broken_prev,
+        ),
+        ("seq-gap", "seq jumps from 3 to 5 (hashes recomputed).", seq_gap),
+        (
+            "stale-hash",
+            "Entry 2's at changed without recomputing its hash.",
+            stale_hash,
+        ),
+        (
+            "foreign-credential",
+            "Entry 2 holds an acme admin credential, not a trust anchor member credential.",
+            foreign_credential,
+        ),
+        ("at-decreases", "Entry 3 is dated before entry 1.", at_decreases),
+    ]:
+        credential_case(
+            f"key-log-{name}",
+            f"{description} Any chain violation fails the verification.",
+            acme_org,
+            key_logs=broken(change),
+        )
+        assert cases[-1]["expected"]["reason"] == "key-log-invalid", cases[-1]
+        assert cases[-1]["expected"]["depth"] == 0
+    credential_case(
+        "key-log-unavailable",
+        "The key log of the trust anchor cannot be fetched.",
+        acme_org,
+        key_logs={},
+    )
+    assert cases[-1]["expected"]["reason"] == "key-log-unavailable"
+    assert len(key_log) == key_log_length, "every case must replay the same log"
+
+    # --- the key log is self-certifying (§4.5 chain check 2 and 3) ------------
+
+    def entry_for(material: dict, at: int, log: list[dict]) -> dict:
+        unhashed = {
+            "seq": len(log) + 1,
+            "kind": material["kind"],
+            "at": at,
+            "prev": log[-1]["hash"] if log else None,
+            "material": material,
+        }
+        return {**unhashed, "hash": key_log_entry_hash(unhashed)}
+
+    def with_entry(material: dict, at: int) -> dict[str, list]:
+        """The shared log with one more entry, as a per-case ``keyLogs``."""
+        entries = json.loads(json.dumps(key_log))
+        entries.append(entry_for(material, at, entries))
+        return {ta: entries}
+
+    def expect_log_invalid() -> None:
+        assert cases[-1]["expected"]["ok"] is False
+        assert (cases[-1]["expected"]["reason"], cases[-1]["expected"]["depth"]) == (
+            "key-log-invalid",
+            0,
+        ), (cases[-1]["name"], cases[-1]["expected"])
+
+    def issuer_jwt(sd_jwt: str) -> str:
+        return sd_jwt.split("~")[0] + "~"
+
+    mallory = SoftAuthenticator()
+    mallory_prepared = tenant.prepare_member(ta, "admin", mallory, iat=NOW - 2 * DAY)
+    mallory_approver = {
+        "sub": mallory_prepared[0]["sub"],
+        "memberOf": ta,
+        "role": "admin",
+    }
+    garbage = build_webauthn_evidence(
+        {
+            "credentialId": "AAAA",
+            "authenticatorData": "AAAA",
+            "clientDataJSON": "AAAA",
+            "signature": "AAAA",
+        },
+        approver=by_ta,
+    )
+    credential_case(
+        "key-log-credential-unverifiable-evidence",
+        "A logged admin credential whose evidence is garbage: the trust anchor "
+        "signing key alone produced it, so the log is rejected.",
+        keyed_org(mallory, mallory_approver, 1),
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(tenant.sign(*mallory_prepared, [garbage])),
+            },
+            NOW - 2 * DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-credential-without-evidence",
+        "A logged admin credential with no evidence member at all.",
+        keyed_org(mallory, mallory_approver, 1),
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": tenant.sign_raw(mallory_prepared[0], typ="dc+sd-jwt"),
+            },
+            NOW - 2 * DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-credential-approved-by-stranger",
+        "A logged admin credential approved by a passkey no earlier entry seated.",
+        keyed_org(mallory, mallory_approver, 1),
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(
+                    tenant.issue(mallory_prepared, SoftAuthenticator(), by_ta)[1]
+                ),
+            },
+            NOW - 2 * DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-backdated-bootstrap",
+        "A self-approved admin credential dated before the genesis and appended "
+        "while admins are active: a bootstrap needs an empty admin set when the "
+        "entry is appended, not only at its iat.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(self_approved(SoftAuthenticator(), 31)),
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-relogged-jti",
+        "The revoked admin's credential appended again: a jti is logged once.",
+        acme_org,
+        key_logs=with_entry(
+            {"kind": "credential", "jwt": revoked.credential}, NOW - 60
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-shared-credential-id",
+        "A new admin credential lists a passkey that already belongs to another admin.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(
+                    tenant.issue(
+                        tenant.prepare_member(ta, "admin", late_key, iat=NOW - DAY),
+                        *by_genesis,
+                    )[1]
+                ),
+            },
+            NOW - DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-logged-before-iat",
+        "A credential entry whose at lies before the credential's iat.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(
+                    tenant.issue(
+                        tenant.prepare_member(
+                            ta, "admin", SoftAuthenticator(), iat=NOW
+                        ),
+                        *by_genesis,
+                    )[1]
+                ),
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-revocation-unverifiable-evidence",
+        "A revocation entry whose evidence is garbage.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "revocation",
+                "instruction": {**revocation, "nonce": "n-key-log-0002"},
+                "evidence": garbage,
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+    outsider_revocation = {
+        **revocation,
+        "actor": acme_admin.payload["sub"],
+        "nonce": "n-key-log-0003",
+    }
+    [(_, _, outsider_evidence)] = tenant.approve_batch(
+        [(outsider_revocation, [])], *by(acme_admin)
+    )
+    credential_case(
+        "key-log-revocation-by-non-admin",
+        "A revocation entry approved by an organisation admin through their "
+        "member credential: not a trust anchor approval.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "revocation",
+                "instruction": outsider_revocation,
+                "evidence": outsider_evidence,
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+
+    def scratch_log(build) -> dict[str, list]:
+        """Run *build* against an empty trust anchor key log; return that log."""
+        saved = tenant.key_logs[ta]
+        tenant.key_logs[ta] = []
+        try:
+            build()
+            return {ta: json.loads(json.dumps(tenant.key_logs[ta]))}
+        finally:
+            tenant.key_logs[ta] = saved
+
+    rebooted: dict[str, Any] = {}
+
+    def build_reboot() -> None:
+        x = SoftAuthenticator()
+        first = tenant.seat_trust_anchor_admin(
+            x, iat=NOW - 40 * DAY, at=NOW - 40 * DAY + 60
+        )
+        instr = {
+            **revocation,
+            "credential": first.payload["jti"],
+            "entry": first.payload["credentialStatus"][0]["id"],
+            "actor": first.payload["sub"],
+            "issuedAt": NOW - 20 * DAY,
+            "nonce": "n-reboot",
+        }
+        [(_, _, ev)] = tenant.approve_batch([(instr, [])], x, first.approver())
+        tenant.append_key_log(
+            {"kind": "revocation", "instruction": instr, "evidence": ev},
+            NOW - 20 * DAY,
+        )
+        rebooted["key"] = SoftAuthenticator()
+        rebooted["admin"] = tenant.seat_trust_anchor_admin(
+            rebooted["key"], iat=NOW - 10 * DAY, at=NOW - 10 * DAY + 60
+        )
+
+    reboot_log = scratch_log(build_reboot)
+    credential_case(
+        "key-log-rebootstrap-after-last-admin-revoked",
+        "The only admin revokes themself; a later self-approved admin is a "
+        "valid re-bootstrap.",
+        keyed_org(rebooted["key"], rebooted["admin"].approver(), 1),
+        key_logs=reboot_log,
+    )
+    expect_ok_by(rebooted["admin"])
+
+    expired: dict[str, Any] = {}
+
+    def build_expired() -> None:
+        expired["key"] = SoftAuthenticator()
+        expired["admin"] = tenant.seat_trust_anchor_admin(
+            expired["key"], iat=NOW - 800 * DAY, at=NOW - 800 * DAY + 60
+        )
+
+    expired_log = scratch_log(build_expired)
+    credential_case(
+        "key-log-admin-expired",
+        "The approving admin's credential (exp = iat + 700 days) had expired at "
+        "the payload's iat.",
+        keyed_org(expired["key"], expired["admin"].approver(), 50),
+        key_logs=expired_log,
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-admin-before-expiry",
+        "The same admin approving while their credential was still valid.",
+        keyed_org(expired["key"], expired["admin"].approver(), 200),
+        key_logs=expired_log,
+    )
+    expect_ok_by(expired["admin"])
+    assert len(key_log) == key_log_length, "every case must replay the same log"
+
     digests = [
         {"input": obj, "digest": payload_digest(obj)}
         for obj in (
@@ -1177,13 +1802,16 @@ def generate() -> dict[str, Any]:
     return {
         "description": (
             "Passkey evidence vectors (docs/specs/passkey-evidence.md): chains, "
-            "instructions and batch approvals. `expected` is the Python verifier's "
-            "result; the TypeScript verifier must agree."
+            "instructions, batch approvals and trust anchor key log replay. "
+            "`keyLogs` maps the trust anchor DID to its key log; a case with its "
+            "own `keyLogs` uses that map instead. `expected` is the Python "
+            "verifier's result; the TypeScript verifier must agree."
         ),
         "generator": "tests/fixtures/evidence/gen_evidence_vectors.py",
         "now": NOW,
         "trustAnchorDid": ta,
         "didDocuments": tenant.docs,
+        "keyLogs": tenant.key_logs,
         "digests": digests,
         "cases": cases,
     }
