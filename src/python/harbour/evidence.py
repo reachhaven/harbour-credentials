@@ -7,7 +7,9 @@ The approver's passkey is trusted through the ``authenticators`` claim of the
 approver's own member credential (embedded as ``approverCredential``), whose
 evidence is checked the same way, until a trust anchor admin passkey ends the
 chain. Trust anchor admin passkeys come from the trust anchor key log, replayed
-as of the approved payload's ``iat`` (:func:`replay_trust_anchor_key_log`).
+as of the approved payload's ``iat`` (:func:`replay_trust_anchor_key_log`). The
+log is self-certifying: every entry that seats or unseats an admin carries an
+approval by a passkey the entries before it seated.
 
 One assertion may approve a whole batch: its challenge is then the Merkle root
 over the payload digests, and each credential carries its ``merklePath``
@@ -178,12 +180,15 @@ class _Fail(Exception):
 class TrustAnchorKeys:
     """A replayed trust anchor key log (spec §4.5).
 
-    ``credential_jtis`` holds the ``jti`` of every ``credential`` entry;
-    :meth:`keys_at` gives the admin passkeys active at an instant.
+    ``credential_jtis`` holds the ``jti`` of every ``credential`` entry,
+    ``bootstrap_jtis`` those the replay accepted under the bootstrap rule (no
+    admin key was active when they were appended); :meth:`keys_at` gives the
+    admin passkeys active at an instant.
     """
 
     ops: tuple[tuple[int, str, dict], ...]
     credential_jtis: frozenset[str]
+    bootstrap_jtis: frozenset[str] = frozenset()
 
     def keys_at(self, t: int) -> dict[str, dict[str, Any]]:
         """``credentialId -> {"sub", "jwk"}`` for every admin passkey active at
@@ -697,8 +702,8 @@ def key_log_entry_hash(entry: dict[str, Any]) -> str:
 
 def _key_log_credential(
     material: dict, ta: str, resolve_did: ResolveDid, member_vcts: tuple[str, ...]
-) -> dict[str, Any] | str:
-    """The verified fields of a ``credential`` entry, or why it is invalid."""
+) -> tuple[dict[str, Any], dict] | str:
+    """``(fields, payload)`` of a ``credential`` entry, or why it is invalid."""
     jwt = material.get("jwt")
     if not isinstance(jwt, str) or not jwt.endswith("~") or jwt.count("~") != 1:
         return "credential jwt is not an issuer JWT with a trailing ~"
@@ -735,7 +740,61 @@ def _key_log_credential(
         "iat": p["iat"],
         "exp": p["exp"],
         "authenticators": authenticators,
-    }
+    }, p
+
+
+def _verify_logged_assertion(
+    e: dict,
+    payload: dict,
+    anchor_time: int,
+    *,
+    keys: TrustAnchorKeys,
+    rp: tuple[str, list[str]],
+    ta: str,
+    member_vcts: tuple[str, ...],
+    subject: dict | None,
+    entry_at: int,
+) -> tuple[str, bool]:
+    """Steps 2–6 for the evidence of a key log entry, against the admins the
+    entries before it seated. Returns ``(approver sub, bootstrapped)``; raises
+    :class:`_Fail` with the §4.4 reason of the first failing check.
+
+    *subject* is the logged credential payload for a ``credential`` entry and
+    ``None`` for a ``revocation``; only a credential may bootstrap itself, and
+    only while no admin key is active at its ``iat`` nor at the entry's ``at``.
+    """
+    if e["kind"] != "approval" or e.get("approverCredential"):
+        raise _Fail(
+            "malformed-evidence",
+            0,
+            "a key log entry takes a trust anchor approval without approverCredential",
+        )
+    challenge = _challenge(payload, e, 0)
+    rp_id, origins = rp
+    _check_client_data(e, challenge, origins, 0)
+    _check_authenticator_data(e, rp_id, 0)
+    active = keys.keys_at(anchor_time)
+    found = active.get(e["credentialId"])
+    bootstrapped = False
+    if found is not None:
+        sub, key = found["sub"], found["jwk"]
+    else:
+        key = None
+        if subject is not None and not active and not keys.keys_at(entry_at):
+            key = _own_passkey(e, subject, ta, member_vcts)
+        if key is None:
+            raise _Fail(
+                "approver-key-not-found", 0, "not a trust anchor admin passkey at iat"
+            )
+        sub, bootstrapped = subject["sub"], True
+    if (
+        e["approver"]["sub"] != sub
+        or e["approver"]["memberOf"] != ta
+        or e["approver"]["role"] != "admin"
+    ):
+        raise _Fail("approver-mismatch", 0, "key is a trust anchor passkey")
+    _verify_assertion_signature(e, key, 0)
+    return sub, bootstrapped
 
 
 def replay_trust_anchor_key_log(
@@ -744,20 +803,49 @@ def replay_trust_anchor_key_log(
     trust_anchor_did: str,
     resolve_did: ResolveDid,
     member_vcts: Iterable[str] | None = None,
+    trust_anchor_document: dict | None = None,
 ) -> TrustAnchorKeys:
     """Check the chain of a trust anchor key log and replay it.
 
-    Raises ``ValueError("key-log-invalid", detail)`` on the first violation:
-    ``seq`` not 1-based and gap-free, a wrong ``prev`` or ``hash``, ``at``
-    decreasing, a malformed entry, or a ``credential`` entry that is not a
-    trust anchor member credential signed by the trust anchor. The evidence of
-    the logged credentials is not chain-verified: the log is the authority.
+    Every entry must hash and link correctly, and every entry that changes the
+    admin set must be approved by a passkey that the entries before it seated
+    (spec §4.5): a ``credential`` entry carries the trust anchor admin approval
+    of the logged credential, or, while no admin key is active, the subject's
+    own approval (the bootstrap); a ``revocation`` entry carries an instruction
+    approved by an active trust anchor admin. The log is therefore
+    self-certifying back to its genesis: the trust anchor signing key alone
+    cannot seat an admin. A ``jti`` may be logged once and a ``credentialId``
+    belongs to one admin.
+
+    *trust_anchor_document* is the resolved trust anchor DID document; it is
+    resolved through *resolve_did* when absent and is the only document the
+    replay consults.
+
+    Raises ``ValueError("key-log-invalid", detail)`` on the first violation.
     """
     vcts = tuple(MEMBER_VCTS if member_vcts is None else member_vcts)
+    ta = trust_anchor_did
+    ta_doc = (
+        _resolve_exact(resolve_did, ta)
+        if trust_anchor_document is None
+        else trust_anchor_document
+    )
+    rp = _read_relying_party(ta_doc)
+    if rp is None:
+        raise ValueError(
+            "key-log-invalid", "trust anchor document has no relying party service"
+        )
+
+    def resolve(did: str) -> dict:
+        # Every logged credential is issued by the trust anchor: one document.
+        return json.loads(json.dumps(ta_doc)) if did == ta else resolve_did(did)
+
     if not isinstance(entries, list):
         raise ValueError("key-log-invalid", "the key log is not an array")
     ops: list[tuple[int, str, dict]] = []
     jtis: set[str] = set()
+    bootstrap_jtis: set[str] = set()
+    owner: dict[str, str] = {}  # credentialId -> sub, over all credential entries
     prev_hash: str | None = None
     prev_at: int | None = None
     for i, entry in enumerate(entries):
@@ -781,47 +869,105 @@ def replay_trust_anchor_key_log(
             raise invalid(f"seq {entry['seq']}")
         if entry["prev"] != prev_hash:
             raise invalid("prev is not the hash of the previous entry")
-        if key_log_entry_hash(entry) != entry["hash"]:
+        try:
+            computed = key_log_entry_hash(entry)
+        except ValueError as err:
+            raise invalid(f"hash cannot be computed: {err}") from err
+        if computed != entry["hash"]:
             raise invalid("hash does not match")
         if prev_at is not None and entry["at"] < prev_at:
             raise invalid("at decreases")
+        at = entry["at"]
         material = entry["material"]
+        # The admins seated by the entries before this one decide who may
+        # have approved it.
+        so_far = TrustAnchorKeys(
+            ops=tuple(ops),
+            credential_jtis=frozenset(jtis),
+            bootstrap_jtis=frozenset(bootstrap_jtis),
+        )
         if entry["kind"] == "credential":
-            data = _key_log_credential(material, trust_anchor_did, resolve_did, vcts)
-            if isinstance(data, str):
-                raise invalid(data)
+            checked = _key_log_credential(material, ta, resolve, vcts)
+            if isinstance(checked, str):
+                raise invalid(checked)
+            data, payload = checked
+            if data["jti"] in jtis:
+                raise invalid("credential jti already logged")
+            for credential_id in data["authenticators"]:
+                if owner.get(credential_id, data["sub"]) != data["sub"]:
+                    raise invalid("credentialId already belongs to another admin")
+            if data["iat"] > at:
+                raise invalid("credential logged before its iat")
+            evidence = payload.get("evidence")
+            if not isinstance(evidence, list) or len(evidence) != 1:
+                raise invalid("credential must carry exactly one evidence object")
+            try:
+                e = _parse_evidence(evidence[0], 0)
+                _, bootstrapped = _verify_logged_assertion(
+                    e,
+                    payload,
+                    data["iat"],
+                    keys=so_far,
+                    rp=rp,
+                    ta=ta,
+                    member_vcts=vcts,
+                    subject=payload,
+                    entry_at=at,
+                )
+            except _Fail as err:
+                raise invalid(f"credential evidence: {err.result.reason}") from err
+            if bootstrapped:
+                bootstrap_jtis.add(data["jti"])
             jtis.add(data["jti"])
+            for credential_id in data["authenticators"]:
+                owner[credential_id] = data["sub"]
         elif entry["kind"] == "revocation":
-            instruction = material.get("instruction")
-            if (
-                not isinstance(instruction, dict)
-                or not _is_str(instruction.get("credential"))
-                or not isinstance(material.get("evidence"), dict)
-            ):
-                raise invalid("malformed revocation")
-            data = {"credential": instruction["credential"]}
+            try:
+                instr = _parse_instruction(material.get("instruction"))
+                e = _parse_evidence(material.get("evidence"), 0)
+                if e["approver"]["sub"] != instr["actor"]:
+                    raise _Fail("approver-mismatch", 0, "approver is not the actor")
+                _verify_logged_assertion(
+                    e,
+                    instr,
+                    instr["issuedAt"],
+                    keys=so_far,
+                    rp=rp,
+                    ta=ta,
+                    member_vcts=vcts,
+                    subject=None,
+                    entry_at=at,
+                )
+            except _Fail as err:
+                raise invalid(f"revocation evidence: {err.result.reason}") from err
+            if instr["issuedAt"] > at:
+                raise invalid("revocation logged before its issuedAt")
+            data = {"credential": instr["credential"]}
         else:
+            # Operator-asserted (spec §4.5): removes a key, carries no evidence.
             if not _is_str(material.get("sub")) or not _is_str(
                 material.get("credentialId")
             ):
                 raise invalid("malformed passkey_revoked")
             data = {"sub": material["sub"], "credentialId": material["credentialId"]}
-        ops.append((entry["at"], entry["kind"], data))
-        prev_hash, prev_at = entry["hash"], entry["at"]
-    return TrustAnchorKeys(ops=tuple(ops), credential_jtis=frozenset(jtis))
+        ops.append((at, entry["kind"], data))
+        prev_hash, prev_at = entry["hash"], at
+    return TrustAnchorKeys(
+        ops=tuple(ops),
+        credential_jtis=frozenset(jtis),
+        bootstrap_jtis=frozenset(bootstrap_jtis),
+    )
 
 
-def _bootstrap_key(
-    e: dict, p: dict | None, keys: dict, ctx: _Ctx, unsigned: bool
+def _own_passkey(
+    e: dict, p: dict, ta: str, member_vcts: tuple[str, ...]
 ) -> dict | None:
-    """The bootstrap rule of step 5.1: a trust anchor admin member credential
-    approved by its own subject's passkey while no admin key is active."""
-    if p is None or keys:
-        return None
+    """The passkey of *p* itself that *e* names, when *p* is a trust anchor
+    admin member credential approving itself; ``None`` otherwise."""
     if (
-        p.get("iss") != ctx.ta
-        or p.get("vct") not in ctx.member_vcts
-        or _member_fields(p) != (ctx.ta, "admin")
+        p.get("iss") != ta
+        or p.get("vct") not in member_vcts
+        or _member_fields(p) != (ta, "admin")
         or e["approver"]["sub"] != p.get("sub")
         or not isinstance(p.get("authenticators"), list)
     ):
@@ -836,11 +982,29 @@ def _bootstrap_key(
     )
     if match is None or not isinstance(match.get("jwk"), dict):
         return None
-    # A signed credential must be in the log; the issuer's pre-signing check
-    # runs before it appends that entry.
-    if not unsigned and p.get("jti") not in ctx.keys.credential_jtis:
-        return None
     return match["jwk"]
+
+
+def _bootstrap_key(
+    e: dict, p: dict | None, keys: dict, ctx: _Ctx, unsigned: bool
+) -> dict | None:
+    """The bootstrap rule of step 5.1 for the credential being verified: a
+    trust anchor admin member credential approved by its own subject's passkey
+    while no admin key is active.
+
+    A signed credential must be a bootstrap entry of the log (the replay
+    accepted it while no admin key was active). The issuer's pre-signing check
+    has no entry yet; it requires no admin key to be active now either, which
+    is what the entry it is about to append will have to satisfy.
+    """
+    if p is None or keys:
+        return None
+    if unsigned:
+        if ctx.keys.keys_at(ctx.now):
+            return None
+    elif p.get("jti") not in ctx.keys.bootstrap_jtis:
+        return None
+    return _own_passkey(e, p, ctx.ta, ctx.member_vcts)
 
 
 def _challenge(payload: dict, e: dict, depth: int) -> str:
@@ -1082,6 +1246,8 @@ def _context(
         ta_doc = _resolve_exact(resolve_did, trust_anchor_did)
     except Exception as err:
         raise _Fail("did-resolution-failed", 0, str(err)) from err
+    if _read_relying_party(ta_doc) is None:
+        raise _Fail("relying-party-missing", 0)
     vcts = tuple(MEMBER_VCTS if member_vcts is None else member_vcts)
     try:
         entries = resolve_key_log(trust_anchor_did)
@@ -1093,10 +1259,17 @@ def _context(
             trust_anchor_did=trust_anchor_did,
             resolve_did=resolve_did,
             member_vcts=vcts,
+            trust_anchor_document=ta_doc,
         )
-    except ValueError as err:
-        reason, detail = (err.args + (None,))[:2]
-        raise _Fail(reason, 0, detail) from err
+    except Exception as err:  # the log is untrusted input: never crash on it
+        detail = (
+            err.args[1]
+            if isinstance(err, ValueError)
+            and len(err.args) == 2
+            and err.args[0] == "key-log-invalid"
+            else f"{type(err).__name__}: {err}"
+        )
+        raise _Fail("key-log-invalid", 0, detail) from err
     return _Ctx(
         resolve_did=resolve_did,
         ta=trust_anchor_did,

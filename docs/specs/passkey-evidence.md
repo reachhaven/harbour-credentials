@@ -160,9 +160,10 @@ bytes, so for single-payload evidence it equals `digest(p)`.
 
 Inputs: the issuer JWT of the credential, the trust anchor DID the verifier
 trusts, a DID resolver, the key log of the trust anchor (§4.5), and the current
-time. Resolve the trust anchor document, fetch the key log and replay it
-first: a log that cannot be fetched fails with `key-log-unavailable`, a log
-that fails the chain check with `key-log-invalid`, both at depth 0. Start at
+time. Resolve the trust anchor document and read its `HavenWebAuthnRelyingParty`
+service (`relying-party-missing` when absent), then fetch the key log and
+replay it: a log that cannot be fetched fails with `key-log-unavailable`, a log
+that fails the chain check with `key-log-invalid`, all at depth 0. Start at
 depth 0 with the credential as `P`.
 
 1. Verify the issuer JWT of `P`: `typ` MUST be `dc+sd-jwt`; `kid` (made absolute
@@ -200,14 +201,18 @@ depth 0 with the credential as `P`.
         equals `E.credentialId` when all of these hold: `P` is a trust anchor
         admin member credential (`iss` the trust anchor, a member `vct`,
         `memberOf` resolving to the trust anchor, `role = admin`),
-        `E.approver.sub = P.sub`, and `keysAt(T)` is empty. When `P` is a
-        signed credential, `P.jti` MUST also be the `jti` of a `credential`
-        entry of the log; the issuer's pre-signing check (below) skips this,
-        since the issuer appends that entry when it signs. `E.approver` MUST
-        then equal `{ sub: P.sub, memberOf: <ta>, role: "admin" }`, otherwise
+        `E.approver.sub = P.sub`, `keysAt(T)` is empty, and `P` is a
+        **bootstrap entry** of the log: a `credential` entry with `P.jti` that
+        the replay (§4.5) accepted under its own bootstrap rule, because no
+        admin key was active when it was appended. The issuer's pre-signing
+        check (below) has no entry yet; it requires instead that no admin key
+        is active at `T` nor at the current time, which is what the entry it
+        is about to append will have to satisfy. `E.approver` MUST then equal
+        `{ sub: P.sub, memberOf: <ta>, role: "admin" }`, otherwise
         `approver-mismatch`. The rule admits the first trust anchor admin and
         a re-bootstrap after every admin key was lost, nothing else: while any
-        admin key is active, self-approval fails.
+        admin key is active, self-approval fails, and so does a self-approval
+        dated into the past.
       - Otherwise the step fails with `approver-key-not-found`. This covers a
         key that is in the log now but was added after `T`, and one removed
         before `T`.
@@ -283,7 +288,7 @@ results compare across runtimes:
 | 6 | `bad-webauthn-signature`, `unsupported-alg` |
 | 7 | `approver-not-admin`, `approver-wrong-organisation`, `approver-not-trust-anchor`, `issuer-not-organisation`, `issuer-not-trust-anchor`, `endorsement-subject-mismatch`, `endorsement-payload-mismatch` |
 | 8 | `depth-exceeded` |
-| Key log (§4.5), before step 1 | `key-log-unavailable` (fetch or resolution failed), `key-log-invalid` (chain, signature or shape of the log) |
+| Key log (§4.5), before step 1 | `key-log-unavailable` (fetch or resolution failed), `key-log-invalid` (chain, signature, evidence or shape of the log) |
 
 `depth` is 0 for the credential itself and *n* for the *n*-th approver
 credential down the chain. Key log failures are reported at depth 0.
@@ -293,7 +298,11 @@ credential down the chain. Key log failures are reported at depth 0.
 The trust anchor key log is an append-only, hash-chained list of the events
 that seat and unseat trust anchor admins. It answers which passkeys could
 approve as a trust anchor admin at a given time, so the trust anchor DID
-document, which only shows the present, never decides a past approval.
+document, which only shows the present, never decides a past approval. It is
+**self-certifying**: every entry that seats or unseats an admin carries a
+passkey approval that the entries before it make verifiable, back to the
+first admin, so the party that signs credentials and serves the log cannot
+seat an admin by itself.
 
 Each entry is
 
@@ -330,12 +339,28 @@ with `material` one of
    verifies as in §4.3 step 1 against the trust anchor's `assertionMethod`
    key named by its `kid`, and its payload has `iss` the trust anchor, a member
    `vct`, `memberOf` resolving to the trust anchor, `role`, `sub`, `jti`,
-   integer `iat` and `exp`, and `authenticators`. The evidence of a logged
-   credential is not chain-verified during replay: the log is the authority,
-   and verifying it would recurse into the log.
-3. A `revocation` entry carries `instruction` and `evidence`; only
-   `instruction.credential` (the `jti` it revokes) is used. A
-   `passkey_revoked` entry carries `sub` and `credentialId`.
+   integer `iat` and `exp`, `authenticators`, and exactly one evidence object
+   `E`. `iat` MUST NOT exceed the entry's `at`. The `jti` MUST NOT have been
+   logged before, and no `credentialId` in `authenticators` may already belong
+   to a credential entry of another `sub`. `E` is then verified with §4.3
+   steps 2 to 6 against the admins seated by the entries **before** this one:
+   `E.kind` MUST be `approval` without `approverCredential`, and
+   `E.credentialId` MUST be in `keysAt(iat)` of that state, or, when that
+   state has no active key at `iat` **and none at the entry's `at`**, be one of
+   the credential's own `authenticators` approving itself. That is the
+   bootstrap; the replay records the `jti` as a bootstrap entry for §4.3 step
+   5.1. A self-approval appended while any admin key is active, or dated into
+   the past, therefore fails the whole log, and so does a credential whose
+   approval nobody in the log could have given.
+3. A `revocation` entry carries an `instruction` (§3,
+   `haven:RevokeCredential`) and its `evidence`. The evidence is verified like
+   a credential entry's, at anchor time `instruction.issuedAt` and with
+   `E.approver.sub = instruction.actor`: the actor MUST be a trust anchor admin
+   active at `issuedAt`, and `issuedAt` MUST NOT exceed the entry's `at`.
+   `instruction.credential` is the `jti` it revokes. A `passkey_revoked` entry
+   carries `sub` and `credentialId` and **no evidence**: it is the operator's
+   assertion. It can only remove a key, but an entry dated before approvals
+   that key signed makes them fail; authenticating it is open (§7).
 
 **Replay.** The state is a map of trust anchor admins by `sub`, each
 `{ jti, iat, exp, authenticators: credentialId -> jwk }`. Entries apply in
@@ -359,11 +384,16 @@ counts for approvals whose anchor time is at or after `at`.
 
 **Compromise stance.** Approvals signed while a key was active stay valid. A
 compromised key is answered by revoking what it approved through the
-revocation registry, never by rewriting the log. A rewritten log fails the
-chain check for every verifier that compares it with what it saw before.
-
-Pinning the genesis entry (a verifier remembers the `hash` of entry 1 per
-trust anchor, as it does for revocation snapshot heads) is future work.
+revocation registry, never by rewriting the log. The chain check makes every
+seat and every revocation accountable to an earlier admin's passkey, so
+neither the trust anchor signing key nor control of the log server adds an
+admin by itself. What they can still do is rewrite history that only removes
+keys: insert a `passkey_revoked` entry, or drop a `revocation` entry and
+recompute the hashes after it, which resurrects the revoked admin. Nothing in
+this version lets a verifier notice such a rewrite: the hashes are not signed
+and no head is pinned. A verifier that remembers the `hash` of the genesis
+entry and of the latest entry it saw per trust anchor, and a witnessed head,
+are future work (§7).
 
 ## 5. Batch approval
 
@@ -455,8 +485,13 @@ a `position` of `left` or `right`; anything else fails with
   mixed credential and instruction batch, key log replay (keys added, removed
   by `passkey_revoked`, demoted and revoked before and after `iat`, the
   bootstrap rule, self-approval while an admin is active, a passkey listed
-  only in the DID document), broken logs (`prev`, `seq`, `hash`, `at`, a
-  foreign credential, an unavailable log), and negative cases (tampered
+  only in the DID document, an expired admin, a re-bootstrap after the last
+  admin revoked themself), broken logs (`prev`, `seq`, `hash`, `at`, a
+  foreign credential, an unavailable log, a logged credential whose approval
+  is unverifiable, missing or by a stranger, a back-dated bootstrap, a
+  re-logged `jti`, a shared `credentialId`, a revocation with unverifiable
+  evidence or by a non-admin, an entry before its `iat`), and negative cases
+  (tampered
   payloads and signatures, wrong approvers, origins and flags, malformed
   paths), with at least one case for every failure reason in §4.4. A case
   may carry its own `didDocuments`, `keyLogs` or `maxDepth`, which replace
@@ -471,8 +506,9 @@ Both files are written by `tests/fixtures/evidence/gen_evidence_vectors.py`.
 ## 7. Scope
 
 Not covered here yet: presentation evidence (a passkey assertion carried in
-the key binding JWT), the revocation snapshot chain, and pinning the genesis
-entry of the trust anchor key log.
+the key binding JWT), the revocation snapshot chain, evidence for
+`passkey_revoked` entries, and pinning or witnessing the head of the trust
+anchor key log.
 
 Verifiers that implement only §4 ignore `merklePath` and so reject batch
 evidence with `digest-mismatch`, which fails safe.

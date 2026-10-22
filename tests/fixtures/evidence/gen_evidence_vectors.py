@@ -1534,6 +1534,263 @@ def generate() -> dict[str, Any]:
     assert cases[-1]["expected"]["reason"] == "key-log-unavailable"
     assert len(key_log) == key_log_length, "every case must replay the same log"
 
+    # --- the key log is self-certifying (§4.5 chain check 2 and 3) ------------
+
+    def entry_for(material: dict, at: int, log: list[dict]) -> dict:
+        unhashed = {
+            "seq": len(log) + 1,
+            "kind": material["kind"],
+            "at": at,
+            "prev": log[-1]["hash"] if log else None,
+            "material": material,
+        }
+        return {**unhashed, "hash": key_log_entry_hash(unhashed)}
+
+    def with_entry(material: dict, at: int) -> dict[str, list]:
+        """The shared log with one more entry, as a per-case ``keyLogs``."""
+        entries = json.loads(json.dumps(key_log))
+        entries.append(entry_for(material, at, entries))
+        return {ta: entries}
+
+    def expect_log_invalid() -> None:
+        assert cases[-1]["expected"]["ok"] is False
+        assert (cases[-1]["expected"]["reason"], cases[-1]["expected"]["depth"]) == (
+            "key-log-invalid",
+            0,
+        ), (cases[-1]["name"], cases[-1]["expected"])
+
+    def issuer_jwt(sd_jwt: str) -> str:
+        return sd_jwt.split("~")[0] + "~"
+
+    mallory = SoftAuthenticator()
+    mallory_prepared = tenant.prepare_member(ta, "admin", mallory, iat=NOW - 2 * DAY)
+    mallory_approver = {
+        "sub": mallory_prepared[0]["sub"],
+        "memberOf": ta,
+        "role": "admin",
+    }
+    garbage = build_webauthn_evidence(
+        {
+            "credentialId": "AAAA",
+            "authenticatorData": "AAAA",
+            "clientDataJSON": "AAAA",
+            "signature": "AAAA",
+        },
+        approver=by_ta,
+    )
+    credential_case(
+        "key-log-credential-unverifiable-evidence",
+        "A logged admin credential whose evidence is garbage: the trust anchor "
+        "signing key alone produced it, so the log is rejected.",
+        keyed_org(mallory, mallory_approver, 1),
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(tenant.sign(*mallory_prepared, [garbage])),
+            },
+            NOW - 2 * DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-credential-without-evidence",
+        "A logged admin credential with no evidence member at all.",
+        keyed_org(mallory, mallory_approver, 1),
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": tenant.sign_raw(mallory_prepared[0], typ="dc+sd-jwt"),
+            },
+            NOW - 2 * DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-credential-approved-by-stranger",
+        "A logged admin credential approved by a passkey no earlier entry seated.",
+        keyed_org(mallory, mallory_approver, 1),
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(
+                    tenant.issue(mallory_prepared, SoftAuthenticator(), by_ta)[1]
+                ),
+            },
+            NOW - 2 * DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-backdated-bootstrap",
+        "A self-approved admin credential dated before the genesis and appended "
+        "while admins are active: a bootstrap needs an empty admin set when the "
+        "entry is appended, not only at its iat.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(self_approved(SoftAuthenticator(), 31)),
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-relogged-jti",
+        "The revoked admin's credential appended again: a jti is logged once.",
+        acme_org,
+        key_logs=with_entry(
+            {"kind": "credential", "jwt": revoked.credential}, NOW - 60
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-shared-credential-id",
+        "A new admin credential lists a passkey that already belongs to another admin.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(
+                    tenant.issue(
+                        tenant.prepare_member(ta, "admin", late_key, iat=NOW - DAY),
+                        *by_genesis,
+                    )[1]
+                ),
+            },
+            NOW - DAY + 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-logged-before-iat",
+        "A credential entry whose at lies before the credential's iat.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "credential",
+                "jwt": issuer_jwt(
+                    tenant.issue(
+                        tenant.prepare_member(
+                            ta, "admin", SoftAuthenticator(), iat=NOW
+                        ),
+                        *by_genesis,
+                    )[1]
+                ),
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+    credential_case(
+        "key-log-revocation-unverifiable-evidence",
+        "A revocation entry whose evidence is garbage.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "revocation",
+                "instruction": {**revocation, "nonce": "n-key-log-0002"},
+                "evidence": garbage,
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+    outsider_revocation = {
+        **revocation,
+        "actor": acme_admin.payload["sub"],
+        "nonce": "n-key-log-0003",
+    }
+    [(_, _, outsider_evidence)] = tenant.approve_batch(
+        [(outsider_revocation, [])], *by(acme_admin)
+    )
+    credential_case(
+        "key-log-revocation-by-non-admin",
+        "A revocation entry approved by an organisation admin through their "
+        "member credential: not a trust anchor approval.",
+        acme_org,
+        key_logs=with_entry(
+            {
+                "kind": "revocation",
+                "instruction": outsider_revocation,
+                "evidence": outsider_evidence,
+            },
+            NOW - 60,
+        ),
+    )
+    expect_log_invalid()
+
+    def scratch_log(build) -> dict[str, list]:
+        """Run *build* against an empty trust anchor key log; return that log."""
+        saved = tenant.key_logs[ta]
+        tenant.key_logs[ta] = []
+        try:
+            build()
+            return {ta: json.loads(json.dumps(tenant.key_logs[ta]))}
+        finally:
+            tenant.key_logs[ta] = saved
+
+    rebooted: dict[str, Any] = {}
+
+    def build_reboot() -> None:
+        x = SoftAuthenticator()
+        first = tenant.seat_trust_anchor_admin(
+            x, iat=NOW - 40 * DAY, at=NOW - 40 * DAY + 60
+        )
+        instr = {
+            **revocation,
+            "credential": first.payload["jti"],
+            "entry": first.payload["credentialStatus"][0]["id"],
+            "actor": first.payload["sub"],
+            "issuedAt": NOW - 20 * DAY,
+            "nonce": "n-reboot",
+        }
+        [(_, _, ev)] = tenant.approve_batch([(instr, [])], x, first.approver())
+        tenant.append_key_log(
+            {"kind": "revocation", "instruction": instr, "evidence": ev},
+            NOW - 20 * DAY,
+        )
+        rebooted["key"] = SoftAuthenticator()
+        rebooted["admin"] = tenant.seat_trust_anchor_admin(
+            rebooted["key"], iat=NOW - 10 * DAY, at=NOW - 10 * DAY + 60
+        )
+
+    reboot_log = scratch_log(build_reboot)
+    credential_case(
+        "key-log-rebootstrap-after-last-admin-revoked",
+        "The only admin revokes themself; a later self-approved admin is a "
+        "valid re-bootstrap.",
+        keyed_org(rebooted["key"], rebooted["admin"].approver(), 1),
+        key_logs=reboot_log,
+    )
+    expect_ok_by(rebooted["admin"])
+
+    expired: dict[str, Any] = {}
+
+    def build_expired() -> None:
+        expired["key"] = SoftAuthenticator()
+        expired["admin"] = tenant.seat_trust_anchor_admin(
+            expired["key"], iat=NOW - 800 * DAY, at=NOW - 800 * DAY + 60
+        )
+
+    expired_log = scratch_log(build_expired)
+    credential_case(
+        "key-log-admin-expired",
+        "The approving admin's credential (exp = iat + 700 days) had expired at "
+        "the payload's iat.",
+        keyed_org(expired["key"], expired["admin"].approver(), 50),
+        key_logs=expired_log,
+    )
+    expect_key_not_found()
+    credential_case(
+        "key-log-admin-before-expiry",
+        "The same admin approving while their credential was still valid.",
+        keyed_org(expired["key"], expired["admin"].approver(), 200),
+        key_logs=expired_log,
+    )
+    expect_ok_by(expired["admin"])
+    assert len(key_log) == key_log_length, "every case must replay the same log"
+
     digests = [
         {"input": obj, "digest": payload_digest(obj)}
         for obj in (

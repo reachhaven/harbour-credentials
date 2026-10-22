@@ -133,13 +133,17 @@ const TRUST_ANCHOR_KEY = JSON.parse(
 );
 const DAY = 86_400;
 
-/** A trust anchor admin member credential, as the issuer JWT with a trailing `~`. */
+/**
+ * A self-approved trust anchor admin member credential (the bootstrap of a
+ * fresh key log), as the issuer JWT with a trailing `~`.
+ */
 async function trustAnchorAdminCredential(
   ta: string,
   kid: string,
   sub: string,
   iat: number,
   passkey: ReturnType<typeof softPasskey>,
+  rp: { rpId: string; origin: string },
 ): Promise<string> {
   const payload = {
     iss: ta,
@@ -152,8 +156,11 @@ async function trustAnchorAdminCredential(
     role: "admin",
     authenticators: [{ credentialId: passkey.credentialId, jwk: passkey.jwk }],
   };
+  const evidence = buildWebAuthnEvidence(passkey.assert(payloadDigest(payload), rp.rpId, rp.origin), {
+    approver: { sub, memberOf: ta, role: "admin" },
+  });
   const { _comment, ...jwk } = TRUST_ANCHOR_KEY;
-  const jws = await new CompactSign(new TextEncoder().encode(JSON.stringify(payload)))
+  const jws = await new CompactSign(new TextEncoder().encode(JSON.stringify({ ...payload, evidence: [evidence] })))
     .setProtectedHeader({ alg: "ES256", typ: "dc+sd-jwt", kid })
     .sign(await importJWK(jwk, "ES256"));
   return `${jws}~`;
@@ -172,8 +179,8 @@ function appendCredential(log: Record<string, unknown>[], jwt: string, at: numbe
 }
 
 describe("batch approval in TypeScript", async () => {
-  // Reuse the Python tenant's DID documents and key log, with a new trust
-  // anchor admin seated in the log.
+  // Reuse the Python tenant's DID documents with a fresh key log whose only
+  // entry is a self-approved first admin (the bootstrap rule).
   const ta = VECTORS.trustAnchorDid;
   const docs = structuredClone(VECTORS.didDocuments);
   const taDoc = docs[ta] as Record<string, any>;
@@ -181,8 +188,11 @@ describe("batch approval in TypeScript", async () => {
   const passkey = softPasskey();
   const approver = { sub: "urn:uuid:00000000-0000-4000-8000-000000000002", memberOf: ta, role: "admin" as const };
   const seatedAt = VECTORS.now - 2 * DAY;
-  const credential = await trustAnchorAdminCredential(ta, taDoc.assertionMethod[0], approver.sub, seatedAt, passkey);
-  const log = appendCredential(VECTORS.keyLogs[ta], credential, seatedAt + 60);
+  const credential = await trustAnchorAdminCredential(ta, taDoc.assertionMethod[0], approver.sub, seatedAt, passkey, {
+    rpId,
+    origin: origins[0],
+  });
+  const log = appendCredential([], credential, seatedAt + 60);
   const options = {
     resolveDid: staticResolver(docs),
     resolveKeyLog: staticKeyLogs({ [ta]: log }),
